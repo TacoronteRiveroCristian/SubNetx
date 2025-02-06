@@ -1,18 +1,21 @@
 #!/bin/bash
-# Descripcion: Script principal para gestionar comandos relacionados con OpenVPN.
+# Descripcion: Script principal para gestionar OpenVPN.
 
-# Determinar la ruta base del proyecto: este script se encuentra en app/bin, asi que la ruta base es dos niveles arriba.
 export BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-
-# Cargar el fichero de configuracion
 source "$BASE_DIR/app/config/openvpn/config.sh"
 
+# Dar permisos iniciales para evitar problemas de acceso durante la configuracion
+sudo chown -R subnetx:subnetx "$OPENVPN_DIR"
+sudo chmod -R 755 "$OPENVPN_DIR"
+
 function usage() {
-    echo "Uso: $0 {setup|run|stop|client {create|delete} <name>}"
+    echo "Uso: $0 {setup|run|stop|client {create|delete} <nombre_cliente>}"
     exit 1
 }
 
 COMMAND=$1
+SUBCOMMAND=$2
+CLIENT_NAME=$3
 
 case $COMMAND in
     setup)
@@ -25,21 +28,20 @@ case $COMMAND in
         "$BASE_DIR/app/scripts/openvpn-stop.sh"
         ;;
     client)
-        CLIENT_COMMAND=$2
-        case $CLIENT_COMMAND in
+        case $SUBCOMMAND in
             create)
-                if [ -z "$3" ]; then
-                    echo "Debe especificar el nombre del cliente para create."
+                if [ -z "$CLIENT_NAME" ]; then
+                    echo "❌ Debes especificar un nombre de cliente."
                     usage
                 fi
-                "$BASE_DIR/app/scripts/openvpn-client-create.sh" "$3"
+                "$BASE_DIR/app/scripts/openvpn-client-create.sh" "$CLIENT_NAME"
                 ;;
             delete)
-                if [ -z "$3" ]; then
-                    echo "Debe especificar el nombre del cliente para delete."
+                if [ -z "$CLIENT_NAME" ]; then
+                    echo "❌ Debes especificar un nombre de cliente."
                     usage
                 fi
-                "$BASE_DIR/app/scripts/openvpn-client-delete.sh" "$3"
+                echo "🗑️ Eliminando cliente: $CLIENT_NAME"
                 ;;
             *)
                 usage
@@ -50,3 +52,8 @@ case $COMMAND in
         usage
         ;;
 esac
+
+# Asegurar permisos adecuados
+sudo chmod -R 600 "$OPENVPN_DIR"
+sudo chmod -R 700 "$EASYRSA_DIR"
+sudo chmod 600 "$SERVER_CONF"

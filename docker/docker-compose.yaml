@@ -6,8 +6,8 @@ services:
       dockerfile: docker/subnetx.Dockerfile
     volumes:
       - ..:/workspaces/SubNetX
-    env_file:
-      - .env
+    # env_file:
+    #   - .env
     environment:
       - WORKDIR=/workspaces/SubNetX
     cap_add:

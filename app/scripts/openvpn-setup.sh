@@ -3,10 +3,6 @@
 
 echo "Configurando OpenVPN..."
 
-# Dar permisos iniciales para evitar problemas de acceso durante la configuracion
-sudo chown -R subnetx:subnetx "$OPENVPN_DIR"
-sudo chmod -R 755 "$OPENVPN_DIR"
-
 # Crear el directorio de configuracion de OpenVPN si no existe
 sudo mkdir -p "$OPENVPN_DIR"
 
@@ -66,10 +62,5 @@ if [ ! -f "$OPENVPN_DIR/ta.key" ]; then
     echo "Generando clave TLS..."
     sudo openvpn --genkey secret "$OPENVPN_DIR/ta.key"
 fi
-
-# Asegurar permisos adecuados
-sudo chmod -R 600 "$OPENVPN_DIR"
-sudo chmod -R 700 "$EASYRSA_DIR"
-sudo chmod 600 "$SERVER_CONF"
 
 echo "Configuracion de OpenVPN completada."
