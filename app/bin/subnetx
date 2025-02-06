@@ -1,0 +1,52 @@
+#!/bin/bash
+# Descripcion: Script principal para gestionar comandos relacionados con OpenVPN.
+
+# Determinar la ruta base del proyecto: este script se encuentra en app/bin, asi que la ruta base es dos niveles arriba.
+export BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+# Cargar el fichero de configuracion
+source "$BASE_DIR/app/config/openvpn/config.sh"
+
+function usage() {
+    echo "Uso: $0 {setup|run|stop|client {create|delete} <name>}"
+    exit 1
+}
+
+COMMAND=$1
+
+case $COMMAND in
+    setup)
+        "$BASE_DIR/app/scripts/openvpn-setup.sh"
+        ;;
+    run)
+        "$BASE_DIR/app/scripts/openvpn-run.sh"
+        ;;
+    stop)
+        "$BASE_DIR/app/scripts/openvpn-stop.sh"
+        ;;
+    client)
+        CLIENT_COMMAND=$2
+        case $CLIENT_COMMAND in
+            create)
+                if [ -z "$3" ]; then
+                    echo "Debe especificar el nombre del cliente para create."
+                    usage
+                fi
+                "$BASE_DIR/app/scripts/openvpn-client-create.sh" "$3"
+                ;;
+            delete)
+                if [ -z "$3" ]; then
+                    echo "Debe especificar el nombre del cliente para delete."
+                    usage
+                fi
+                "$BASE_DIR/app/scripts/openvpn-client-delete.sh" "$3"
+                ;;
+            *)
+                usage
+                ;;
+        esac
+        ;;
+    *)
+        usage
+        ;;
+esac

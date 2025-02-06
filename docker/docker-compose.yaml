@@ -1,0 +1,18 @@
+services:
+  subnetx-dev:
+    container_name: subnetx-dev
+    build:
+      context: ..
+      dockerfile: docker/subnetx.Dockerfile
+    volumes:
+      - ..:/workspaces/SubNetX
+    env_file:
+      - .env
+    environment:
+      - WORKDIR=/workspaces/SubNetX
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    command: sleep infinity
+    restart: unless-stopped

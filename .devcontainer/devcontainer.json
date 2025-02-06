@@ -1,0 +1,31 @@
+{
+    "name": "SubNetX Dev",
+    "dockerComposeFile": "../docker/docker-compose.yaml",
+    "service": "subnetx-dev",
+    "workspaceFolder": "/workspaces/SubNetX",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "ms-toolsai.jupyter",
+                "yzhang.markdown-all-in-one",
+                "Codeium.codeium",
+                "ms-python.black-formatter",
+                "njpwerner.autodocstring",
+                "mhutchie.git-graph",
+                "donjayamanne.githistory",
+                "ms-python.isort",
+                "ms-python.pylint",
+                "ms-python.debugpy",
+                "donjayamanne.python-extension-pack",
+                "KevinRose.vsc-python-indent",
+                "ShaneLiesegang.vscode-simple-icons-rev",
+                "zhuangtongfa.material-theme"
+            ],
+            "settings": {
+                "workbench.colorTheme": "One Dark Pro"
+            }
+        }
+    }
+}
