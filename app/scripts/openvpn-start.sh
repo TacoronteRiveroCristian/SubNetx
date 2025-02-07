@@ -1,45 +1,47 @@
 #!/bin/bash
-# Descripcion: Inicia OpenVPN en segundo plano, guarda su PID y verifica la conexión.
-
-source "/app/config/openvpn/config.sh"
+# Descripcion: Inicia OpenVPN en segundo plano, guarda su PID y verifica la conexion.
 
 echo "🛠️ Iniciando OpenVPN en segundo plano..."
 
 # Iniciar OpenVPN en segundo plano con `--daemon`
-sudo openvpn --config /etc/openvpn/server/server.conf --daemon
+sudo openvpn --config "${OPENVPN_DIR}/server/server.conf" --daemon
 
 # Esperar 2 segundos para que OpenVPN cree el proceso
 sleep 2
 
 # Obtener el PID del proceso OpenVPN
-PID=$(pgrep -f "openvpn --config /etc/openvpn/server/server.conf")
+PID=$(pgrep -f "openvpn --config ${OPENVPN_DIR}/server/server.conf")
 
 if [ -z "$PID" ]; then
-    echo "❌ Error: OpenVPN no se está ejecutando."
+    echo "❌ Error: OpenVPN no se esta ejecutando."
     exit 1
 fi
 
 # Guardar el PID
-echo "$PID" | sudo tee /var/run/openvpn.pid > /dev/null
+echo "$PID" | sudo tee "${OPENVPN_PID_FILE}" > /dev/null
 
 echo "✅ OpenVPN iniciado correctamente en segundo plano (PID: $PID)."
 
 # Esperar unos segundos para asegurar que OpenVPN establezca la red
 sleep 3
 
-# Verificar si la interfaz TUN está activa
-if ip a show tun0 > /dev/null 2>&1; then
+# Verificar si la interfaz TUN esta activa
+if ip a show "${TUN_DEVICE}" > /dev/null 2>&1; then
     echo "🔍 Estado de la interfaz TUN:"
-    ip a show tun0
+    ip a show "${TUN_DEVICE}"
+
+    # Extraer los primeros tres octetos y agregar ".1"
+    VPN_GATEWAY="${VPN_NETWORK%.*}.1"
 
     # Ejecutar un ping a la IP de la VPN para verificar conectividad
-    echo "📡 Probando conexión con la VPN..."
-    if ping -c 1 10.8.0.1 > /dev/null 2>&1; then
-        echo "🚀 OpenVPN está activo y funcionando correctamente."
+    echo "📡 Probando conexion con la VPN en ${VPN_GATEWAY}..."
+    if ping -c 1 "${VPN_GATEWAY}" > /dev/null 2>&1; then
+        echo "🚀 OpenVPN esta activo y funcionando correctamente."
     else
-        echo "⚠️ OpenVPN está corriendo, pero la conexión a 10.8.0.1 falló."
+        echo "⚠️ OpenVPN esta corriendo, pero la conexion a ${VPN_GATEWAY} fallo."
     fi
+
 else
-    echo "❌ Error: La interfaz tun0 no se creó. Verifica los logs en /var/log/openvpn.log"
+    echo "❌ Error: La interfaz ${TUN_DEVICE} no se creo. Verifica los logs en ${OPENVPN_LOG}"
     exit 1
 fi

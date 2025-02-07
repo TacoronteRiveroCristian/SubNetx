@@ -31,29 +31,42 @@ Este comando ejecuta el contenedor en modo detenido (`-d`), lo que significa que
 
 ## Configurar el Servicio VPN
 
-Para iniciar el servicio VPN dentro del contenedor, ejecuta:
+Para configurar el servicio VPN dentro del contenedor con todos los certificados y claves necesarios, se debe de ejecutar en primer lugar
+el siguiente comando:
 
-`docker exec -it subnetx-openvpn sudo init-vpn.sh`
+`docker exec -it subnetx-openvpn subnetx setup`
 
-Este comando utiliza `docker exec` para ejecutar el script `init-vpn.sh` dentro del contenedor `subnetx-openvpn`. Al ser un script com permisos de root, hay que introducirle la contraseña; esto se logra gracias a que el comando docker se ejecuta de forma interfactiva mediante el flag `-it`.
+Este comando utiliza `docker exec` para ejecutar el script `subnetx` dentro del contenedor `subnetx-openvpn`.
 
 ### Control del servidor VPN
 
 Una vez listo el contenedor, se puede iniciar el servicio VPN mediante el siguiente comando:
 
-`docker exec -it subnetx-openvpn sudo start-vpn.sh`
+`docker exec -it subnetx-openvpn subnetx start`
 
-Del mismo modo que se ejecutó el script `start.sh` en la sección anterior, en este caso lo que se ha hecho es iniciar el servidor OpenVPN con las características preconfiguradas. Llegados a este punto, el contenedor docker posee un túnel el cuál hace de pasarela entre los clientes y el servidor VPN.
+En el caso de que se inicie de forma satisfactoria, aparecerán unos mensajes indicando que el servicio VPN se ha iniciado correctamente y el estado de la interfaz TUN.
 
-En el caso que se desee parar el servidor VPN, simplemente hay que ejecutar el comando anterior pero llamando al script `stop-vpn.sh`. Este comando lo que hace es buscar el proceso ejecutado anteriormente y finalizarlo, eliminando así el túnel creado anteriormente.
+Por otro lado, en el caso de que se desee parar el servicio, simplemente hay que ejecutar este otro comando:
+
+`docker exec -it subnetx-openvpn subnetx stop`
+
+En este caso, se busca el PID del proceso OpenVPN y se utiliza `kill` para detenerlo completamente.
+
+## Generar Clientes VPN
+
+Una vez que se ha iniciado el servicio VPN, se puede generar los clientes VPN necesarios ejecutando el siguiente comando:
+
+`docker exec -it subnetx-openvpn subnetx client new <client name>`
+
+Dichos clientes, aparecerán en la carpeta `/etc/openvpn/client` dentro del contenedor los cuales se encuentran conectados con la carpeta host `client`. De esta forma, se pueden generar tantos clientes VPN como se desee y distribuirlos de manera sencilla.
 
 ## Detener y Eliminar el Contenedor
 
-Cuando ya no necesites el servicio VPN, puedes detener y eliminar el contenedor:
+Para eliminar el contenedor, simplemente hay que ejecutar:
 
 `docker rm -f subnetx-openvpn`
 
-Este comando fuerza la detención y eliminación del contenedor `subnetx-openvpn`.
+De esta forma se elimina el contenedor y se libera el espacio en disco además de dar de baja todos los cliente VPN creados.
 
 ## Notas Adicionales
 

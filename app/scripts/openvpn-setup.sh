@@ -3,55 +3,51 @@
 
 echo "🛠️ Configurando OpenVPN..."
 
-# Definir rutas
-DIR_OPENVPN="/etc/openvpn"
-DIR_EASYRSA="${DIR_OPENVPN}/easy-rsa"
-
 # Crear directorio de Easy-RSA si no existe
-if [ ! -d "$DIR_EASYRSA" ]; then
+if [ ! -d "$EASYRSA_DIR" ]; then
     echo "📂 Creando directorio Easy-RSA..."
-    sudo make-cadir "$DIR_EASYRSA"
-    sudo chmod -R 755 "$DIR_EASYRSA"
+    sudo make-cadir "$EASYRSA_DIR"
+    sudo chmod -R 755 "$EASYRSA_DIR"
 else
     echo "✅ Directorio Easy-RSA ya existe."
 fi
 
 # Moverse al directorio Easy-RSA
-cd "$DIR_EASYRSA" || { echo "❌ Error: No se pudo acceder a $DIR_EASYRSA"; exit 1; }
+cd "$EASYRSA_DIR" || { echo "❌ Error: No se pudo acceder a $EASYRSA_DIR"; exit 1; }
 
 # Inicializar la PKI si no existe
-if [ ! -d "$DIR_EASYRSA/pki" ]; then
+if [ ! -d "$EASYRSA_DIR/pki" ]; then
     echo "🔑 Inicializando PKI..."
     sudo ./easyrsa --batch init-pki
 fi
 
 # Crear la CA si no existe
-if [ ! -f "$DIR_OPENVPN/ca.crt" ]; then
+if [ ! -f "$OPENVPN_DIR/ca.crt" ]; then
     echo "🔏 Generando Autoridad de Certificación (CA)..."
     sudo ./easyrsa --batch build-ca nopass
-    sudo cp pki/ca.crt "$DIR_OPENVPN/"
+    sudo cp pki/ca.crt "$OPENVPN_DIR/"
 fi
 
 # Crear clave y certificado del servidor si no existen
-if [ ! -f "$DIR_OPENVPN/server.crt" ]; then
+if [ ! -f "$OPENVPN_DIR/server.crt" ]; then
     echo "🔐 Generando clave y certificado del servidor..."
     sudo ./easyrsa --batch gen-req server nopass
     echo "yes" | sudo ./easyrsa --batch sign-req server server
-    sudo cp pki/private/server.key "$DIR_OPENVPN/"
-    sudo cp pki/issued/server.crt "$DIR_OPENVPN/"
+    sudo cp pki/private/server.key "$OPENVPN_DIR/"
+    sudo cp pki/issued/server.crt "$OPENVPN_DIR/"
 fi
 
 # Generar Diffie-Hellman si no existe
-if [ ! -f "$DIR_OPENVPN/dh.pem" ]; then
+if [ ! -f "$OPENVPN_DIR/dh.pem" ]; then
     echo "🔀 Generando Diffie-Hellman..."
     sudo ./easyrsa gen-dh
-    sudo cp pki/dh.pem "$DIR_OPENVPN/"
+    sudo cp pki/dh.pem "$OPENVPN_DIR/"
 fi
 
 # Generar clave TLS si no existe
-if [ ! -f "$DIR_OPENVPN/ta.key" ]; then
+if [ ! -f "$OPENVPN_DIR/ta.key" ]; then
     echo "🔑 Generando clave TLS..."
-    sudo openvpn --genkey secret "$DIR_OPENVPN/ta.key"
+    sudo openvpn --genkey secret "$OPENVPN_DIR/ta.key"
 fi
 
 # Aplicar los cambios en sysctl sin necesidad de reiniciar

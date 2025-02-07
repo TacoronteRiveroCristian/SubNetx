@@ -8,7 +8,7 @@ sudo chown -R subnetx:subnetx "$OPENVPN_DIR"
 sudo chmod -R 755 "$OPENVPN_DIR"
 
 function usage() {
-    echo "Uso: $0 {setup|run|stop|client {create|delete} <nombre_cliente>}"
+    echo "Uso: $0 {setup|run|stop|client {new|delete} <client name>}"
     exit 1
 }
 
@@ -28,12 +28,12 @@ case $COMMAND in
         ;;
     client)
         case $SUBCOMMAND in
-            create)
+            new)
                 if [ -z "$CLIENT_NAME" ]; then
                     echo "❌ Debes especificar un nombre de cliente."
                     usage
                 fi
-                "/app/scripts/openvpn-client-create.sh" "$CLIENT_NAME"
+                "/app/scripts/openvpn-client-new.sh" "$CLIENT_NAME"
                 ;;
             delete)
                 if [ -z "$CLIENT_NAME" ]; then

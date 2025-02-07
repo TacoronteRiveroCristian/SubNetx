@@ -1,8 +1,6 @@
 #!/bin/bash
 # Descripcion: Genera un certificado y configuración para un nuevo cliente OpenVPN.
 
-source "/app/config/openvpn/config.sh"
-
 CLIENT_NAME="$1"
 
 if [ -z "$CLIENT_NAME" ]; then
@@ -27,7 +25,7 @@ fi
 echo "✅ Certificado y clave generados para $CLIENT_NAME."
 
 # Crear el perfil de configuración del cliente (.ovpn con todo embebido)
-CLIENT_CONFIG="/etc/openvpn/client/$CLIENT_NAME.ovpn"
+CLIENT_CONFIG="$OPENVPN_DIR/client/$CLIENT_NAME.ovpn"
 
 echo "📄 Creando archivo de configuración del cliente: $CLIENT_CONFIG"
 
@@ -35,7 +33,7 @@ cat > "$CLIENT_CONFIG" <<EOF
 client
 dev tun
 proto $OPENVPN_PROTO
-remote labcrist.duckdns.org $OPENVPN_PORT
+remote $PUBLIC_IP $OPENVPN_PORT
 resolv-retry infinite
 nobind
 user nobody
@@ -64,7 +62,7 @@ EOF
     echo "</key>"
 
     echo "<tls-auth>"
-    sudo cat "/etc/openvpn/ta.key"
+    sudo cat "$OPENVPN_DIR/ta.key"
     echo "</tls-auth>"
 } >> "$CLIENT_CONFIG"
 
