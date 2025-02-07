@@ -19,7 +19,13 @@ Este comando construye una imagen Docker llamada `subnetx-openvpn` utilizando el
 
 Con la imagen construida, puedes iniciar el contenedor:
 
-`docker run --name subnetx-openvpn -d --rm --cap-add=NET_ADMIN -p 1194:1194/udp --device=/dev/net/tun:/dev/net/tun subnetx-openvpn`
+```bash
+docker run --name subnetx-openvpn -d --rm --cap-add=NET_ADMIN \
+    -p 1194:1194/udp \
+    --device=/dev/net/tun:/dev/net/tun \
+    -v ./client:/etc/openvpn/client \
+    subnetx-openvpn
+```
 
 Este comando ejecuta el contenedor en modo detenido (`-d`), lo que significa que el contenedor se ejecutará en segundo plano. El argumento `--rm` indica que el contenedor se eliminará automáticamente cuando se detenga. Se otorgan capacidades de administrador de red (`NET_ADMIN`) y se monta el dispositivo TUN/TAP necesario para la VPN.
 

@@ -26,12 +26,8 @@ fi
 
 echo "✅ Certificado y clave generados para $CLIENT_NAME."
 
-# Crear el directorio de configuraciones de cliente si no existe
-CLIENT_CONFIG_DIR="/app/config/openvpn/client-configs"
-mkdir -p "$CLIENT_CONFIG_DIR"
-
 # Crear el perfil de configuración del cliente (.ovpn con todo embebido)
-CLIENT_CONFIG="$CLIENT_CONFIG_DIR/$CLIENT_NAME.ovpn"
+CLIENT_CONFIG="/etc/openvpn/client/$CLIENT_NAME.ovpn"
 
 echo "📄 Creando archivo de configuración del cliente: $CLIENT_CONFIG"
 
@@ -68,7 +64,7 @@ EOF
     echo "</key>"
 
     echo "<tls-auth>"
-    sudo cat "$SERVER_DIR/ta.key"
+    sudo cat "/etc/openvpn/ta.key"
     echo "</tls-auth>"
 } >> "$CLIENT_CONFIG"
 

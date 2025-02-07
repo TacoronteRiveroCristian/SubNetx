@@ -6,13 +6,13 @@ source "/app/config/openvpn/config.sh"
 echo "🛠️ Iniciando OpenVPN en segundo plano..."
 
 # Iniciar OpenVPN en segundo plano con `--daemon`
-sudo openvpn --config "$SERVER_CONF" --daemon
+sudo openvpn --config /etc/openvpn/server/server.conf --daemon
 
 # Esperar 2 segundos para que OpenVPN cree el proceso
 sleep 2
 
 # Obtener el PID del proceso OpenVPN
-PID=$(pgrep -f "openvpn --config $SERVER_CONF")
+PID=$(pgrep -f "openvpn --config /etc/openvpn/server/server.conf")
 
 if [ -z "$PID" ]; then
     echo "❌ Error: OpenVPN no se está ejecutando."

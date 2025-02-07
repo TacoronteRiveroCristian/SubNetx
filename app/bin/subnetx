@@ -20,8 +20,8 @@ case $COMMAND in
     setup)
         "/app/scripts/openvpn-setup.sh"
         ;;
-    run)
-        "/app/scripts/openvpn-run.sh"
+    start)
+        "/app/scripts/openvpn-start.sh"
         ;;
     stop)
         "/app/scripts/openvpn-stop.sh"
