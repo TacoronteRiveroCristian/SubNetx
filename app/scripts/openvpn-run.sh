@@ -1,7 +1,7 @@
 #!/bin/bash
 # Descripcion: Inicia OpenVPN en segundo plano, guarda su PID y verifica la conexión.
 
-source "$BASE_DIR/app/config/openvpn/config.sh"
+source "/app/config/openvpn/config.sh"
 
 echo "🛠️ Iniciando OpenVPN en segundo plano..."
 

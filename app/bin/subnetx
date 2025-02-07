@@ -1,8 +1,7 @@
 #!/bin/bash
 # Descripcion: Script principal para gestionar OpenVPN.
 
-export BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-source "$BASE_DIR/app/config/openvpn/config.sh"
+source /app/config/openvpn/config.sh
 
 # Dar permisos iniciales para evitar problemas de acceso durante la configuracion
 sudo chown -R subnetx:subnetx "$OPENVPN_DIR"
@@ -19,13 +18,13 @@ CLIENT_NAME=$3
 
 case $COMMAND in
     setup)
-        "$BASE_DIR/app/scripts/openvpn-setup.sh"
+        "/app/scripts/openvpn-setup.sh"
         ;;
     run)
-        "$BASE_DIR/app/scripts/openvpn-run.sh"
+        "/app/scripts/openvpn-run.sh"
         ;;
     stop)
-        "$BASE_DIR/app/scripts/openvpn-stop.sh"
+        "/app/scripts/openvpn-stop.sh"
         ;;
     client)
         case $SUBCOMMAND in
@@ -34,7 +33,7 @@ case $COMMAND in
                     echo "❌ Debes especificar un nombre de cliente."
                     usage
                 fi
-                "$BASE_DIR/app/scripts/openvpn-client-create.sh" "$CLIENT_NAME"
+                "/app/scripts/openvpn-client-create.sh" "$CLIENT_NAME"
                 ;;
             delete)
                 if [ -z "$CLIENT_NAME" ]; then
@@ -56,4 +55,3 @@ esac
 # Asegurar permisos adecuados
 sudo chmod -R 600 "$OPENVPN_DIR"
 sudo chmod -R 700 "$EASYRSA_DIR"
-sudo chmod 600 "$SERVER_CONF"

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Descripcion: Genera un certificado y configuración para un nuevo cliente OpenVPN.
 
-source "$BASE_DIR/app/config/openvpn/config.sh"
+source "/app/config/openvpn/config.sh"
 
 CLIENT_NAME="$1"
 
@@ -27,10 +27,10 @@ fi
 echo "✅ Certificado y clave generados para $CLIENT_NAME."
 
 # Crear el directorio de configuraciones de cliente si no existe
-CLIENT_CONFIG_DIR="$BASE_DIR/app/config/openvpn/client-configs"
+CLIENT_CONFIG_DIR="/app/config/openvpn/client-configs"
 mkdir -p "$CLIENT_CONFIG_DIR"
 
-# Crear el perfil de configuración del cliente
+# Crear el perfil de configuración del cliente (.ovpn con todo embebido)
 CLIENT_CONFIG="$CLIENT_CONFIG_DIR/$CLIENT_NAME.ovpn"
 
 echo "📄 Creando archivo de configuración del cliente: $CLIENT_CONFIG"
@@ -39,39 +39,41 @@ cat > "$CLIENT_CONFIG" <<EOF
 client
 dev tun
 proto $OPENVPN_PROTO
-remote $(hostname -I | awk '{print $1}') $OPENVPN_PORT
+remote labcrist.duckdns.org $OPENVPN_PORT
 resolv-retry infinite
 nobind
+user nobody
+group nogroup
 persist-key
 persist-tun
-ca [inline]
-cert [inline]
-key [inline]
-tls-auth [inline] 1
-cipher AES-256-CBC
+remote-cert-tls server
+data-ciphers AES-256-GCM:AES-128-GCM:AES-256-CBC
 auth SHA256
-comp-lzo
 verb 3
+key-direction 1
 EOF
 
-# Incluir certificados en el archivo .ovpn
-echo "<ca>" >> "$CLIENT_CONFIG"
-sudo cat "$EASYRSA_DIR/pki/ca.crt" >> "$CLIENT_CONFIG"
-echo "</ca>" >> "$CLIENT_CONFIG"
+# Incluir certificados en el archivo .ovpn embebido
+{
+    echo "<ca>"
+    sudo cat "$EASYRSA_DIR/pki/ca.crt"
+    echo "</ca>"
 
-echo "<cert>" >> "$CLIENT_CONFIG"
-sudo cat "$EASYRSA_DIR/pki/issued/$CLIENT_NAME.crt" >> "$CLIENT_CONFIG"
-echo "</cert>" >> "$CLIENT_CONFIG"
+    echo "<cert>"
+    sudo cat "$EASYRSA_DIR/pki/issued/$CLIENT_NAME.crt"
+    echo "</cert>"
 
-echo "<key>" >> "$CLIENT_CONFIG"
-sudo cat "$EASYRSA_DIR/pki/private/$CLIENT_NAME.key" >> "$CLIENT_CONFIG"
-echo "</key>" >> "$CLIENT_CONFIG"
+    echo "<key>"
+    sudo cat "$EASYRSA_DIR/pki/private/$CLIENT_NAME.key"
+    echo "</key>"
 
-echo "<tls-auth>" >> "$CLIENT_CONFIG"
-sudo cat "$SERVER_DIR/ta.key" >> "$CLIENT_CONFIG"
-echo "</tls-auth>" >> "$CLIENT_CONFIG"
+    echo "<tls-auth>"
+    sudo cat "$SERVER_DIR/ta.key"
+    echo "</tls-auth>"
+} >> "$CLIENT_CONFIG"
 
-# Cambiar permisos para que el usuario pueda descargarlo
-sudo chown subnetx:subnetx "$CLIENT_CONFIG"
+# Cambiar permisos para que el usuario pueda acceder a los archivos
+sudo chown -R subnetx:subnetx "$CLIENT_CONFIG_DIR"
 
-echo "✅ Cliente creado correctamente. Configuración guardada en: $CLIENT_CONFIG"
+echo "✅ Cliente creado correctamente."
+echo "📄 Archivo .ovpn (todo embebido): $CLIENT_CONFIG"

@@ -29,8 +29,18 @@ RUN useradd -m subnetx && \
     usermod -aG sudo subnetx && \
     echo "subnetx ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-# Establecer el directorio de trabajo
-WORKDIR /workspaces/SubNetX
+# Copiar los ficheros de configuracion para el servidor OpenVPN
+COPY docker/config/openvpn/server.conf /etc/openvpn/server/server.conf
+COPY docker/config/openvpn/sysctl.conf /etc/sysctl.conf
+
+# Copiar estrcutura de ficheros
+COPY app/bin/subnetx /usr/local/bin/subnetx
+COPY app/config/ /app/config/
+COPY app/scripts/ /app/scripts/
+
+# Dar permisos iniciales para evitar problemas de acceso durante la configuracion
+RUN chown -R subnetx:subnetx /app
+RUN chmod +x /usr/local/bin/subnetx
 
 # Comando por defecto para mantener el contenedor en ejecución
 CMD ["sleep", "infinity"]
