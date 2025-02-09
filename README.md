@@ -5,7 +5,7 @@ Este proyecto proporciona una imagen de Docker optimizada para gestionar un serv
 ## 📌 Características
 - Basado en **Ubuntu 22.04**.
 - Incluye **OpenVPN, Easy-RSA, iptables y otras utilidades necesarias**.
-- Configuración automatizada con el comando `subnetx setup`.
+- Configuración automatizada con el comando `subnetx setup`, ahora con soporte para **parámetros de entrada**.
 - Soporta **gestión de clientes VPN**.
 - Usa **iptables para NAT** y permite reenvío de paquetes.
 
@@ -41,20 +41,27 @@ sudo docker run --name subnetx-openvpn -d --rm --cap-add=NET_ADMIN \
 ```
 
 ### 5. Ejecutar la Configuración Inicial
-Para configurar OpenVPN, generar certificados y aplicar reglas de iptables, usa:
+Ahora `subnetx setup` admite **parámetros de entrada** para personalizar la configuración del servidor OpenVPN:
 ```bash
-sudo docker exec -it subnetx-openvpn subnetx setup
+sudo docker exec -it subnetx-openvpn subnetx setup \
+    --network 10.9.0.0 \
+    --netmask 255.255.255.0 \
+    --port 1195 \
+    --proto tcp \
+    --tun tun1 \
+    --ip myvpn.example.com
 ```
-También puedes acceder al contenedor y ejecutarlo manualmente:
+
+Si prefieres ejecutarlo manualmente dentro del contenedor:
 ```bash
 sudo docker exec -it subnetx-openvpn bash
-sudo subnetx setup
+sudo subnetx setup --network 10.9.0.0 --netmask 255.255.255.0 --port 1195 --proto tcp --tun tun1 --ip myvpn.example.com
 ```
 
 ### 6. Administrar Clientes VPN
 Para añadir un cliente:
 ```bash
-sudo docker exec -it subnetx-openvpn subnetx client new --name cliente1 --ip 10.8.0.10
+sudo docker exec -it subnetx-openvpn subnetx client new --name cliente1 --ip 10.9.0.10
 ```
 
 ### 7. Detener y Eliminar el Contenedor
@@ -71,7 +78,4 @@ sudo docker stop subnetx-openvpn
 ## 📖 Información Adicional
 Para más detalles sobre OpenVPN y su configuración avanzada, visita la documentación oficial:
 🔗 [OpenVPN Documentation](https://openvpn.net/community-resources/)
-
----
-📌 **Mantenido por:** Tu equipo de administración VPN 🚀
 
