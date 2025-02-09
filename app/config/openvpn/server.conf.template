@@ -1,0 +1,33 @@
+port {{PORT}}                # Puerto del servidor
+proto {{PROTO}}              # Protocolo
+dev {{TUN}}                  # Dispositivo TUN
+topology subnet              # Topología de subred
+keepalive 5 30               # Comprobar conexión
+
+# Rutas a certificados y claves
+ca /etc/openvpn/ca.crt       # Certificado CA
+cert /etc/openvpn/server.crt # Certificado servidor
+key /etc/openvpn/server.key  # Clave privada servidor
+dh /etc/openvpn/dh.pem       # Clave Diffie-Hellman
+tls-auth /etc/openvpn/ta.key 0  # Clave autenticación TLS
+
+# Cifrado
+data-ciphers AES-256-GCM:AES-128-GCM
+data-ciphers-fallback AES-256-CBC
+auth SHA256
+
+# Red
+server {{NETWORK}} {{NETMASK}}   # Subred VPN
+push "redirect-gateway def1 bypass-dhcp"
+push "dhcp-option DNS 8.8.8.8"
+push "dhcp-option DNS 8.8.4.4"
+client-config-dir /etc/openvpn/ccd
+
+# Registro y persistencia
+user nobody
+group nogroup
+persist-key
+persist-tun
+status /etc/openvpn/openvpn-status.log
+log /etc/openvpn/openvpn.log
+verb 3

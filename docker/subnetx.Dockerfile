@@ -30,8 +30,7 @@ RUN useradd -m subnetx && \
     echo "subnetx ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
     # echo "subnetx ALL=(ALL) ALL" >> /etc/sudoers
 
-# Copiar los ficheros de configuracion para el servidor OpenVPN
-COPY docker/config/openvpn/server.conf /etc/openvpn/server/server.conf
+# Copiar fichero de configuracion de red para OpenVPN
 COPY docker/config/openvpn/sysctl.conf /etc/sysctl.conf
 
 # Copiar estrcutura de ficheros

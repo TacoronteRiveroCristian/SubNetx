@@ -9,12 +9,12 @@ export EASYRSA_VAR="${EASYRSA_DIR}/vars"
 export _EASYRSA_VAR="/app/config/openvpn/vars"
 
 # Parametros de la red VPN
-export VPN_NETWORK="10.8.0.0"
-export VPN_NETMASK="255.255.255.0"
+export VPN_NETWORK="{{NETWORK}}"
+export VPN_NETMASK="{{NETMASK}}"
 
 # Otros parametros de configuracion
 export OPENVPN_PID_FILE="${OPENVPN_DIR}/openvpn.pid"
-export PUBLIC_IP="labcrist.duckdns.org"
-export OPENVPN_PORT=1194
-export OPENVPN_PROTO="udp"
-export TUN_DEVICE="tun0"
+export PUBLIC_IP="{{PUBLIC_IP}}"
+export OPENVPN_PORT="{{PORT}}"
+export OPENVPN_PROTO="{{PROTO}}"
+export TUN_DEVICE="{{TUN}}"

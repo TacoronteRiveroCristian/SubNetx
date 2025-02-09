@@ -3,6 +3,11 @@
 
 source /app/config/openvpn/config.sh
 
+CONFIG_TEMPLATE="/app/config/openvpn/config.sh.template"
+CONFIG_FILE="/app/config/openvpn/config.sh"
+
+
+
 function usage() {
     echo "Uso: $0 {setup|start|stop|client {new|delete} [--name <nombre>] [--ip <ip>]}"
     exit 1
@@ -10,6 +15,7 @@ function usage() {
 
 COMMAND=$1
 SUBCOMMAND=$2
+
 
 # Variables para client new
 CLIENT_NAME=""
@@ -34,7 +40,7 @@ fi
 
 case $COMMAND in
     setup)
-        "/app/scripts/openvpn-setup.sh"
+        /app/scripts/openvpn-setup.sh "${@:2}"
         ;;
     start)
         "/app/scripts/openvpn-start.sh"

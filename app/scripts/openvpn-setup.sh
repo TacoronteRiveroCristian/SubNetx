@@ -1,6 +1,98 @@
 #!/bin/bash
-# Descripcion: Configura OpenVPN, genera certificados, habilita el reenvío de paquetes y configura NAT.
+# Descripcion: Configura OpenVPN, genera certificados, habilita el reenvio de paquetes y configura NAT.
 
+# ---------------------------
+# Recoger los parametros
+# ---------------------------
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --network)
+            VPN_NETWORK="$2"
+            shift 2
+            ;;
+        --netmask)
+            VPN_NETMASK="$2"
+            shift 2
+            ;;
+        --port)
+            OPENVPN_PORT="$2"
+            shift 2
+            ;;
+        --proto)
+            OPENVPN_PROTO="$2"
+            shift 2
+            ;;
+        --tun)
+            TUN_DEVICE="$2"
+            shift 2
+            ;;
+        --ip)
+            PUBLIC_IP="$2"
+            shift 2
+            ;;
+        *)
+            echo "❌ Opción desconocida: $1"
+            exit 1
+            ;;
+    esac
+done
+
+# Mostrar los parametros recibidos
+echo "Parámetros recibidos:"
+echo "VPN_NETWORK: $VPN_NETWORK"
+echo "VPN_NETMASK: $VPN_NETMASK"
+echo "OPENVPN_PORT: $OPENVPN_PORT"
+echo "OPENVPN_PROTO: $OPENVPN_PROTO"
+echo "TUN_DEVICE: $TUN_DEVICE"
+echo "PUBLIC_IP: $PUBLIC_IP"
+
+# ---------------------------
+# Sustituir los marcadores en la plantilla
+# ---------------------------
+TEMPLATE="/app/config/openvpn/config.sh.template"
+CONFIG="/app/config/openvpn/config.sh"
+
+if [ ! -f "$TEMPLATE" ]; then
+    echo "❌ No se encontro el archivo de plantilla: $TEMPLATE"
+    exit 1
+fi
+
+# Utilizamos sed para reemplazar los marcadores con los valores recogidos
+sed -e "s/{{NETWORK}}/${VPN_NETWORK}/g" \
+    -e "s/{{NETMASK}}/${VPN_NETMASK}/g" \
+    -e "s/{{PUBLIC_IP}}/${PUBLIC_IP}/g" \
+    -e "s/{{PORT}}/${OPENVPN_PORT}/g" \
+    -e "s/{{PROTO}}/${OPENVPN_PROTO}/g" \
+    -e "s/{{TUN}}/${TUN_DEVICE}/g" \
+    "$TEMPLATE" > "$CONFIG"
+
+echo "✔ Archivo de configuracion generado en $CONFIG"
+
+# Definir rutas del template y del archivo final de server.conf
+SERVER_TEMPLATE="/app/config/openvpn/server.conf.template"
+SERVER_CONF="/etc/openvpn/server/server.conf"
+
+# Verificar que el template existe
+if [ ! -f "$SERVER_TEMPLATE" ]; then
+    echo "❌ No se encontró el template de server.conf: $SERVER_TEMPLATE"
+    exit 1
+fi
+
+# Utilizar sed para reemplazar los placeholders con los parámetros recogidos
+sed -e "s/{{PORT}}/${OPENVPN_PORT}/g" \
+    -e "s/{{PROTO}}/${OPENVPN_PROTO}/g" \
+    -e "s/{{TUN}}/${TUN_DEVICE}/g" \
+    -e "s/{{NETWORK}}/${VPN_NETWORK}/g" \
+    -e "s/{{NETMASK}}/${VPN_NETMASK}/g" \
+    "$SERVER_TEMPLATE" > "$SERVER_CONF"
+
+echo "✔ Archivo server.conf generado en $SERVER_CONF"
+
+source "$CONFIG"
+
+# ---------------------------
+# Continuar con el resto de la configuracion
+# ---------------------------
 echo "🛠️ Configurando OpenVPN..."
 
 # Crear directorio de clientes si no existe
