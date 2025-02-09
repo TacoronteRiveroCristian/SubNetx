@@ -1,73 +1,77 @@
-# VPN Sencilla con Docker
+# SubnetX OpenVPN Container
 
-Este documento describe los pasos para configurar y ejecutar una VPN sencilla utilizando Docker.
+Este proyecto proporciona una imagen de Docker optimizada para gestionar un servidor **OpenVPN** con herramientas de configuración automatizadas. La imagen contiene los paquetes necesarios para instalar, configurar y administrar OpenVPN de manera segura y eficiente.
 
-## Pre-requisitos
+## 📌 Características
+- Basado en **Ubuntu 22.04**.
+- Incluye **OpenVPN, Easy-RSA, iptables y otras utilidades necesarias**.
+- Configuración automatizada con el comando `subnetx setup`.
+- Soporta **gestión de clientes VPN**.
+- Usa **iptables para NAT** y permite reenvío de paquetes.
 
-- Docker instalado en tu máquina.
-- Acceso a una terminal o línea de comandos.
+## 🚀 Instalación y Uso
 
-## Construir la Imagen Docker
-
-Primero, construye la imagen Docker para el servidor VPN:
-
-`docker build -t subnetx-openvpn -f docker/subnetx.Dockerfile .`
-
-Este comando construye una imagen Docker llamada `subnetx-openvpn` utilizando el Dockerfile especificado en `docker/subnetx.Dockerfile`.
-
-## Ejecutar el Contenedor VPN
-
-Con la imagen construida, puedes iniciar el contenedor:
-
+### 1. Clonar el Repositorio
 ```bash
-docker run --name subnetx-openvpn -d --rm --cap-add=NET_ADMIN \
+git clone <URL_DEL_REPOSITORIO>
+cd <NOMBRE_DEL_PROYECTO>
+```
+
+### 2. Configurar los Permisos
+Para mejorar la seguridad, asegúrate de que la carpeta `docker/` tenga los permisos adecuados:
+```bash
+chmod 600 -R docker/
+```
+Esto evitará que otros usuarios en el sistema puedan leer archivos sensibles de configuración.
+
+### 3. Construir la Imagen Docker
+Ejecuta el siguiente comando para construir la imagen:
+```bash
+docker build -t subnetx-openvpn .
+```
+
+### 4. Ejecutar el Contenedor
+Para iniciar el contenedor y configurar OpenVPN:
+```bash
+sudo docker run --name subnetx-openvpn -d --rm --cap-add=NET_ADMIN \
     -p 1194:1194/udp \
     --device=/dev/net/tun:/dev/net/tun \
     -v ./client:/etc/openvpn/client \
     subnetx-openvpn
 ```
 
-Este comando ejecuta el contenedor en modo detenido (`-d`), lo que significa que el contenedor se ejecutará en segundo plano. El argumento `--rm` indica que el contenedor se eliminará automáticamente cuando se detenga. Se otorgan capacidades de administrador de red (`NET_ADMIN`) y se monta el dispositivo TUN/TAP necesario para la VPN.
+### 5. Ejecutar la Configuración Inicial
+Para configurar OpenVPN, generar certificados y aplicar reglas de iptables, usa:
+```bash
+sudo docker exec -it subnetx-openvpn subnetx setup
+```
+También puedes acceder al contenedor y ejecutarlo manualmente:
+```bash
+sudo docker exec -it subnetx-openvpn bash
+sudo subnetx setup
+```
 
-## Configurar el Servicio VPN
+### 6. Administrar Clientes VPN
+Para añadir un cliente:
+```bash
+sudo docker exec -it subnetx-openvpn subnetx client new --name cliente1 --ip 10.8.0.10
+```
 
-Para configurar el servicio VPN dentro del contenedor con todos los certificados y claves necesarios, se debe de ejecutar en primer lugar
-el siguiente comando:
+### 7. Detener y Eliminar el Contenedor
+Para detener el contenedor:
+```bash
+sudo docker stop subnetx-openvpn
+```
 
-`docker exec -it subnetx-openvpn subnetx setup`
+## 📌 Notas Importantes
+- **Ejecuta siempre el contenedor como `root`** para evitar problemas de permisos.
+- **Los comandos dentro del contenedor también deben ejecutarse como `root`**.
+- Si modificas `docker/config/openvpn/`, recuerda reconstruir la imagen.
 
-Este comando utiliza `docker exec` para ejecutar el script `subnetx` dentro del contenedor `subnetx-openvpn`.
+## 📖 Información Adicional
+Para más detalles sobre OpenVPN y su configuración avanzada, visita la documentación oficial:
+🔗 [OpenVPN Documentation](https://openvpn.net/community-resources/)
 
-### Control del servidor VPN
+---
+📌 **Mantenido por:** Tu equipo de administración VPN 🚀
 
-Una vez listo el contenedor, se puede iniciar el servicio VPN mediante el siguiente comando:
-
-`docker exec -it subnetx-openvpn subnetx start`
-
-En el caso de que se inicie de forma satisfactoria, aparecerán unos mensajes indicando que el servicio VPN se ha iniciado correctamente y el estado de la interfaz TUN.
-
-Por otro lado, en el caso de que se desee parar el servicio, simplemente hay que ejecutar este otro comando:
-
-`docker exec -it subnetx-openvpn subnetx stop`
-
-En este caso, se busca el PID del proceso OpenVPN y se utiliza `kill` para detenerlo completamente.
-
-## Generar Clientes VPN
-
-Una vez que se ha iniciado el servicio VPN, se puede generar los clientes VPN necesarios ejecutando el siguiente comando:
-
-`docker exec -it subnetx-openvpn subnetx client new <client name>`
-
-Dichos clientes, aparecerán en la carpeta `/etc/openvpn/client` dentro del contenedor los cuales se encuentran conectados con la carpeta host `client`. De esta forma, se pueden generar tantos clientes VPN como se desee y distribuirlos de manera sencilla.
-
-## Detener y Eliminar el Contenedor
-
-Para eliminar el contenedor, simplemente hay que ejecutar:
-
-`docker rm -f subnetx-openvpn`
-
-De esta forma se elimina el contenedor y se libera el espacio en disco además de dar de baja todos los cliente VPN creados.
-
-## Notas Adicionales
-
-- El servidor y el cliente debem de operar en redes distintas. No se puede establecer el túnel correctamente si ambos dispositivos se encuentran en la red 192.168.1.1 por ejemplo.
