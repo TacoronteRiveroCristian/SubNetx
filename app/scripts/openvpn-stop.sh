@@ -8,20 +8,20 @@ if [ -f $OPENVPN_PID_FILE ]; then
     PID=$(cat $OPENVPN_PID_FILE)
 
     # Intentar matar el proceso con SIGTERM
-    sudo kill "$PID"
+    kill "$PID"
     sleep 2
 
     # Verificar si sigue corriendo y forzar la terminacion si es necesario
     if ps -p "$PID" > /dev/null 2>&1; then
         echo "⚠️ El proceso sigue corriendo, forzando con SIGKILL..."
-        sudo kill -9 "$PID"
+        kill -9 "$PID"
         sleep 2
     fi
 
     # Verificar si OpenVPN sigue corriendo (puede haber quedado huerfano)
     if pgrep -f "openvpn --config" > /dev/null 2>&1; then
         echo "⚠️ OpenVPN sigue corriendo como proceso huerfano, intentando detenerlo..."
-        sudo pkill -f "openvpn --config"
+        pkill -f "openvpn --config"
         sleep 2
     fi
 
@@ -32,7 +32,7 @@ if [ -f $OPENVPN_PID_FILE ]; then
     fi
 
     echo "✅ OpenVPN detenido correctamente."
-    sudo rm -f $OPENVPN_PID_FILE
+    rm -f $OPENVPN_PID_FILE
 else
     echo "⚠️ No se encontro el PID de OpenVPN. Puede que ya este detenido."
 fi
@@ -40,7 +40,7 @@ fi
 # Eliminar la interfaz TUN si sigue activa
 if ip link show $TUN_DEVICE > /dev/null 2>&1; then
     echo "🧹 Eliminando interfaz $TUN_DEVICE..."
-    sudo ip link delete $TUN_DEVICE
+    ip link delete $TUN_DEVICE
     sleep 2
 fi
 

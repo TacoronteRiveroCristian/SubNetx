@@ -4,7 +4,7 @@
 echo "🛠️ Iniciando OpenVPN en segundo plano..."
 
 # Iniciar OpenVPN en segundo plano con `--daemon`
-sudo openvpn --config "${OPENVPN_DIR}/server/server.conf" --daemon
+openvpn --config "${OPENVPN_DIR}/server/server.conf" --daemon
 
 # Esperar 2 segundos para que OpenVPN cree el proceso
 sleep 2
@@ -18,7 +18,7 @@ if [ -z "$PID" ]; then
 fi
 
 # Guardar el PID
-echo "$PID" | sudo tee "${OPENVPN_PID_FILE}" > /dev/null
+echo "$PID" | tee "${OPENVPN_PID_FILE}" > /dev/null
 
 echo "✅ OpenVPN iniciado correctamente en segundo plano (PID: $PID)."
 
