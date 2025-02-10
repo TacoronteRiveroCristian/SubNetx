@@ -33,11 +33,14 @@ sudo docker build -t subnetx-openvpn -f docker/subnetx.Dockerfile .
 ### 4. Ejecutar el Contenedor
 Para iniciar el contenedor y configurar OpenVPN:
 ```bash
-sudo docker run --name subnetx-openvpn -d --rm --cap-add=NET_ADMIN \
-    -p 1194:1194/udp \
+sudo docker run --name subnetx-openvpn -d
+    --restart unless-stopped \
+    --cap-add=NET_ADMIN \
     --device=/dev/net/tun:/dev/net/tun \
+    -p 1194:1194/udp \
     -v ./client:/etc/openvpn/client \
     subnetx-openvpn
+
 ```
 
 ### 5. Ejecutar la Configuración Inicial
