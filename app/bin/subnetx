@@ -3,62 +3,32 @@
 
 source /app/config/openvpn/config.sh
 
-CONFIG_TEMPLATE="/app/config/openvpn/config.sh.template"
-CONFIG_FILE="/app/config/openvpn/config.sh"
-
-
-
-function usage() {
-    echo "Uso: $0 {setup|start|stop|client {new|delete} [--name <nombre>] [--ip <ip>]}"
+# Mostrar ayuda si se pasa "help" como primer argumento.
+if [[ "$1" == "help" ]]; then
+    /app/scripts/openvpn-help.sh
     exit 1
-}
+fi
 
 COMMAND=$1
 SUBCOMMAND=$2
-
-
-# Variables para client new
-CLIENT_NAME=""
-CLIENT_IP=""
-
-if [[ $EUID -ne 0 ]]; then
-    echo "Este script debe ejecutarse como root." >&2
-    exit 1
-fi
-
-# Parsear argumentos para client new
-if [[ "$COMMAND" == "client" && "$SUBCOMMAND" == "new" ]]; then
-    shift 2  # Eliminar "client" y "new" de los argumentos
-    while [[ "$#" -gt 0 ]]; do
-        case "$1" in
-            --name) CLIENT_NAME="$2"; shift 2 ;;
-            --ip) CLIENT_IP="$2"; shift 2 ;;
-            *) echo "❌ Error: Opción desconocida $1"; usage ;;
-        esac
-    done
-fi
 
 case $COMMAND in
     setup)
         /app/scripts/openvpn-setup.sh "${@:2}"
         ;;
     start)
-        "/app/scripts/openvpn-start.sh"
+        /app/scripts/openvpn-start.sh
         ;;
     stop)
-        "/app/scripts/openvpn-stop.sh"
+        /app/scripts/openvpn-stop.sh
         ;;
     client)
         case $SUBCOMMAND in
             new)
-                if [[ -z "$CLIENT_NAME" || -z "$CLIENT_IP" ]]; then
-                    echo "❌ Debes especificar --name y --ip."
-                    usage
-                fi
-                "/app/scripts/openvpn-client-new.sh" --name "$CLIENT_NAME" --ip "$CLIENT_IP"
+                /app/scripts/openvpn-client-new.sh "${@:3}"
                 ;;
             delete)
-                # Lógica para delete
+                /app/scripts/openvpn-client-delete.sh "${@:3}"
                 ;;
             *)
                 usage

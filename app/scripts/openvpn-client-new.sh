@@ -1,29 +1,33 @@
 #!/bin/bash
-# Descripción: Genera un certificado y configuración para un nuevo cliente OpenVPN con IP fija.
+# Descripcion: Genera un certificado y configuracion para un nuevo cliente OpenVPN con IP fija.
 
 CLIENT_NAME=""
 CLIENT_IP=""
 
-# Función para mostrar ayuda
-show_help() {
-    echo "Uso: $0 --name <CLIENT_NAME> --ip <CLIENT_IP>"
-    echo "Ejemplo: $0 --name myclient1 --ip 10.8.0.10"
-    exit 1
-}
-
 # Parsear argumentos
 while [[ "$#" -gt 0 ]]; do
     case "$1" in
-        --name) CLIENT_NAME="$2"; shift 2 ;;
-        --ip) CLIENT_IP="$2"; shift 2 ;;
-        *) echo "❌ Error: Opción desconocida $1"; show_help ;;
+        --name)
+            CLIENT_NAME="$2"
+            shift 2
+            ;;
+        --ip)
+            CLIENT_IP="$2"
+            shift 2
+            ;;
+        *)
+            echo "❌ Error: Opcion desconocida $1"
+            /app/scripts/openvpn-help.sh
+            exit 1
+            ;;
     esac
 done
 
-# Validar parámetros
+# Validar parametros
 if [[ -z "$CLIENT_NAME" || -z "$CLIENT_IP" ]]; then
     echo "❌ Error: Debes especificar un nombre y una IP para el cliente."
-    show_help
+    /app/scripts/openvpn-help.sh
+    exit 1
 fi
 
 echo "🔑 Creando certificado y clave para el cliente: $CLIENT_NAME"
@@ -42,17 +46,17 @@ fi
 
 echo "✅ Certificado y clave generados para $CLIENT_NAME."
 
-# Crear el archivo de configuración del cliente en el servidor (CCD)
+# Crear el archivo de configuracion del cliente en el servidor (CCD)
 CCD_FILE="/etc/openvpn/ccd/$CLIENT_NAME"
 echo "📄 Asignando IP fija al cliente en: $CCD_FILE"
 
 mkdir -p /etc/openvpn/ccd
-echo "ifconfig-push $CLIENT_IP 255.255.255.0" | tee "$CCD_FILE" > /dev/null
+echo "ifconfig-push $CLIENT_IP $VPN_NETMASK" | tee "$CCD_FILE" > /dev/null
 
-# Crear el perfil de configuración del cliente (.ovpn con todo embebido)
+# Crear el perfil de configuracion del cliente (.ovpn con todo embebido)
 CLIENT_CONFIG="$OPENVPN_DIR/client/$CLIENT_NAME.ovpn"
 
-echo "📄 Creando archivo de configuración del cliente: $CLIENT_CONFIG"
+echo "📄 Creando archivo de configuracion del cliente: $CLIENT_CONFIG"
 
 cat > "$CLIENT_CONFIG" <<EOF
 client
@@ -90,9 +94,6 @@ EOF
     cat "$OPENVPN_DIR/ta.key"
     echo "</tls-auth>"
 } >> "$CLIENT_CONFIG"
-
-# Cambiar permisos para que el usuario pueda acceder a los archivos
-chown -R subnetx:subnetx "$CLIENT_CONFIG"
 
 echo "✅ Cliente creado correctamente con IP fija: $CLIENT_IP"
 echo "📄 Archivo .ovpn (todo embebido): $CLIENT_CONFIG"

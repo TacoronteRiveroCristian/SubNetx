@@ -32,13 +32,14 @@ while [[ "$#" -gt 0 ]]; do
             ;;
         *)
             echo "❌ Opción desconocida: $1"
+            /app/scripts/openvpn-help.sh
             exit 1
             ;;
     esac
 done
 
 # Mostrar los parametros recibidos
-echo "Parámetros recibidos:"
+echo "Parametros recibidos:"
 echo "VPN_NETWORK: $VPN_NETWORK"
 echo "VPN_NETMASK: $VPN_NETMASK"
 echo "OPENVPN_PORT: $OPENVPN_PORT"
