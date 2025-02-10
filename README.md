@@ -27,7 +27,7 @@ Esto evitará que otros usuarios en el sistema puedan leer archivos sensibles de
 ### 3. Construir la Imagen Docker
 Ejecuta el siguiente comando para construir la imagen:
 ```bash
-docker build -t subnetx-openvpn .
+sudo docker build -t subnetx-openvpn -f docker/subnetx.Dockerfile .
 ```
 
 ### 4. Ejecutar el Contenedor
@@ -46,16 +46,16 @@ Ahora `subnetx setup` admite **parámetros de entrada** para personalizar la con
 sudo docker exec -it subnetx-openvpn subnetx setup \
     --network 10.9.0.0 \
     --netmask 255.255.255.0 \
-    --port 1195 \
-    --proto tcp \
+    --port 1994 \
+    --proto udp \
     --tun tun1 \
     --ip myvpn.example.com
 ```
 
 Si prefieres ejecutarlo manualmente dentro del contenedor:
 ```bash
-sudo docker exec -it subnetx-openvpn bash
-sudo subnetx setup --network 10.9.0.0 --netmask 255.255.255.0 --port 1195 --proto tcp --tun tun1 --ip myvpn.example.com
+sudo docker exec -it subnetx-openvpn /bin/bash
+subnetx setup --network 10.9.0.0 --netmask 255.255.255.0 --port 1195 --proto udp --tun tun1 --ip myvpn.example.com
 ```
 
 ### 6. Administrar Clientes VPN
@@ -71,6 +71,7 @@ sudo docker stop subnetx-openvpn
 ```
 
 ## 📌 Notas Importantes
+- **Es necesario abrir el o los puertos a usar por la VPN en el router con el protocolo correspondiente.**
 - **Ejecuta siempre el contenedor como `root`** para evitar problemas de permisos.
 - **Los comandos dentro del contenedor también deben ejecutarse como `root`**.
 - Si modificas `docker/config/openvpn/`, recuerda reconstruir la imagen.

@@ -20,16 +20,6 @@ RUN apt-get update && \
     net-tools && \
     rm -rf /var/lib/apt/lists/*
 
-# Exponer el puerto UDP por defecto para OpenVPN
-EXPOSE 1194/udp
-
-# Crear el usuario "subnetx", asignarle la contraseña y otorgarle permisos sudo.
-RUN useradd -m subnetx && \
-    echo "subnetx:subnetx" | chpasswd && \
-    usermod -aG sudo subnetx && \
-    echo "subnetx ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
-    # echo "subnetx ALL=(ALL) ALL" >> /etc/sudoers
-
 # Copiar fichero de configuracion de red para OpenVPN
 COPY docker/config/openvpn/sysctl.conf /etc/sysctl.conf
 
@@ -39,11 +29,7 @@ COPY app/config/ /app/config/
 COPY app/scripts/ /app/scripts/
 
 # Dar permisos iniciales para evitar problemas de acceso durante la configuracion
-RUN chown -R subnetx:subnetx /app
 RUN chmod +x /usr/local/bin/subnetx
 
 # Comando por defecto para mantener el contenedor en ejecución
 CMD ["sleep", "infinity"]
-
-# Ejecutar como usuario "subnetx"
-USER subnetx
