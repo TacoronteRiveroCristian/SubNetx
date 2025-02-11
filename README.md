@@ -1,13 +1,13 @@
-# SubnetX OpenVPN Container
+# SubnetX VPN Container
 
-Este proyecto proporciona una imagen de Docker optimizada para gestionar un servidor **OpenVPN** con herramientas de configuración automatizadas. La imagen contiene los paquetes necesarios para instalar, configurar y administrar OpenVPN de manera segura y eficiente.
+Este proyecto proporciona una imagen de Docker optimizada para gestionar un servidor **OpenVPN**, permitiendo configurar y administrar VPNs de manera segura y eficiente. Cada contenedor despliega una **subred VPN independiente**, lo que significa que si deseas gestionar múltiples subredes, puedes ejecutar un contenedor por cada una, facilitando la segmentación de redes para distintos proyectos.
 
 ## 📌 Características
 - Basado en **Ubuntu 22.04**.
-- Incluye **OpenVPN, Easy-RSA, iptables y otras utilidades necesarias**.
-- Configuración automatizada con el comando `subnetx setup`, ahora con soporte para **parámetros de entrada**.
-- Soporta **gestión de clientes VPN**.
-- Usa **iptables para NAT** y permite reenvío de paquetes.
+- Incluye **OpenVPN, Easy-RSA, iptables y herramientas esenciales**.
+- Configuración automatizada con `subnetx setup`, que ahora admite **parámetros de entrada**.
+- Soporte para **gestión de clientes VPN**.
+- Uso de **iptables para NAT** y reenvío de paquetes.
 
 ## 🚀 Instalación y Uso
 
@@ -18,68 +18,105 @@ cd <NOMBRE_DEL_PROYECTO>
 ```
 
 ### 2. Configurar los Permisos
-Para mejorar la seguridad, asegúrate de que la carpeta `docker/` tenga los permisos adecuados:
+Para mejorar la seguridad, establece permisos adecuados en la carpeta `docker/`:
 ```bash
 chmod 600 -R docker/
 ```
-Esto evitará que otros usuarios en el sistema puedan leer archivos sensibles de configuración.
+Esto evita accesos no autorizados a archivos sensibles de configuración.
 
 ### 3. Construir la Imagen Docker
 Ejecuta el siguiente comando para construir la imagen:
 ```bash
-sudo docker build -t subnetx-openvpn -f docker/subnetx.Dockerfile .
+sudo docker build -t subnetx-vpn1 -f docker/subnetx.Dockerfile .
+```
+Si necesitas múltiples subredes VPN, puedes construir varias imágenes con nombres diferentes:
+```bash
+sudo docker build -t subnetx-vpn2 -f docker/subnetx.Dockerfile .
 ```
 
 ### 4. Ejecutar el Contenedor
-Para iniciar el contenedor y configurar OpenVPN:
+Cada contenedor se encarga de gestionar una **subred VPN independiente**. Si deseas configurar una VPN específica para un proyecto, lanza un contenedor con un nombre distintivo:
 ```bash
-sudo docker run --name subnetx-openvpn -d
+sudo docker run --name subnetx-vpn1 -d \
     --restart unless-stopped \
     --cap-add=NET_ADMIN \
     --device=/dev/net/tun:/dev/net/tun \
     -p 1194:1194/udp \
-    -v ./client:/etc/openvpn/client \
-    subnetx-openvpn
+    -v ./vpn1-data:/etc/openvpn \
+    subnetx-vpn1
+```
+> **Nota:** El volumen `-v ./vpn1-data:/etc/openvpn` asegura que los certificados y configuraciones se almacenen en el sistema host, evitando su pérdida al reiniciar o eliminar el contenedor. En el caso de que sólo se desee mantener los clientes, el volumen se debería de especificar de la siguiente forma: `-v ./vpn1-client:/etc/openvpn/client`.
 
+Si deseas otra subred para un segundo proyecto:
+```bash
+sudo docker run --name subnetx-vpn2 -d \
+    --restart unless-stopped \
+    --cap-add=NET_ADMIN \
+    --device=/dev/net/tun:/dev/net/tun \
+    -p 1195:1194/udp \
+    -v ./vpn2-data:/etc/openvpn \
+    subnetx-vpn2
 ```
 
 ### 5. Ejecutar la Configuración Inicial
-Ahora `subnetx setup` admite **parámetros de entrada** para personalizar la configuración del servidor OpenVPN:
+Cada contenedor VPN debe configurarse individualmente. Ejecuta el siguiente comando para configurar `subnetx-vpn1`:
 ```bash
-sudo docker exec -it subnetx-openvpn subnetx setup \
+sudo docker exec -it subnetx-vpn1 subnetx setup \
     --network 10.9.0.0 \
     --netmask 255.255.255.0 \
-    --port 1994 \
+    --port 1194 \
     --proto udp \
     --tun tun1 \
-    --ip myvpn.example.com
+    --ip myvpn1.example.com
 ```
-
-Si prefieres ejecutarlo manualmente dentro del contenedor:
+Para otro proyecto con una subred diferente:
 ```bash
-sudo docker exec -it subnetx-openvpn /bin/bash
-subnetx setup --network 10.9.0.0 --netmask 255.255.255.0 --port 1195 --proto udp --tun tun1 --ip myvpn.example.com
+sudo docker exec -it subnetx-vpn2 subnetx setup \
+    --network 10.10.0.0 \
+    --netmask 255.255.255.0 \
+    --port 1195 \
+    --proto udp \
+    --tun tun2 \
+    --ip myvpn2.example.com
 ```
 
 ### 6. Administrar Clientes VPN
-Para añadir un cliente:
+Para agregar clientes sin perder la configuración ni los certificados:
 ```bash
-sudo docker exec -it subnetx-openvpn subnetx client new --name cliente1 --ip 10.9.0.10
+sudo docker exec -it subnetx-vpn1 subnetx client new --name cliente1 --ip 10.9.0.10
+```
+Para otro proyecto:
+```bash
+sudo docker exec -it subnetx-vpn2 subnetx client new --name cliente2 --ip 10.10.0.10
 ```
 
 ### 7. Detener y Eliminar el Contenedor
-Para detener el contenedor:
+Para **detener** el contenedor sin perder la configuración:
 ```bash
-sudo docker stop subnetx-openvpn
+sudo docker stop subnetx-vpn1
 ```
+Para eliminarlo definitivamente:
+```bash
+sudo docker rm subnetx-vpn1
+```
+Si deseas reiniciar la VPN sin afectar los datos almacenados en el volumen:
+```bash
+sudo docker start subnetx-vpn1
+```
+Para eliminar el contenedor y los datos de configuración:
+```bash
+sudo docker rm -v subnetx-vpn1
+```
+> **Importante:** Si eliminas el contenedor sin la opción `-v`, los certificados y configuraciones seguirán almacenados en `./vpn1-data`.
 
 ## 📌 Notas Importantes
-- **Es necesario abrir el o los puertos a usar por la VPN en el router con el protocolo correspondiente.**
-- **Ejecuta siempre el contenedor como `root`** para evitar problemas de permisos.
-- **Los comandos dentro del contenedor también deben ejecutarse como `root`**.
-- Si modificas `docker/config/openvpn/`, recuerda reconstruir la imagen.
+- **Cada contenedor gestiona una subred VPN independiente**, ideal para separar proyectos o clientes.
+- **Los puertos deben abrirse en el router** para permitir conexiones externas.
+- **Siempre ejecuta el contenedor como `root`** para evitar problemas de permisos.
+- **Guarda los certificados en volúmenes externos (`-v ./vpn1-data:/etc/openvpn`) para evitar pérdidas de datos.**
+- Si modificas `docker/config/openvpn/`, recuerda reconstruir la imagen antes de reiniciar.
 
 ## 📖 Información Adicional
-Para más detalles sobre OpenVPN y su configuración avanzada, visita la documentación oficial:
+Para más detalles sobre OpenVPN y configuraciones avanzadas, consulta la documentación oficial:
 🔗 [OpenVPN Documentation](https://openvpn.net/community-resources/)
 
