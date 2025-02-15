@@ -66,7 +66,7 @@ remote $PUBLIC_IP $OPENVPN_PORT
 resolv-retry infinite
 nobind
 user nobody
-group nogroup
+group nobody
 persist-key
 persist-tun
 remote-cert-tls server
