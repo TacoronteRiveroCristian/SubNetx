@@ -25,7 +25,7 @@ client-config-dir /etc/openvpn/ccd
 
 # Registro y persistencia
 user nobody
-group nogroup
+group nobody
 persist-key
 persist-tun
 status /etc/openvpn/openvpn-status.log
