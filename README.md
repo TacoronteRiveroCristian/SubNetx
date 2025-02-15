@@ -42,10 +42,9 @@ sudo docker run --name subnetx-vpn1 -d \
     --cap-add=NET_ADMIN \
     --device=/dev/net/tun:/dev/net/tun \
     -p 1194:1194/udp \
-    -v ./vpn1-data:/etc/openvpn \
+    -v ./vpn1-client:/etc/openvpn/client \
     subnetx-vpn1
 ```
-> **Nota:** El volumen `-v ./vpn1-data:/etc/openvpn` asegura que los certificados y configuraciones se almacenen en el sistema host, evitando su pérdida al reiniciar o eliminar el contenedor. En el caso de que sólo se desee mantener los clientes, el volumen se debería de especificar de la siguiente forma: `-v ./vpn1-client:/etc/openvpn/client`.
 
 Si deseas otra subred para un segundo proyecto:
 ```bash
@@ -54,7 +53,7 @@ sudo docker run --name subnetx-vpn2 -d \
     --cap-add=NET_ADMIN \
     --device=/dev/net/tun:/dev/net/tun \
     -p 1195:1194/udp \
-    -v ./vpn2-data:/etc/openvpn \
+    -v ./vpn2-client:/etc/openvpn/client \
     subnetx-vpn2
 ```
 
@@ -79,6 +78,14 @@ sudo docker exec -it subnetx-vpn2 subnetx setup \
     --tun tun2 \
     --ip myvpn2.example.com
 ```
+
+### 6. Gestión del Servidor VPN
+Una vez configurado, puedes gestionar el servidor con los siguientes comandos:
+```bash
+sudo docker exec -it subnetx-vpn1 subnetx start
+sudo docker exec -it subnetx-vpn1 subnetx stop
+```
+Al ejecutar los comandos `subnetx start` y `subnetx stop`, la VPN se inicia o para respectivamente y manteniendo los certificados y configuración que se estableció con el comando `subnetx setup`.
 
 ### 6. Administrar Clientes VPN
 Para agregar clientes sin perder la configuración ni los certificados:
@@ -113,7 +120,7 @@ sudo docker rm -v subnetx-vpn1
 - **Cada contenedor gestiona una subred VPN independiente**, ideal para separar proyectos o clientes.
 - **Los puertos deben abrirse en el router** para permitir conexiones externas.
 - **Siempre ejecuta el contenedor como `root`** para evitar problemas de permisos.
-- **Guarda los certificados en volúmenes externos (`-v ./vpn1-data:/etc/openvpn`) para evitar pérdidas de datos.**
+- **Cuidado con eliminar el contenedor ya que los certificados se perderán**. Si deseas eliminar el contenedor sin perder los certificados, utiliza la opción `-v` al eliminarlo: `sudo docker rm -v subnetx-vpn1`.
 - Si modificas `docker/config/openvpn/`, recuerda reconstruir la imagen antes de reiniciar.
 
 ## 📖 Información Adicional
