@@ -94,7 +94,7 @@ sudo docker exec -it subnetx-vpn1 subnetx stop
 ```
 Al ejecutar los comandos `subnetx start` y `subnetx stop`, la VPN se inicia o para respectivamente y manteniendo los certificados y configuración que se estableció con el comando `subnetx setup`.
 
-### 6. Administrar Clientes VPN
+### 7. Administrar Clientes VPN
 Para agregar clientes sin perder la configuración ni los certificados:
 ```bash
 sudo docker exec -it subnetx-vpn1 subnetx client new --name cliente1 --ip 10.9.0.10
@@ -116,7 +116,7 @@ resolv-retry infinite
 ```
 
 
-### 7. Detener y Eliminar el Contenedor
+### 8. Detener y Eliminar el Contenedor
 Para **detener** el contenedor sin perder la configuración:
 ```bash
 sudo docker stop subnetx-vpn1
