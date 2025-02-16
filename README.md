@@ -53,7 +53,7 @@ sudo docker run --name subnetx-vpn2 -d \
     subnetx-vpn
 ```
 
-> **IMPORTANTE:** Si el servidor está detrás de un router, **debes abrir y redirigir el puerto correspondiente en el router** para permitir conexiones externas. En este ejemplo:
+> ⚠️ **IMPORTANTE:** Si el servidor está detrás de un router, **debes abrir y redirigir el puerto correspondiente en el router** para permitir conexiones externas. En este ejemplo:
 > - Para `subnetx-vpn1`, debes abrir y redirigir el puerto **1194/UDP** en el router hacia la IP del servidor.
 > - Para `subnetx-vpn2`, debes abrir y redirigir el puerto **1195/UDP** en el router hacia la IP del servidor.
 
