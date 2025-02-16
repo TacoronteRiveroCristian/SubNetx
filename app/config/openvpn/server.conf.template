@@ -1,33 +1,35 @@
-port {{PORT}}                # Puerto del servidor
-proto {{PROTO}}              # Protocolo
-dev {{TUN}}                  # Dispositivo TUN
-topology subnet              # Topología de subred
-keepalive 5 30               # Comprobar conexión
+port {{PORT}}                                          # Puerto en el que escucha el servidor OpenVPN
+proto {{PROTO}}                                        # Protocolo de transporte (UDP o TCP)
+dev {{TUN}}                                            # Dispositivo virtual de tunel (TUN para capa 3, TAP para capa 2)
+topology subnet                                        # Configuracion de topología, usa subnet en lugar de punto a punto
+keepalive 5 30                                         # Mantiene la conexión activa enviando pings cada 5s, reconecta tras 30s
 
 # Rutas a certificados y claves
-ca /etc/openvpn/ca.crt       # Certificado CA
-cert /etc/openvpn/server.crt # Certificado servidor
-key /etc/openvpn/server.key  # Clave privada servidor
-dh /etc/openvpn/dh.pem       # Clave Diffie-Hellman
-tls-auth /etc/openvpn/ta.key 0  # Clave autenticación TLS
+ca /etc/openvpn/ca.crt                                 # Certificado de la Autoridad de Certificacion (CA)
+cert /etc/openvpn/server.crt                           # Certificado del servidor OpenVPN
+key /etc/openvpn/server.key                            # Clave privada del servidor
+dh /etc/openvpn/dh.pem                                 # Parámetros Diffie-Hellman para el intercambio de claves
+tls-auth /etc/openvpn/ta.key 0                         # Clave de autenticación TLS para proteger contra ataques MITM
 
-# Cifrado
-data-ciphers AES-256-GCM:AES-128-GCM
-data-ciphers-fallback AES-256-CBC
-auth SHA256
+# Cifrado y autenticación
+data-ciphers AES-256-GCM:AES-128-GCM                   # Algoritmos de cifrado permitidos para la comunicacion segura
+data-ciphers-fallback AES-256-CBC                      # Algoritmo de cifrado de respaldo si el cliente no soporta los anteriores
+auth SHA256                                            # Algoritmo de autenticación de mensajes para garantizar integridad
 
-# Red
-server {{NETWORK}} {{NETMASK}}   # Subred VPN
-push "redirect-gateway def1 bypass-dhcp"
-push "dhcp-option DNS 8.8.8.8"
-push "dhcp-option DNS 8.8.4.4"
-client-config-dir /etc/openvpn/ccd
+# Red y enrutamiento
+server {{NETWORK}} {{NETMASK}}                         # Define la red privada de la VPN y su mascara de red
+push "route {{NETWORK}} {{NETMASK}}"                   # Envía la ruta de la red VPN a los clientes
+push "dhcp-option DNS 8.8.8.8"                         # Asigna el servidor DNS 8.8.8.8 (Google) a los clientes
+push "dhcp-option DNS 8.8.4.4"                         # Asigna el servidor DNS 8.8.4.4 (Google) a los clientes
+client-config-dir /etc/openvpn/ccd                     # Directorio donde se definen configuraciones especificas para clientes
 
-# Registro y persistencia
-user nobody
-group nobody
-persist-key
-persist-tun
-status /etc/openvpn/openvpn-status.log
-log /etc/openvpn/openvpn.log
-verb 3
+# Seguridad y persistencia
+user nobody                                           # Ejecuta OpenVPN con el usuario 'nobody' (sin privilegios)
+group nogroup                                         # Ejecuta OpenVPN con el grupo 'nogroup' (sin privilegios)
+persist-key                                           # Mantiene la clave de cifrado al reiniciar la conexión
+persist-tun                                           # Mantiene el tunel activo en caso de reconexión
+
+# Logs y depuración
+status /etc/openvpn/openvpn-status.log                # Archivo donde se almacenan los estados de conexion de clientes
+log /etc/openvpn/openvpn.log                          # Archivo de logs de OpenVPN
+verb 3                                                # Nivel de verbosidad en logs

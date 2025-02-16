@@ -27,11 +27,7 @@ Esto evita accesos no autorizados a archivos sensibles de configuración.
 ### 3. Construir la Imagen Docker
 Ejecuta el siguiente comando para construir la imagen:
 ```bash
-sudo docker build -t subnetx-vpn1 -f docker/subnetx.Dockerfile .
-```
-Si necesitas múltiples subredes VPN, puedes construir varias imágenes con nombres diferentes:
-```bash
-sudo docker build -t subnetx-vpn2 -f docker/subnetx.Dockerfile .
+sudo docker build -t subnetx-vpn -f docker/subnetx.Dockerfile .
 ```
 
 ### 4. Ejecutar el Contenedor
@@ -43,7 +39,7 @@ sudo docker run --name subnetx-vpn1 -d \
     --device=/dev/net/tun:/dev/net/tun \
     -p 1194:1194/udp \
     -v ./vpn1-client:/etc/openvpn/client \
-    subnetx-vpn1
+    subnetx-vpn
 ```
 
 Si deseas otra subred para un segundo proyecto:
@@ -54,8 +50,12 @@ sudo docker run --name subnetx-vpn2 -d \
     --device=/dev/net/tun:/dev/net/tun \
     -p 1195:1194/udp \
     -v ./vpn2-client:/etc/openvpn/client \
-    subnetx-vpn2
+    subnetx-vpn
 ```
+
+> **IMPORTANTE:** Si el servidor está detrás de un router, **debes abrir y redirigir el puerto correspondiente en el router** para permitir conexiones externas. En este ejemplo:
+> - Para `subnetx-vpn1`, debes abrir y redirigir el puerto **1194/UDP** en el router hacia la IP del servidor.
+> - Para `subnetx-vpn2`, debes abrir y redirigir el puerto **1195/UDP** en el router hacia la IP del servidor.
 
 ### 5. Ejecutar la Configuración Inicial
 Cada contenedor VPN debe configurarse individualmente. Ejecuta el siguiente comando para configurar `subnetx-vpn1`:
@@ -79,6 +79,13 @@ sudo docker exec -it subnetx-vpn2 subnetx setup \
     --ip myvpn2.example.com
 ```
 
+#### 🔍 **Configuración de `tunX` y `tapX`**
+El parámetro `--tun tunX` o `--tap tapX` especifica el tipo de interfaz de red:
+- `tunX`: Crea una interfaz de **capa 3 (IP Routing)**, permitiendo el acceso a la VPN sin integrar los clientes en la misma red local.
+- `tapX`: Crea una interfaz de **capa 2 (Ethernet Bridging)**, lo que significa que los clientes de la VPN estarán en la misma red que el servidor, como si estuvieran conectados por cable.
+
+Para la mayoría de los casos, **`tunX` es la mejor opción** porque es más eficiente y evita colisiones de direcciones IP en redes LAN existentes. Usa `tapX` solo si necesitas que los clientes compartan la misma red LAN que el servidor.
+
 ### 6. Gestión del Servidor VPN
 Una vez configurado, puedes gestionar el servidor con los siguientes comandos:
 ```bash
@@ -96,6 +103,18 @@ Para otro proyecto:
 ```bash
 sudo docker exec -it subnetx-vpn2 subnetx client new --name cliente2 --ip 10.10.0.10
 ```
+
+> ⚠️ **IMPORTANTE:** En el caso de que el cliente necesite apuntar a un **puerto distinto de 1194**, es necesario especificarlo en el **archivo .ovpn** del cliente ya que esa funcionalidad aún no está implementada en la herramienta `subnetx`.
+
+```bash
+client
+dev tun
+proto udp
+remote myvpn1.example.com 119X #1994
+resolv-retry infinite
+...
+```
+
 
 ### 7. Detener y Eliminar el Contenedor
 Para **detener** el contenedor sin perder la configuración:
