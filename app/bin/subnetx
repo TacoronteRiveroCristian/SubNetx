@@ -1,13 +1,18 @@
 #!/bin/bash
 # Descripcion: Script principal para gestionar OpenVPN.
 
-source /app/config/openvpn/config.sh
+echo ""
+echo "📡 SubnetX - Gestion de OpenVPN"
+echo "--------------------------------"
+echo ""
 
 # Mostrar ayuda si se pasa "help" como primer argumento.
 if [[ "$1" == "help" ]]; then
     /app/scripts/openvpn-help.sh
     exit 1
 fi
+
+source /app/config/openvpn/config.sh
 
 COMMAND=$1
 SUBCOMMAND=$2

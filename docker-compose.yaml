@@ -1,0 +1,46 @@
+services:
+  subnetx:
+    build:
+      context: .
+      dockerfile: ./docker/subnetx.Dockerfile
+    container_name: subnetx_vpn
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    privileged: true
+    volumes:
+      - ./app/bin/:/usr/local/bin/
+      - ./app/config/:/app/config/
+      - ./app/scripts/:/app/scripts/
+      - ./clients/:/etc/openvpn/client/
+    ports:
+      - "${OPENVPN_PORT:-1194}:${OPENVPN_PORT:-1194}/udp"
+    environment:
+      - PUBLIC_IP=${DUCKDNS_DOMAIN}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - subnetx
+
+  duckdns:
+    image: linuxserver/duckdns
+    container_name: subnetx_vpn_duckdns
+    restart: unless-stopped
+    environment:
+      - SUBDOMAINS=${DUCKDNS_DOMAIN}
+      - TOKEN=${DUCKDNS_TOKEN}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - subnetx
+
+networks:
+  subnetx:
+    driver: bridge
