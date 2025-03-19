@@ -18,7 +18,7 @@ if [ -z "$PID" ]; then
 fi
 
 # Guardar el PID
-echo "$PID" | tee "${OPENVPN_PID_FILE}" > /dev/null
+echo "$PID" > "${OPENVPN_DIR}/openvpn.pid"
 
 echo "✅ OpenVPN iniciado correctamente en segundo plano (PID: $PID)."
 

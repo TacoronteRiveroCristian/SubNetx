@@ -4,6 +4,10 @@ FROM ubuntu:22.04
 # Evitar interacciones durante la instalación
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Definir variables de entorno base
+ENV OPENVPN_DIR="/etc/openvpn"
+ENV EASYRSA_DIR="/etc/openvpn/easy-rsa"
+
 # Actualizar e instalar paquetes necesarios sin recomendaciones extras
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
