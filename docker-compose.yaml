@@ -10,10 +10,8 @@ services:
       - SYS_ADMIN
     privileged: true
     volumes:
-      - ./app/bin/:/usr/local/bin/
-      - ./app/config/:/app/config/
-      - ./app/scripts/:/app/scripts/
-      - ./clients/:/etc/openvpn/client/
+      - ./certs:/etc/openvpn/certs
+      - ./logs:/var/log/openvpn
     ports:
       - "${OPENVPN_PORT}:${OPENVPN_PORT}/udp"
     environment:

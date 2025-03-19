@@ -1,3 +1,4 @@
-config.sh
+certs/
+logs/
 .env
 *.ovpn

@@ -17,6 +17,18 @@ Variables de entorno requeridas para setup:
   TUN_DEVICE       - Dispositivo TUN (ej: tun0)
   PUBLIC_IP        - IP pública del servidor
 
+Rutas importantes:
+  Certificados     - /etc/openvpn/certs
+  Configuraciones  - /etc/openvpn/ccd
+  Logs             - /var/log/openvpn
+  Clientes         - /etc/openvpn/clients
+
+Para montar volúmenes en Docker:
+  volumes:
+    - ./certs:/etc/openvpn/certs
+    - ./logs:/var/log/openvpn
+    - ./clients:/etc/openvpn/clients
+
 Ejemplo de configuración en .env:
   VPN_NETWORK=10.8.0.0
   VPN_NETMASK=255.255.255.0

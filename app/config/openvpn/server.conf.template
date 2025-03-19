@@ -5,11 +5,11 @@ topology subnet                                        # Configuracion de topolo
 keepalive 5 30                                         # Mantiene la conexión activa enviando pings cada 5s, reconecta tras 30s
 
 # Rutas a certificados y claves
-ca /etc/openvpn/ca.crt                                 # Certificado de la Autoridad de Certificacion (CA)
-cert /etc/openvpn/server.crt                           # Certificado del servidor OpenVPN
-key /etc/openvpn/server.key                            # Clave privada del servidor
-dh /etc/openvpn/dh.pem                                 # Parámetros Diffie-Hellman para el intercambio de claves
-tls-auth /etc/openvpn/ta.key 0                         # Clave de autenticación TLS para proteger contra ataques MITM
+ca /etc/openvpn/certs/ca.crt                           # Certificado de la Autoridad de Certificacion (CA)
+cert /etc/openvpn/certs/server.crt                     # Certificado del servidor OpenVPN
+key /etc/openvpn/certs/server.key                      # Clave privada del servidor
+dh /etc/openvpn/certs/dh.pem                           # Parámetros Diffie-Hellman para el intercambio de claves
+tls-auth /etc/openvpn/certs/ta.key 0                   # Clave de autenticación TLS para proteger contra ataques MITM
 
 # Cifrado y autenticación
 data-ciphers AES-256-GCM:AES-128-GCM                   # Algoritmos de cifrado permitidos para la comunicacion segura
@@ -30,6 +30,6 @@ persist-key                                           # Mantiene la clave de cif
 persist-tun                                           # Mantiene el tunel activo en caso de reconexión
 
 # Logs y depuración
-status /etc/openvpn/openvpn-status.log                # Archivo donde se almacenan los estados de conexion de clientes
-log /etc/openvpn/openvpn.log                          # Archivo de logs de OpenVPN
+status {{LOGS_DIR}}/status.log                         # Archivo donde se almacenan los estados de conexión de clientes
+log {{LOGS_DIR}}/openvpn.log                           # Archivo de logs de OpenVPN
 verb 3                                                # Nivel de verbosidad en logs
