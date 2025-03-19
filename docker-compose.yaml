@@ -15,9 +15,14 @@ services:
       - ./app/scripts/:/app/scripts/
       - ./clients/:/etc/openvpn/client/
     ports:
-      - "${OPENVPN_PORT:-1194}:${OPENVPN_PORT:-1194}/udp"
+      - "${OPENVPN_PORT}:${OPENVPN_PORT}/udp"
     environment:
-      - PUBLIC_IP=${DUCKDNS_DOMAIN}
+      - VPN_NETWORK=${VPN_NETWORK}
+      - VPN_NETMASK=${VPN_NETMASK}
+      - OPENVPN_PORT=${OPENVPN_PORT}
+      - OPENVPN_PROTO=${OPENVPN_PROTO}
+      - TUN_DEVICE=${TUN_DEVICE}
+      - PUBLIC_IP=${PUBLIC_IP}
     logging:
       driver: "json-file"
       options:
@@ -31,7 +36,7 @@ services:
     container_name: subnetx_vpn_duckdns
     restart: unless-stopped
     environment:
-      - SUBDOMAINS=${DUCKDNS_DOMAIN}
+      - SUBDOMAINS=${PUBLIC_IP}
       - TOKEN=${DUCKDNS_TOKEN}
     logging:
       driver: "json-file"

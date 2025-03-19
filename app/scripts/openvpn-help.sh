@@ -9,11 +9,19 @@ Comandos:
   client new    Crea un nuevo cliente (requiere --name y --ip).
   client delete Elimina un cliente.
 
-Opciones para "client new":
-  --name <nombre>   Especifica el nombre del cliente.
-  --ip   <ip>       Especifica la IP asignada al cliente.
+Variables de entorno requeridas para setup:
+  VPN_NETWORK      - Red VPN (ej: 10.8.0.0)
+  VPN_NETMASK      - Máscara de red VPN (ej: 255.255.255.0)
+  OPENVPN_PORT     - Puerto OpenVPN (ej: 1194)
+  OPENVPN_PROTO    - Protocolo (udp/tcp)
+  TUN_DEVICE       - Dispositivo TUN (ej: tun0)
+  PUBLIC_IP        - IP pública del servidor
 
-Ejemplo:
-  $(basename "$0") client new --name myclient1 --ip 10.8.0.10
-
+Ejemplo de configuración en .env:
+  VPN_NETWORK=10.8.0.0
+  VPN_NETMASK=255.255.255.0
+  OPENVPN_PORT=1194
+  OPENVPN_PROTO=udp
+  TUN_DEVICE=tun0
+  PUBLIC_IP=ejemplo.com
 EOF
