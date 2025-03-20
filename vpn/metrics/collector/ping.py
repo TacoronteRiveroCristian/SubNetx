@@ -1,75 +1,54 @@
 #!/usr/bin/env python3
 """
 SubNetx VPN Client Ping Monitor
-This script monitors the status and latency of VPN clients by performing ping tests.
-Includes TLS verification, ICMP metrics, and response time measurements.
+
+This module provides functionality to monitor VPN client connectivity
+through ICMP ping tests, measuring latency, packet loss, and response times.
+It serves as the primary tool for basic connectivity assessment.
 """
 
 import subprocess
 import json
-import time
+import re
 from datetime import datetime
 import logging
-from typing import Dict, List, Optional, Any
-import re
-import ssl
-import socket
+from typing import Dict, List, Any
 
-class VPNPingMonitor:
+from base import BaseMonitor
+
+class PingMonitor(BaseMonitor):
+    """VPN Ping Monitor for measuring network connectivity and latency.
+
+    This class specializes in ICMP ping-based measurements, providing
+    detailed packet loss statistics, response times in milliseconds,
+    and connection quality assessment.
+
+    :param target: Target hostname or IP address to monitor
+    :type target: str
+    :ivar results: Storage for ping test results
+    :type results: Dict[str, Any]
+    """
+
     def __init__(self, target: str):
-        """
-        Initialize the VPN Ping Monitor.
+        """Initialize the VPN Ping Monitor.
 
-        Args:
-            target (str): Target hostname or IP address to monitor
+        :param target: Target hostname or IP address to monitor
+        :type target: str
         """
-        self.target = target
+        super().__init__(target)
         self.results = {}
-        self.logger = logging.getLogger('subnetx')
-        self.logger.info(f"Initialized Ping Monitor for {target}")
-
-    def check_tls(self, hostname: str, port: int = 443) -> Dict[str, Any]:
-        """
-        Check TLS certificate information for the target host.
-
-        Args:
-            hostname (str): Hostname to check TLS for
-            port (int): Port to check TLS on (default: 443)
-
-        Returns:
-            Dict[str, Any]: TLS certificate information
-        """
-        try:
-            context = ssl.create_default_context()
-            with socket.create_connection((hostname, port)) as sock:
-                with context.wrap_socket(sock, server_hostname=hostname) as ssock:
-                    cert = ssock.getpeercert()
-                    return {
-                        'tls_version': ssock.version(),
-                        'cipher': ssock.cipher(),
-                        'cert_expiry': datetime.strptime(cert['notAfter'], '%b %d %H:%M:%S %Y %Z').isoformat(),
-                        'issuer': dict(x[0] for x in cert['issuer']),
-                        'subject': dict(x[0] for x in cert['subject'])
-                    }
-        except Exception as e:
-            self.logger.error(f"TLS check failed for {hostname}: {e}")
-            return {
-                'tls_version': None,
-                'cipher': None,
-                'cert_expiry': None,
-                'issuer': None,
-                'subject': None,
-                'error': str(e)
-            }
 
     def get_active_clients(self) -> List[str]:
-        """
-        Get list of active VPN clients from OpenVPN status file.
+        """Get list of active VPN clients from OpenVPN status file.
 
-        Returns:
-            List[str]: List of client IP addresses
+        :return: List of client IP addresses
+        :rtype: List[str]
+        :raises FileNotFoundError: If status file cannot be found
         """
         try:
+            # Read the status file
+            # TODO: Here you have to edit the script so that
+            # it takes the clients that are in the ccd folder
             with open('/var/log/openvpn/status.log', 'r') as f:
                 status_data = f.read()
 
@@ -83,45 +62,44 @@ class VPNPingMonitor:
 
             return clients
         except Exception as e:
-            self.logger.error(f"Error reading status file: {e}")
-            return []
+            print(f"Error reading status file: {e}")
+            raise
 
     def _parse_ping_output(self, output: str) -> Dict[str, Any]:
-        """
-        Parse the ping command output to extract metrics.
+        """Parse the ping command output to extract metrics.
 
-        Args:
-            output (str): Raw output from ping command
-
-        Returns:
-            Dict[str, Any]: Dictionary with parsed metrics
+        :param output: Raw output from ping command
+        :type output: str
+        :return: Dictionary with parsed ping metrics
+        :rtype: Dict[str, Any]
+        :raises ValueError: If ping output cannot be parsed
         """
         try:
-            # Extract packet loss percentage using regex - capture both number and %
-            packet_loss_match = re.search(r'(\d+%)', output)
-            packet_loss = packet_loss_match.group(1) if packet_loss_match else "100%"
+            # Extract packet loss percentage
+            packet_loss_match = re.search(r'(\d+)% packet loss', output)
+            packet_loss = packet_loss_match.group(1) if packet_loss_match else "100"
 
             # Extract round-trip time statistics
             rtt_match = re.search(r'rtt min/avg/max/mdev = ([\d.]+)/([\d.]+)/([\d.]+)/([\d.]+)', output)
             if rtt_match:
                 rtt_stats = {
-                    'min': float(rtt_match.group(1)),
-                    'avg': float(rtt_match.group(2)),
-                    'max': float(rtt_match.group(3)),
-                    'mdev': float(rtt_match.group(4))
+                    'min_ms': float(rtt_match.group(1)),
+                    'avg_ms': float(rtt_match.group(2)),
+                    'max_ms': float(rtt_match.group(3)),
+                    'mdev_ms': float(rtt_match.group(4))
                 }
             else:
-                rtt_stats = {'min': 0, 'avg': 0, 'max': 0, 'mdev': 0}
+                rtt_stats = {'min_ms': 0, 'avg_ms': 0, 'max_ms': 0, 'mdev_ms': 0}
 
-            # Extract ICMP type and code information
-            icmp_info = []
+            # Extract ICMP sequence details
+            icmp_details = []
             for line in output.split('\n'):
                 if 'icmp_seq=' in line:
                     icmp_match = re.search(r'icmp_seq=(\d+).*time=([\d.]+)', line)
                     if icmp_match:
-                        icmp_info.append({
+                        icmp_details.append({
                             'sequence': int(icmp_match.group(1)),
-                            'response_time': float(icmp_match.group(2))
+                            'response_time_ms': float(icmp_match.group(2))
                         })
 
             # Extract transmitted and received packets
@@ -135,179 +113,138 @@ class VPNPingMonitor:
 
             return {
                 'timestamp': datetime.now().isoformat(),
-                'packet_loss': packet_loss,
+                'packet_loss_percent': float(packet_loss),
                 'rtt_stats': rtt_stats,
-                'icmp_details': icmp_info,
+                'icmp_details': icmp_details,
                 'packets': {
                     'transmitted': transmitted,
                     'received': received
                 }
             }
         except Exception as e:
-            self.logger.error(f"Error parsing ping output: {e}")
-            return {
-                'timestamp': datetime.now().isoformat(),
-                'packet_loss': "100%",
-                'rtt_stats': {'min': 0, 'avg': 0, 'max': 0, 'mdev': 0},
-                'icmp_details': [],
-                'packets': {'transmitted': 0, 'received': 0},
-                'error': str(e)
-            }
+            print(f"Error parsing ping output: {e}")
+            raise ValueError(f"Failed to parse ping output: {e}")
 
-    def ping_target(self, ip: str = None) -> Optional[Dict]:
-        """
-        Perform ping test on a target IP.
+    def ping_target(self, ip: str = None, count: int = 4, timeout: int = 10) -> Dict[str, Any]:
+        """Perform ping test on a target IP.
 
-        Args:
-            ip (str, optional): IP address to ping. If None, uses self.target.
-
-        Returns:
-            Optional[Dict]: Ping results or None if failed
+        :param ip: IP address to ping. If None, uses self.target
+        :type ip: str, optional
+        :param count: Number of ICMP packets to send
+        :type count: int, optional
+        :param timeout: Timeout in seconds
+        :type timeout: int, optional
+        :return: Ping results including status, latency and packet loss
+        :rtype: Dict[str, Any]
+        :raises subprocess.TimeoutExpired: If ping command times out
+        :raises subprocess.SubprocessError: If ping command fails
         """
         target = ip if ip else self.target
-        self.logger.info(f"Pinging {target}...")
+        print(f"Pinging {target}...")
 
         try:
-            # Perform ping test with 4 packets
+            # Perform ping test
             result = subprocess.run(
-                ['ping', '-c', '4', target],
+                ['ping', '-c', str(count), target],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=timeout
             )
 
             # Parse ping output
             if result.returncode == 0:
-                # Extract statistics
-                stats = {}
-                packet_loss = "100%"  # Default to 100% loss
-                min_rtt = max_rtt = avg_rtt = std_rtt = "N/A"
+                # Parse the ping output
+                parsed_results = self._parse_ping_output(result.stdout)
 
-                for line in result.stdout.split('\n'):
-                    if 'min/avg/max' in line:
-                        # Parse the RTT values (min/avg/max/mdev)
-                        rtt_parts = line.split('=')[1].strip().split('/')
-                        if len(rtt_parts) >= 4:
-                            min_rtt = float(rtt_parts[0])
-                            avg_rtt = float(rtt_parts[1])
-                            max_rtt = float(rtt_parts[2])
-                            std_rtt = float(rtt_parts[3].split()[0])  # Remove 'ms'
-                    elif 'packet loss' in line:
-                        # Parse packet loss percentage
-                        for part in line.split(','):
-                            if 'packet loss' in part:
-                                packet_loss = re.search(r'(\d+)%', part).group(1)
-                                break
-
-                # Create detailed stats dictionary
-                stats = {
-                    'min_rtt': min_rtt,
-                    'avg_rtt': avg_rtt,
-                    'max_rtt': max_rtt,
-                    'std_rtt': std_rtt,
-                    'packet_loss': packet_loss
-                }
-
-                # Determine if connection is stable based on packet loss
-                if packet_loss not in ['N/A', 'unknown', None]:
-                    loss_pct = float(packet_loss)
-                    connection_quality = 'excellent' if loss_pct == 0 else \
-                                         'good' if loss_pct < 5 else \
-                                         'fair' if loss_pct < 20 else \
-                                         'poor'
-                else:
-                    connection_quality = 'unknown'
-
-                # Get TLS information if it's a hostname
-                tls_info = {}
-                if not re.match(r'^(\d{1,3}\.){3}\d{1,3}$', target):
-                    tls_info = self.check_tls(target)
-
-                # Parse ICMP details
-                icmp_details = []
-                for line in result.stdout.split('\n'):
-                    if 'icmp_seq=' in line:
-                        icmp_match = re.search(r'icmp_seq=(\d+).*time=([\d.]+)', line)
-                        if icmp_match:
-                            icmp_details.append({
-                                'sequence': int(icmp_match.group(1)),
-                                'response_time': float(icmp_match.group(2))
-                            })
+                # Determine connection quality based on packet loss
+                packet_loss = parsed_results['packet_loss_percent']
+                connection_quality = 'excellent' if packet_loss == 0 else \
+                                     'good' if packet_loss < 5 else \
+                                     'fair' if packet_loss < 20 else \
+                                     'poor'
 
                 return {
                     'ip': target,
                     'status': 'online',
                     'timestamp': datetime.now().isoformat(),
                     'connection_quality': connection_quality,
-                    'stats': stats,
-                    'tls_info': tls_info,
-                    'icmp_details': icmp_details,
+                    'rtt_stats': parsed_results['rtt_stats'],
+                    'icmp_details': parsed_results['icmp_details'],
+                    'packet_loss_percent': parsed_results['packet_loss_percent'],
+                    'packets': parsed_results['packets'],
                     'raw_output': result.stdout
                 }
             else:
-                self.logger.warning(f"Ping to {target} failed with return code {result.returncode}")
+                print(f"Ping to {target} failed with return code {result.returncode}")
                 return {
                     'ip': target,
                     'status': 'offline',
                     'timestamp': datetime.now().isoformat(),
                     'connection_quality': 'none',
-                    'stats': None,
-                    'tls_info': {},
-                    'icmp_details': [],
                     'error': result.stderr
                 }
 
         except subprocess.TimeoutExpired:
-            self.logger.warning(f"Ping to {target} timed out")
+            print(f"Ping to {target} timed out")
             return {
                 'ip': target,
                 'status': 'timeout',
                 'timestamp': datetime.now().isoformat(),
                 'connection_quality': 'none',
-                'stats': None,
-                'tls_info': {},
-                'icmp_details': [],
                 'error': 'Ping timeout'
             }
         except Exception as e:
-            self.logger.error(f"Error pinging {target}: {e}")
-            return {
-                'ip': target,
-                'status': 'error',
-                'timestamp': datetime.now().isoformat(),
-                'connection_quality': 'none',
-                'stats': None,
-                'tls_info': {},
-                'icmp_details': [],
-                'error': str(e)
-            }
+            print(f"Error pinging {target}: {e}")
+            raise
 
     def collect(self) -> Dict[str, Any]:
+        """Collect ping metrics for the target.
+
+        Performs ping tests to measure basic connectivity metrics including
+        latency, packet loss, and jitter.
+
+        :return: Dictionary with ping metrics
+        :rtype: Dict[str, Any]
+        :raises Exception: If collection fails
         """
-        Collect ping metrics for the target.
+        try:
+            # Start with the basic result structure
+            result = self.get_basic_result()
 
-        Returns:
-            Dict[str, Any]: Dictionary with ping metrics
-        """
-        # Ping the main target
-        result = self.ping_target()
-        self.results[self.target] = result
+            # Ping the main target
+            ping_result = self.ping_target()
 
-        # If we're monitoring a VPN server, we could also ping clients
-        if self.target.startswith('10.') or self.target.startswith('192.168.'):
-            # This might be a VPN server, so ping clients too
-            try:
-                clients = self.get_active_clients()
-                for client in clients:
-                    if client != self.target:  # Don't ping the target twice
-                        client_result = self.ping_target(client)
-                        if client_result:
-                            self.results[client] = client_result
-                            self.logger.info(f"Client ping result for {client}: {client_result['status']}")
-            except Exception as e:
-                self.logger.error(f"Error pinging VPN clients: {e}")
+            # Add TLS information for hostnames
+            if self.is_hostname(self.target):
+                tls_info = self.get_tls_info()
+                ping_result['tls_info'] = tls_info
 
-        return self.results
+            self.results[self.target] = ping_result
+            result['primary_target'] = ping_result
+
+            # If we're monitoring a VPN server, we could also ping clients
+            if self.target.startswith('10.') or self.target.startswith('192.168.'):
+                # This might be a VPN server, so ping clients too
+                clients_results = {}
+                try:
+                    clients = self.get_active_clients()
+                    for client in clients:
+                        if client != self.target:  # Don't ping the target twice
+                            client_result = self.ping_target(client)
+                            if client_result:
+                                clients_results[client] = client_result
+                                print(f"Client ping result for {client}: {client_result['status']}")
+
+                    if clients_results:
+                        result['vpn_clients'] = clients_results
+                except Exception as e:
+                    print(f"Error pinging VPN clients: {e}")
+                    result['vpn_clients_error'] = str(e)
+
+            return result
+        except Exception as e:
+            print(f"Error in ping collection: {e}")
+            raise
 
 # Standalone testing when script is run directly
 if __name__ == "__main__":
@@ -317,13 +254,18 @@ if __name__ == "__main__":
         format='%(asctime)s - %(levelname)s - %(message)s',
         handlers=[logging.StreamHandler()]
     )
-    logger = logging.getLogger('subnetx')
+    logger = logging.getLogger(__name__)
 
     # Test the ping monitor
     targets = ["google.com", "8.8.8.8", "invalid.example.domain"]
 
     for target in targets:
-        monitor = VPNPingMonitor(target)
-        results = monitor.collect()
-        print(f"\nResults for {target}:")
-        print(json.dumps(results, indent=2))
+        try:
+            logger.info(f"Testing {target}")
+            monitor = PingMonitor(target)
+            results = monitor.collect()
+            logger.info(f"\nResults for {target}:")
+            logger.info(json.dumps(results, indent=2))
+        except Exception as e:
+            logger.error(f"Failed to collect metrics for {target}: {str(e)}")
+            logger.error(f"Error details: {e.__class__.__name__}")

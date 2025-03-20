@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
 SubNetx VPN Bandwidth Monitor
-This script measures available bandwidth to assess connection quality.
-Includes TLS verification, ICMP details, and response time measurements.
+
+This module provides functionality to measure available bandwidth and connection quality
+for VPN connections, focusing on download/upload speeds and jitter measurements.
 """
 
 import subprocess
@@ -11,21 +12,40 @@ import json
 import logging
 import requests
 import statistics
-import ssl
-import socket
-import re
 from datetime import datetime
 from typing import Dict, List, Any, Optional, Tuple
 
-class BandwidthMonitor:
-    def __init__(self, target: str):
-        """
-        Initialize the Bandwidth Monitor.
+from .base import BaseMonitor
+from .ping import PingMonitor
 
-        Args:
-            target (str): Target hostname or IP address to monitor
+class BandwidthMonitor(BaseMonitor):
+    """Monitor for available bandwidth and connection quality.
+
+    This class specializes in measuring available bandwidth, including
+    download/upload speeds, jitter, and latency. It provides both raw
+    metrics and human-readable summaries.
+
+    :param target: Target hostname or IP address to monitor
+    :type target: str
+    :ivar download_speeds: Historical download speed measurements
+    :type download_speeds: List[Dict[str, Any]]
+    :ivar upload_speeds: Historical upload speed measurements
+    :type upload_speeds: List[Dict[str, Any]]
+    :ivar test_servers: List of servers to test bandwidth with
+    :type test_servers: List[str]
+    :ivar last_test_time: Timestamp of the last bandwidth test
+    :type last_test_time: float
+    :ivar test_interval: Interval between bandwidth tests in seconds
+    :type test_interval: int
+    """
+
+    def __init__(self, target: str):
+        """Initialize the Bandwidth Monitor.
+
+        :param target: Target hostname or IP address to monitor
+        :type target: str
         """
-        self.target = target
+        super().__init__(target)
         self.download_speeds = []
         self.upload_speeds = []
         self.test_servers = [
@@ -36,118 +56,18 @@ class BandwidthMonitor:
         ]
         self.last_test_time = 0
         self.test_interval = 3600  # Default test interval: 1 hour
-        self.logger = logging.getLogger('subnetx')
-        self.logger.info(f"Initialized Bandwidth Monitor for {target}")
-
-    def check_tls(self, hostname: str, port: int = 443) -> Dict[str, Any]:
-        """
-        Check TLS certificate information for the target host.
-
-        Args:
-            hostname (str): Hostname to check TLS for
-            port (int): Port to check TLS on (default: 443)
-
-        Returns:
-            Dict[str, Any]: TLS certificate information
-        """
-        try:
-            context = ssl.create_default_context()
-            with socket.create_connection((hostname, port)) as sock:
-                with context.wrap_socket(sock, server_hostname=hostname) as ssock:
-                    cert = ssock.getpeercert()
-                    return {
-                        'tls_version': ssock.version(),
-                        'cipher': ssock.cipher(),
-                        'cert_expiry': datetime.strptime(cert['notAfter'], '%b %d %H:%M:%S %Y %Z').isoformat(),
-                        'issuer': dict(x[0] for x in cert['issuer']),
-                        'subject': dict(x[0] for x in cert['subject'])
-                    }
-        except Exception as e:
-            self.logger.error(f"TLS check failed for {hostname}: {e}")
-            return {
-                'tls_version': None,
-                'cipher': None,
-                'cert_expiry': None,
-                'issuer': None,
-                'subject': None,
-                'error': str(e)
-            }
-
-    def _get_icmp_metrics(self, target: str = None) -> Dict[str, Any]:
-        """
-        Collect ICMP ping metrics for the target.
-
-        Args:
-            target (str, optional): IP address to ping. If None, uses self.target.
-
-        Returns:
-            Dict[str, Any]: ICMP metrics including response times
-        """
-        ping_target = target if target else self.target
-        try:
-            # Run ping command with 4 packets
-            result = subprocess.run(
-                ['ping', '-c', '4', ping_target],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-
-            if result.returncode != 0:
-                return {
-                    'success': False,
-                    'error': f"Ping failed with return code {result.returncode}"
-                }
-
-            # Parse the ping output
-            packet_loss_match = re.search(r'(\d+)% packet loss', result.stdout)
-            packet_loss = packet_loss_match.group(1) if packet_loss_match else "100"
-
-            rtt_match = re.search(r'rtt min/avg/max/mdev = ([\d.]+)/([\d.]+)/([\d.]+)/([\d.]+)', result.stdout)
-            if rtt_match:
-                rtt_stats = {
-                    'min': float(rtt_match.group(1)),
-                    'avg': float(rtt_match.group(2)),
-                    'max': float(rtt_match.group(3)),
-                    'mdev': float(rtt_match.group(4))
-                }
-            else:
-                rtt_stats = {'min': 0, 'avg': 0, 'max': 0, 'mdev': 0}
-
-            # Extract ICMP sequence details
-            icmp_details = []
-            for line in result.stdout.split('\n'):
-                if 'icmp_seq=' in line:
-                    icmp_match = re.search(r'icmp_seq=(\d+).*time=([\d.]+)', line)
-                    if icmp_match:
-                        icmp_details.append({
-                            'sequence': int(icmp_match.group(1)),
-                            'response_time': float(icmp_match.group(2))
-                        })
-
-            return {
-                'success': True,
-                'packet_loss': float(packet_loss),
-                'rtt_stats': rtt_stats,
-                'icmp_details': icmp_details
-            }
-        except Exception as e:
-            self.logger.error(f"Error collecting ICMP metrics: {e}")
-            return {
-                'success': False,
-                'error': str(e)
-            }
+        print(f"Initialized Bandwidth Monitor for {target}")
 
     def _download_test(self, url: str, timeout: int = 10) -> Optional[float]:
-        """
-        Perform a download speed test by downloading a file from a URL.
+        """Perform a download speed test by downloading a file from a URL.
 
-        Args:
-            url (str): URL to download from
-            timeout (int): Timeout in seconds
-
-        Returns:
-            Optional[float]: Download speed in bytes per second, or None if failed
+        :param url: URL to download from
+        :type url: str
+        :param timeout: Timeout in seconds
+        :type timeout: int, optional
+        :return: Download speed in bytes per second, or None if failed
+        :rtype: Optional[float]
+        :raises requests.RequestException: If download fails
         """
         try:
             start_time = time.time()
@@ -155,7 +75,7 @@ class BandwidthMonitor:
             # Download the main page
             response = requests.get(f"{url}", stream=True, timeout=timeout)
             if not response.ok:
-                self.logger.warning(f"Download test failed for {url}: {response.status_code}")
+                print(f"Download test failed for {url}: {response.status_code}")
                 return None
 
             # Read the content and measure
@@ -168,32 +88,30 @@ class BandwidthMonitor:
             duration = time.time() - start_time
             if duration > 0:
                 speed = total_bytes / duration
-                self.logger.info(f"Download test: {self._format_bytes(speed)}/s from {url}")
+                print(f"Download test: {self._format_bytes(speed)}/s from {url}")
                 return speed
             else:
-                self.logger.warning(f"Download test had zero duration for {url}")
+                print(f"Download test had zero duration for {url}")
                 return None
         except Exception as e:
-            self.logger.error(f"Error in download test for {url}: {e}")
+            print(f"Error in download test for {url}: {e}")
             return None
 
     def _upload_test(self, url: str, data_size: int = 1024*1024, timeout: int = 10) -> Optional[float]:
-        """
-        Perform an upload speed test by uploading data to a URL.
+        """Perform an upload speed test by uploading data to a URL.
 
-        Args:
-            url (str): URL to upload to
-            data_size (int): Size of data to upload in bytes
-            timeout (int): Timeout in seconds
-
-        Returns:
-            Optional[float]: Upload speed in bytes per second, or None if failed
+        :param url: URL to upload to
+        :type url: str
+        :param data_size: Size of data to upload in bytes
+        :type data_size: int, optional
+        :param timeout: Timeout in seconds
+        :type timeout: int, optional
+        :return: Upload speed in bytes per second, or None if failed
+        :rtype: Optional[float]
+        :raises requests.RequestException: If upload fails
         """
         try:
-            # Since we can't easily upload to arbitrary URLs without a server component,
-            # we'll simulate an upload by measuring how quickly we can send headers and
-            # start sending a POST request
-
+            # Generate test data
             data = b'0' * data_size
 
             start_time = time.time()
@@ -210,61 +128,40 @@ class BandwidthMonitor:
             duration = time.time() - start_time
             if duration > 0:
                 # We calculate bytes transferred including headers
-                # This is an approximation
                 speed = len(data) / duration
-                self.logger.info(f"Upload test: {self._format_bytes(speed)}/s to {url}")
+                print(f"Upload test: {self._format_bytes(speed)}/s to {url}")
                 return speed
             else:
-                self.logger.warning(f"Upload test had zero duration for {url}")
+                print(f"Upload test had zero duration for {url}")
                 return None
         except Exception as e:
-            self.logger.error(f"Error in upload test for {url}: {e}")
+            print(f"Error in upload test for {url}: {e}")
             return None
 
-    def _format_bytes(self, bytes_value: float) -> str:
-        """
-        Format bytes to human-readable format (KB, MB, GB).
-
-        Args:
-            bytes_value (float): Bytes value to format
-
-        Returns:
-            str: Formatted string with units
-        """
-        units = ['B', 'KB', 'MB', 'GB', 'TB']
-        unit_index = 0
-
-        while bytes_value >= 1024 and unit_index < len(units) - 1:
-            bytes_value /= 1024
-            unit_index += 1
-
-        return f"{bytes_value:.2f} {units[unit_index]}"
-
     def _should_run_test(self) -> bool:
-        """
-        Determine if a bandwidth test should be run based on elapsed time.
+        """Determine if a bandwidth test should be run based on elapsed time.
 
-        Returns:
-            bool: True if a test should be run, False otherwise
+        :return: True if a test should be run, False otherwise
+        :rtype: bool
         """
         current_time = time.time()
         return (current_time - self.last_test_time) >= self.test_interval
 
     def _run_speed_tests(self) -> Dict[str, Any]:
-        """
-        Run a complete set of speed tests.
+        """Run a complete set of speed tests.
 
-        Returns:
-            Dict[str, Any]: Speed test results
+        :return: Speed test results
+        :rtype: Dict[str, Any]
+        :raises Exception: If speed tests fail
         """
-        self.logger.info("Running bandwidth tests...")
+        print("Running bandwidth tests...")
         download_speeds = []
         upload_speeds = []
         server_results = {}
 
         for server_url in self.test_servers:
             try:
-                self.logger.info(f"Testing bandwidth with server: {server_url}")
+                print(f"Testing bandwidth with server: {server_url}")
 
                 # Download test
                 download_speed = self._download_test(server_url)
@@ -288,7 +185,7 @@ class BandwidthMonitor:
                 time.sleep(1)
 
             except Exception as e:
-                self.logger.error(f"Error testing with {server_url}: {e}")
+                print(f"Error testing with {server_url}: {e}")
 
         # Calculate averages if we have data
         avg_download = statistics.mean(download_speeds) if download_speeds else 0
@@ -323,158 +220,108 @@ class BandwidthMonitor:
             'server_results': server_results
         }
 
-    def _get_jitter_latency(self, count: int = 4) -> Dict[str, Any]:
-        """
-        Measure network jitter and latency using ping.
+    def _get_jitter_latency(self) -> Dict[str, Any]:
+        """Measure network jitter and latency using PingMonitor.
 
-        Args:
-            count (int): Number of ping packets to send
-
-        Returns:
-            Dict[str, Any]: Jitter and latency measurements
+        :return: Jitter and latency measurements
+        :rtype: Dict[str, Any]
+        :raises Exception: If ping measurements fail
         """
         try:
-            self.logger.info(f"Measuring jitter and latency to {self.target}")
+            # Use PingMonitor to get accurate ICMP measurements
+            ping_monitor = PingMonitor(self.target)
+            ping_result = ping_monitor.ping_target(count=10)  # Use more packets for jitter
 
-            # Run ping command
-            result = subprocess.run(
-                ['ping', '-c', str(count), self.target],
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
-
-            if result.returncode != 0:
-                self.logger.warning(f"Ping failed with return code {result.returncode}")
+            if ping_result.get('status') != 'online':
                 return {
                     'success': False,
-                    'error': f"Ping failed with return code {result.returncode}"
+                    'error': f"Target is {ping_result.get('status', 'unavailable')}"
                 }
 
-            # Extract RTT values
-            rtts = []
-            for line in result.stdout.split('\n'):
-                if 'time=' in line:
-                    try:
-                        rtt = float(line.split('time=')[1].split()[0])
-                        rtts.append(rtt)
-                    except (IndexError, ValueError):
-                        pass
+            # Extract RTT stats
+            rtt_stats = ping_result.get('rtt_stats', {})
 
-            # Calculate statistics
-            if rtts:
-                avg_latency = statistics.mean(rtts)
+            # Extract individual ping times for jitter calculation
+            icmp_details = ping_result.get('icmp_details', [])
+            response_times = [ping.get('response_time_ms', 0) for ping in icmp_details]
 
-                # Calculate jitter (variation in latency)
-                if len(rtts) > 1:
-                    jitter = statistics.stdev(rtts)
-                else:
-                    jitter = 0
+            # Calculate jitter (mean absolute difference between consecutive samples)
+            jitter_ms = 0
+            if len(response_times) > 1:
+                diffs = [abs(response_times[i] - response_times[i-1]) for i in range(1, len(response_times))]
+                jitter_ms = sum(diffs) / len(diffs) if diffs else 0
 
-                return {
-                    'success': True,
-                    'latency_ms': avg_latency,
-                    'jitter_ms': jitter,
-                    'min_latency_ms': min(rtts),
-                    'max_latency_ms': max(rtts),
-                    'samples': len(rtts)
-                }
-            else:
-                self.logger.warning("No RTT values found in ping output")
-                return {
-                    'success': False,
-                    'error': "No RTT values found in ping output"
-                }
-
+            return {
+                'success': True,
+                'latency_ms': rtt_stats.get('avg_ms', 0),
+                'min_latency_ms': rtt_stats.get('min_ms', 0),
+                'max_latency_ms': rtt_stats.get('max_ms', 0),
+                'jitter_ms': jitter_ms,
+                'standard_deviation_ms': rtt_stats.get('mdev_ms', 0),
+                'packets_sent': len(response_times),
+                'packets_received': len([t for t in response_times if t > 0])
+            }
         except Exception as e:
-            self.logger.error(f"Error measuring jitter and latency: {e}")
+            print(f"Error measuring jitter and latency: {e}")
             return {
                 'success': False,
                 'error': str(e)
             }
 
     def collect(self) -> Dict[str, Any]:
-        """
-        Collect bandwidth metrics for the target.
+        """Collect bandwidth metrics for the target.
 
-        Returns:
-            Dict[str, Any]: Dictionary with bandwidth metrics
+        Performs bandwidth tests to measure download/upload speeds and
+        network quality metrics including jitter and latency.
+
+        :return: Dictionary with bandwidth metrics
+        :rtype: Dict[str, Any]
+        :raises Exception: If collection fails
         """
         try:
-            # Get current timestamp
-            timestamp = datetime.now().isoformat()
+            # Start with the basic result structure
+            result = self.get_basic_result()
 
-            # Run bandwidth test if needed
-            bandwidth_results = {}
+            # Run bandwidth tests if needed
             if self._should_run_test():
-                bandwidth_results = self._run_speed_tests()
-            else:
-                # Calculate averages from historical data
-                if self.download_speeds:
-                    avg_download = statistics.mean([entry['speed'] for entry in self.download_speeds])
-                    bandwidth_results['average_download'] = avg_download
-                    bandwidth_results['download_human'] = self._format_bytes(avg_download)
+                speed_results = self._run_speed_tests()
+                result.update(speed_results)
 
-                if self.upload_speeds:
-                    avg_upload = statistics.mean([entry['speed'] for entry in self.upload_speeds])
-                    bandwidth_results['average_upload'] = avg_upload
-                    bandwidth_results['upload_human'] = self._format_bytes(avg_upload)
-
-            # Add TLS information if it's a hostname
-            tls_info = {}
-            if not re.match(r'^(\d{1,3}\.){3}\d{1,3}$', self.target):
-                tls_info = self.check_tls(self.target)
-
-            # Get jitter and latency metrics
+            # Get jitter and latency measurements
             jitter_latency = self._get_jitter_latency()
+            result['network_quality'] = jitter_latency
 
-            # Get ICMP metrics
-            icmp_metrics = self._get_icmp_metrics()
-
-            # Build the result
-            result = {
-                'timestamp': timestamp,
-                'target': self.target,
-                'bandwidth': bandwidth_results,
-                'jitter_latency': jitter_latency,
-                'tls_info': tls_info,
-                'icmp_metrics': icmp_metrics,
-                'history': {
-                    'download_speeds': self.download_speeds[-10:],  # Last 10 entries
-                    'upload_speeds': self.upload_speeds[-10:]  # Last 10 entries
-                },
-                'test_info': {
-                    'last_test_time': datetime.fromtimestamp(self.last_test_time).isoformat() if self.last_test_time else None,
-                    'test_interval_seconds': self.test_interval
-                }
+            # Add historical data
+            result['historical_data'] = {
+                'download_speeds': self.download_speeds,
+                'upload_speeds': self.upload_speeds
             }
 
             return result
         except Exception as e:
-            self.logger.error(f"Error collecting bandwidth metrics: {e}")
-            return {
-                'timestamp': datetime.now().isoformat(),
-                'target': self.target,
-                'error': str(e)
-            }
+            print(f"Error in bandwidth collection: {e}")
+            raise
 
 # Standalone testing when script is run directly
 if __name__ == "__main__":
-    # Setup basic logging
+    # Setup basic logging if running standalone
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
         handlers=[logging.StreamHandler()]
     )
-    logger = logging.getLogger('subnetx')
+    logger = logging.getLogger(__name__)
 
     # Test the bandwidth monitor
-    target = "google.com"
+    targets = ["google.com", "8.8.8.8"]
 
-    # Set short test interval for demo purposes
-    monitor = BandwidthMonitor(target)
-    monitor.test_interval = 0  # Always run test for demo
-
-    print(f"Testing bandwidth for {target}")
-    results = monitor.collect()
-    print(json.dumps(results, indent=2))
+    for target in targets:
+        try:
+            logger.info(f"Testing {target}")
+            monitor = BandwidthMonitor(target)
+            results = monitor.collect()
+            logger.info(f"\nResults for {target}:")
+            logger.info(json.dumps(results, indent=2))
+        except Exception as e:
+            logger.error(f"Failed to collect metrics for {target}: {str(e)}")
+            logger.error(f"Error details: {e.__class__.__name__}")

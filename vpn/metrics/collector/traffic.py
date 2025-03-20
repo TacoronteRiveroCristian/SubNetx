@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """
 SubNetx VPN Traffic Monitor
-This script monitors network traffic to/from specified hosts or interfaces.
-Includes TLS verification, ICMP details, and response time metrics.
+
+This module provides functionality to monitor network traffic statistics
+for VPN connections, focusing on throughput, packet counts, and traffic
+patterns on specific interfaces or to/from target hosts.
 """
 
 import subprocess
@@ -15,21 +17,43 @@ import socket
 from datetime import datetime
 from typing import Dict, List, Any, Optional, Tuple
 
-class TrafficMonitor:
-    def __init__(self, target: str):
-        """
-        Initialize the Traffic Monitor.
+from .base import BaseMonitor
+from .ping import PingMonitor
 
-        Args:
-            target (str): Target hostname or IP address to monitor
+class TrafficMonitor(BaseMonitor):
+    """Monitor for network traffic statistics.
+
+    This class specializes in monitoring network traffic data including
+    bytes transmitted/received, packet counts, and transfer rates.
+    It provides both raw statistical data and human-readable summaries.
+
+    :param target: Target hostname or IP address to monitor
+    :type target: str
+    :ivar interface: Network interface being monitored
+    :type interface: str
+    :ivar previous_stats: Previous traffic statistics
+    :type previous_stats: Dict[str, int]
+    :ivar current_stats: Current traffic statistics
+    :type current_stats: Dict[str, int]
+    :ivar traffic_history: Historical traffic data
+    :type traffic_history: List[Dict[str, Any]]
+    :ivar last_collection_time: Timestamp of last collection
+    :type last_collection_time: Optional[float]
+    """
+
+    def __init__(self, target: str):
+        """Initialize the Traffic Monitor.
+
+        :param target: Target hostname or IP address to monitor
+        :type target: str
         """
-        self.target = target
-        self.logger = logging.getLogger('subnetx')  # Initialize logger first
+        super().__init__(target)
         self.interface = self._detect_interface()
         self.previous_stats = {}
         self.current_stats = {}
         self.traffic_history = []
-        self.logger.info(f"Initialized Traffic Monitor for {target} on interface {self.interface}")
+        self.last_collection_time = None
+        print(f"Initialized Traffic Monitor for {target} on interface {self.interface}")
 
     def check_tls(self, hostname: str, port: int = 443) -> Dict[str, Any]:
         """
@@ -65,77 +89,14 @@ class TrafficMonitor:
                 'error': str(e)
             }
 
-    def _get_icmp_metrics(self, target: str = None) -> Dict[str, Any]:
-        """
-        Collect ICMP ping metrics for the target.
-
-        Args:
-            target (str, optional): IP address to ping. If None, uses self.target.
-
-        Returns:
-            Dict[str, Any]: ICMP metrics including response times
-        """
-        ping_target = target if target else self.target
-        try:
-            # Run ping command with 4 packets
-            result = subprocess.run(
-                ['ping', '-c', '4', ping_target],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-
-            if result.returncode != 0:
-                return {
-                    'success': False,
-                    'error': f"Ping failed with return code {result.returncode}"
-                }
-
-            # Parse the ping output
-            packet_loss_match = re.search(r'(\d+)% packet loss', result.stdout)
-            packet_loss = packet_loss_match.group(1) if packet_loss_match else "100"
-
-            rtt_match = re.search(r'rtt min/avg/max/mdev = ([\d.]+)/([\d.]+)/([\d.]+)/([\d.]+)', result.stdout)
-            if rtt_match:
-                rtt_stats = {
-                    'min': float(rtt_match.group(1)),
-                    'avg': float(rtt_match.group(2)),
-                    'max': float(rtt_match.group(3)),
-                    'mdev': float(rtt_match.group(4))
-                }
-            else:
-                rtt_stats = {'min': 0, 'avg': 0, 'max': 0, 'mdev': 0}
-
-            # Extract ICMP sequence details
-            icmp_details = []
-            for line in result.stdout.split('\n'):
-                if 'icmp_seq=' in line:
-                    icmp_match = re.search(r'icmp_seq=(\d+).*time=([\d.]+)', line)
-                    if icmp_match:
-                        icmp_details.append({
-                            'sequence': int(icmp_match.group(1)),
-                            'response_time': float(icmp_match.group(2))
-                        })
-
-            return {
-                'success': True,
-                'packet_loss': float(packet_loss),
-                'rtt_stats': rtt_stats,
-                'icmp_details': icmp_details
-            }
-        except Exception as e:
-            self.logger.error(f"Error collecting ICMP metrics: {e}")
-            return {
-                'success': False,
-                'error': str(e)
-            }
-
     def _detect_interface(self) -> str:
-        """
-        Detect the network interface used to reach the target.
+        """Detect the network interface used to reach the target.
 
-        Returns:
-            str: Name of the network interface
+        Determines which network interface is used to route traffic to the target.
+
+        :return: Name of the network interface
+        :rtype: str
+        :raises subprocess.SubprocessError: If ip route command fails
         """
         try:
             # Use ip route to determine which interface is used to reach the target
@@ -151,18 +112,18 @@ class TrafficMonitor:
                 return match.group(1)
 
             # Fallback to default interface
-            self.logger.warning(f"Could not detect interface for {self.target}, using default")
+            print(f"Could not detect interface for {self.target}, using default")
             return self._get_default_interface()
         except Exception as e:
-            self.logger.error(f"Error detecting interface: {e}")
+            print(f"Error detecting interface: {e}")
             return self._get_default_interface()
 
     def _get_default_interface(self) -> str:
-        """
-        Get the default network interface.
+        """Get the default network interface.
 
-        Returns:
-            str: Name of the default network interface
+        :return: Name of the default network interface
+        :rtype: str
+        :raises subprocess.SubprocessError: If ip route command fails
         """
         try:
             # Try to get the default route interface
@@ -186,15 +147,15 @@ class TrafficMonitor:
             else:
                 return 'eth0'
         except Exception as e:
-            self.logger.error(f"Error getting default interface: {e}")
+            print(f"Error getting default interface: {e}")
             return 'eth0'  # Default fallback
 
     def _list_interfaces(self) -> List[str]:
-        """
-        List all network interfaces on the system.
+        """List all network interfaces on the system.
 
-        Returns:
-            List[str]: List of interface names
+        :return: List of interface names
+        :rtype: List[str]
+        :raises subprocess.SubprocessError: If ip link command fails
         """
         try:
             # Use ip link to list interfaces
@@ -213,18 +174,17 @@ class TrafficMonitor:
 
             return interfaces
         except Exception as e:
-            self.logger.error(f"Error listing interfaces: {e}")
+            print(f"Error listing interfaces: {e}")
             return []
 
     def _get_interface_stats(self, interface: str) -> Dict[str, int]:
-        """
-        Get current traffic statistics for a network interface.
+        """Get current traffic statistics for a network interface.
 
-        Args:
-            interface (str): Network interface name
-
-        Returns:
-            Dict[str, int]: Dictionary with rx_bytes, tx_bytes, rx_packets, tx_packets
+        :param interface: Network interface name
+        :type interface: str
+        :return: Dictionary with rx_bytes, tx_bytes, rx_packets, tx_packets
+        :rtype: Dict[str, int]
+        :raises FileNotFoundError: If /proc/net/dev cannot be read
         """
         try:
             stats = {}
@@ -243,7 +203,7 @@ class TrafficMonitor:
                         break
 
             if not stats:
-                self.logger.warning(f"No stats found for interface {interface}")
+                print(f"No stats found for interface {interface}")
                 # Return zeros as fallback
                 stats = {
                     'rx_bytes': 0,
@@ -254,7 +214,7 @@ class TrafficMonitor:
 
             return stats
         except Exception as e:
-            self.logger.error(f"Error getting interface stats: {e}")
+            print(f"Error getting interface stats: {e}")
             return {
                 'rx_bytes': 0,
                 'rx_packets': 0,
@@ -264,16 +224,16 @@ class TrafficMonitor:
 
     def _calculate_rates(self, current: Dict[str, int], previous: Dict[str, int],
                         interval: float) -> Dict[str, float]:
-        """
-        Calculate traffic rates based on current and previous stats.
+        """Calculate traffic rates based on current and previous stats.
 
-        Args:
-            current (Dict[str, int]): Current traffic statistics
-            previous (Dict[str, int]): Previous traffic statistics
-            interval (float): Time interval in seconds
-
-        Returns:
-            Dict[str, float]: Dictionary with calculated rates
+        :param current: Current traffic statistics
+        :type current: Dict[str, int]
+        :param previous: Previous traffic statistics
+        :type previous: Dict[str, int]
+        :param interval: Time interval in seconds
+        :type interval: float
+        :return: Dictionary with calculated rates (bytes/sec, packets/sec)
+        :rtype: Dict[str, float]
         """
         rates = {}
 
@@ -319,137 +279,126 @@ class TrafficMonitor:
         return f"{bytes_value:.2f} {units[unit_index]}"
 
     def _get_target_traffic(self) -> Dict[str, Any]:
-        """
-        Get traffic statistics specifically for the target IP.
-        Uses iptables or tcpdump depending on availability.
+        """Get traffic statistics specific to the target.
 
-        Returns:
-            Dict[str, Any]: Traffic statistics for the target
-        """
-        try:
-            # First try with 'ss' command to get current connections
-            result = subprocess.run(
-                ['ss', '-t', '-n', 'dst', self.target],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-
-            connections = 0
-            for line in result.stdout.splitlines()[1:]:  # Skip header
-                connections += 1
-
-            return {
-                'active_connections': connections,
-                'timestamp': datetime.now().isoformat()
-            }
-        except Exception as e:
-            self.logger.error(f"Error getting target traffic: {e}")
-            return {
-                'active_connections': 0,
-                'timestamp': datetime.now().isoformat(),
-                'error': str(e)
-            }
-
-    def collect(self) -> Dict[str, Any]:
-        """
-        Collect traffic metrics for the target.
-
-        Returns:
-            Dict[str, Any]: Dictionary with traffic metrics
+        :return: Dictionary with target-specific traffic data
+        :rtype: Dict[str, Any]
+        :raises Exception: If traffic data collection fails
         """
         try:
-            now = time.time()
-            timestamp = datetime.now().isoformat()
-
             # Get current interface stats
             self.current_stats = self._get_interface_stats(self.interface)
 
             # Calculate rates if we have previous stats
-            rates = self._calculate_rates(
-                self.current_stats,
-                self.previous_stats,
-                now - self.last_collection_time if hasattr(self, 'last_collection_time') else 0
-            )
+            current_time = time.time()
+            interval = current_time - self.last_collection_time if self.last_collection_time else 1.0
+            rates = self._calculate_rates(self.current_stats, self.previous_stats, interval)
 
-            # Get target-specific traffic if available
-            target_traffic = self._get_target_traffic()
+            # Store current stats as previous for next calculation
+            self.previous_stats = self.current_stats.copy()
+            self.last_collection_time = current_time
 
-            # Add TLS information if it's a hostname
-            tls_info = {}
-            if not re.match(r'^(\d{1,3}\.){3}\d{1,3}$', self.target):
-                tls_info = self.check_tls(self.target)
-
-            # Get ICMP metrics
-            icmp_metrics = self._get_icmp_metrics()
-
-            # Store stats for next calculation
-            self.previous_stats = self.current_stats
-            self.last_collection_time = now
-
-            # Create human-readable rates
-            human_readable = {
-                'rx_rate': self._format_bytes(rates.get('rx_bytes_rate', 0)),
-                'tx_rate': self._format_bytes(rates.get('tx_bytes_rate', 0)),
-                'total_rx': self._format_bytes(self.current_stats.get('rx_bytes', 0)),
-                'total_tx': self._format_bytes(self.current_stats.get('tx_bytes', 0))
-            }
-
-            # Create result dictionary
-            result = {
-                'timestamp': timestamp,
+            # Format the results
+            return {
                 'interface': self.interface,
-                'target': self.target,
-                'current_stats': self.current_stats,
-                'rates': rates,
-                'human_readable': human_readable,
-                'target_traffic': target_traffic,
-                'tls_info': tls_info,
-                'icmp_metrics': icmp_metrics
+                'timestamp': datetime.now().isoformat(),
+                'bytes': {
+                    'received': self.current_stats['rx_bytes'],
+                    'sent': self.current_stats['tx_bytes'],
+                    'received_rate': rates['rx_bytes_rate'],
+                    'sent_rate': rates['tx_bytes_rate'],
+                    'received_human': self._format_bytes(self.current_stats['rx_bytes']),
+                    'sent_human': self._format_bytes(self.current_stats['tx_bytes']),
+                    'received_rate_human': f"{self._format_bytes(rates['rx_bytes_rate'])}/s",
+                    'sent_rate_human': f"{self._format_bytes(rates['tx_bytes_rate'])}/s"
+                },
+                'packets': {
+                    'received': self.current_stats['rx_packets'],
+                    'sent': self.current_stats['tx_packets'],
+                    'received_rate': rates['rx_packets_rate'],
+                    'sent_rate': rates['tx_packets_rate']
+                }
             }
+        except Exception as e:
+            print(f"Error getting target traffic: {e}")
+            raise
 
-            # Add to history (keep last 100 entries)
-            self.traffic_history.append({
-                'timestamp': timestamp,
-                'rx_rate': rates.get('rx_bytes_rate', 0),
-                'tx_rate': rates.get('tx_bytes_rate', 0)
-            })
+    def _get_ping_data_if_needed(self) -> Optional[Dict[str, Any]]:
+        """Get ping data if needed for traffic analysis.
 
-            if len(self.traffic_history) > 100:
+        :return: Ping data if available, None otherwise
+        :rtype: Optional[Dict[str, Any]]
+        """
+        try:
+            # Use PingMonitor to get ICMP metrics
+            ping_monitor = PingMonitor(self.target)
+            ping_result = ping_monitor.ping_target(count=4)
+
+            if ping_result.get('status') == 'online':
+                return {
+                    'latency_ms': ping_result.get('rtt_stats', {}).get('avg_ms', 0),
+                    'packet_loss_percent': ping_result.get('packet_loss_percent', 0),
+                    'jitter_ms': ping_result.get('rtt_stats', {}).get('mdev_ms', 0)
+                }
+            return None
+        except Exception as e:
+            print(f"Error getting ping data: {e}")
+            return None
+
+    def collect(self) -> Dict[str, Any]:
+        """Collect traffic metrics for the target.
+
+        Performs traffic monitoring to measure throughput, packet counts,
+        and network quality metrics.
+
+        :return: Dictionary with traffic metrics
+        :rtype: Dict[str, Any]
+        :raises Exception: If collection fails
+        """
+        try:
+            # Start with the basic result structure
+            result = self.get_basic_result()
+
+            # Get interface traffic data
+            traffic_data = self._get_target_traffic()
+            result['traffic'] = traffic_data
+
+            # Get ping data if needed
+            ping_data = self._get_ping_data_if_needed()
+            if ping_data:
+                result['network_quality'] = ping_data
+
+            # Add historical data
+            self.traffic_history.append(traffic_data)
+            if len(self.traffic_history) > 100:  # Keep last 100 entries
                 self.traffic_history = self.traffic_history[-100:]
+            result['historical_data'] = self.traffic_history
 
             return result
         except Exception as e:
-            self.logger.error(f"Error collecting traffic metrics: {e}")
-            return {
-                'timestamp': datetime.now().isoformat(),
-                'interface': self.interface,
-                'target': self.target,
-                'error': str(e)
-            }
+            print(f"Error in traffic collection: {e}")
+            raise
 
 # Standalone testing when script is run directly
 if __name__ == "__main__":
-    # Setup basic logging
+    # Setup basic logging if running standalone
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
         handlers=[logging.StreamHandler()]
     )
-    logger = logging.getLogger('subnetx')
+    logger = logging.getLogger(__name__)
 
     # Test the traffic monitor
-    target = "google.com"
-    monitor = TrafficMonitor(target)
+    targets = ["google.com", "8.8.8.8"]
 
-    print(f"Monitoring traffic for {target}")
-    print("Initial reading (no rates yet):")
-    results = monitor.collect()
-    print(json.dumps(results, indent=2))
-
-    print("\nWaiting 5 seconds for second reading...")
-    time.sleep(5)
-
-    results = monitor.collect()
-    print("\nSecond reading (with rates):")
-    print(json.dumps(results, indent=2))
+    for target in targets:
+        try:
+            logger.info(f"Testing {target}")
+            monitor = TrafficMonitor(target)
+            results = monitor.collect()
+            logger.info(f"\nResults for {target}:")
+            logger.info(json.dumps(results, indent=2))
+        except Exception as e:
+            logger.error(f"Failed to collect metrics for {target}: {str(e)}")
+            logger.error(f"Error details: {e.__class__.__name__}")

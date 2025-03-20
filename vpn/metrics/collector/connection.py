@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """
 SubNetx VPN Connection Monitor
-This script tracks connection status, uptime, and disconnection events.
-Includes TLS verification, ICMP details, and response time measurements.
+
+This module provides functionality to monitor VPN connection status,
+uptime, and stability metrics. It tracks connection events, calculates
+uptime percentages, and analyzes connection patterns.
 """
 
 import subprocess
@@ -11,20 +13,48 @@ import json
 import logging
 import socket
 import os
-import ssl
-import re
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Tuple
 
-class ConnectionMonitor:
-    def __init__(self, target: str):
-        """
-        Initialize the Connection Monitor.
+from .base import BaseMonitor
+from .ping import PingMonitor
 
-        Args:
-            target (str): Target hostname or IP address to monitor
+class ConnectionMonitor(BaseMonitor):
+    """Monitor for VPN connection status and stability.
+
+    This class specializes in monitoring VPN connection status, uptime,
+    and connection stability metrics. It provides both real-time status
+    and historical connection data.
+
+    :param target: Target hostname or IP address to monitor
+    :type target: str
+    :ivar connection_history: List of connection status changes
+    :type connection_history: List[Dict[str, Any]]
+    :ivar disconnection_events: List of disconnection events
+    :type disconnection_events: List[Dict[str, Any]]
+    :ivar first_seen: Timestamp of first connection
+    :type first_seen: Optional[float]
+    :ivar last_seen: Timestamp of last connection
+    :type last_seen: Optional[float]
+    :ivar current_session_start: Start time of current session
+    :type current_session_start: Optional[float]
+    :ivar is_connected: Current connection status
+    :type is_connected: bool
+    :ivar total_uptime: Total time connected in seconds
+    :type total_uptime: float
+    :ivar total_downtime: Total time disconnected in seconds
+    :type total_downtime: float
+    :ivar status_history: List of status check results
+    :type status_history: List[Dict[str, Any]]
+    """
+
+    def __init__(self, target: str):
+        """Initialize the Connection Monitor.
+
+        :param target: Target hostname or IP address to monitor
+        :type target: str
         """
-        self.target = target
+        super().__init__(target)
         self.connection_history = []
         self.disconnection_events = []
         self.first_seen = None
@@ -34,121 +64,25 @@ class ConnectionMonitor:
         self.total_uptime = 0
         self.total_downtime = 0
         self.status_history = []
-        self.logger = logging.getLogger('subnetx')
-        self.logger.info(f"Initialized Connection Monitor for {target}")
+        print(f"Initialized Connection Monitor for {target}")
 
         # Attempt initial connection check
         self._check_connection()
 
-    def check_tls(self, hostname: str, port: int = 443) -> Dict[str, Any]:
-        """
-        Check TLS certificate information for the target host.
-
-        Args:
-            hostname (str): Hostname to check TLS for
-            port (int): Port to check TLS on (default: 443)
-
-        Returns:
-            Dict[str, Any]: TLS certificate information
-        """
-        try:
-            context = ssl.create_default_context()
-            with socket.create_connection((hostname, port)) as sock:
-                with context.wrap_socket(sock, server_hostname=hostname) as ssock:
-                    cert = ssock.getpeercert()
-                    return {
-                        'tls_version': ssock.version(),
-                        'cipher': ssock.cipher(),
-                        'cert_expiry': datetime.strptime(cert['notAfter'], '%b %d %H:%M:%S %Y %Z').isoformat(),
-                        'issuer': dict(x[0] for x in cert['issuer']),
-                        'subject': dict(x[0] for x in cert['subject'])
-                    }
-        except Exception as e:
-            self.logger.error(f"TLS check failed for {hostname}: {e}")
-            return {
-                'tls_version': None,
-                'cipher': None,
-                'cert_expiry': None,
-                'issuer': None,
-                'subject': None,
-                'error': str(e)
-            }
-
-    def _get_icmp_metrics(self) -> Dict[str, Any]:
-        """
-        Collect ICMP ping metrics for the target.
-
-        Returns:
-            Dict[str, Any]: ICMP metrics including response times
-        """
-        try:
-            # Run ping command with 4 packets
-            result = subprocess.run(
-                ['ping', '-c', '4', self.target],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-
-            if result.returncode != 0:
-                return {
-                    'success': False,
-                    'error': f"Ping failed with return code {result.returncode}"
-                }
-
-            # Parse the ping output
-            packet_loss_match = re.search(r'(\d+)% packet loss', result.stdout)
-            packet_loss = packet_loss_match.group(1) if packet_loss_match else "100"
-
-            rtt_match = re.search(r'rtt min/avg/max/mdev = ([\d.]+)/([\d.]+)/([\d.]+)/([\d.]+)', result.stdout)
-            if rtt_match:
-                rtt_stats = {
-                    'min': float(rtt_match.group(1)),
-                    'avg': float(rtt_match.group(2)),
-                    'max': float(rtt_match.group(3)),
-                    'mdev': float(rtt_match.group(4))
-                }
-            else:
-                rtt_stats = {'min': 0, 'avg': 0, 'max': 0, 'mdev': 0}
-
-            # Extract ICMP sequence details
-            icmp_details = []
-            for line in result.stdout.split('\n'):
-                if 'icmp_seq=' in line:
-                    icmp_match = re.search(r'icmp_seq=(\d+).*time=([\d.]+)', line)
-                    if icmp_match:
-                        icmp_details.append({
-                            'sequence': int(icmp_match.group(1)),
-                            'response_time': float(icmp_match.group(2))
-                        })
-
-            return {
-                'success': True,
-                'packet_loss': float(packet_loss),
-                'rtt_stats': rtt_stats,
-                'icmp_details': icmp_details
-            }
-        except Exception as e:
-            self.logger.error(f"Error collecting ICMP metrics: {e}")
-            return {
-                'success': False,
-                'error': str(e)
-            }
-
     def _check_connection(self) -> bool:
-        """
-        Check if connection to target is active.
+        """Check if connection to target is active.
+
+        Updates connection state and history based on current status.
 
         Returns:
-            bool: True if connected, False otherwise
+            bool: True if connected, False otherwise.
         """
         now = datetime.now()
         was_connected = self.is_connected
 
-        # Try to connect to the target with a socket
+        # Try to connect to the target
         try:
             # First try with socket to test TCP connectivity
-            # Default to port 80 since it's commonly open
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(2)  # 2 second timeout
 
@@ -167,15 +101,12 @@ class ConnectionMonitor:
                 self.is_connected = True
             else:
                 # Fall back to ping if TCP connection fails
-                ping_result = subprocess.run(
-                    ['ping', '-c', '1', '-W', '2', self.target],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
-                )
-                self.is_connected = ping_result.returncode == 0
+                ping_monitor = PingMonitor(self.target)
+                ping_result = ping_monitor.ping_target(count=1, timeout=2)
+                self.is_connected = ping_result.get('status') == 'online'
 
         except Exception as e:
-            self.logger.warning(f"Connection check error: {e}")
+            print(f"Connection check error: {e}")
             self.is_connected = False
 
         # Update connection records
@@ -183,7 +114,7 @@ class ConnectionMonitor:
             # We're connected
             if not was_connected:
                 # This is a new connection
-                self.logger.info(f"Connection established to {self.target}")
+                print(f"Connection established to {self.target}")
                 self.current_session_start = now
 
             if self.first_seen is None:
@@ -194,7 +125,7 @@ class ConnectionMonitor:
             # We're disconnected
             if was_connected:
                 # This is a new disconnection
-                self.logger.warning(f"Connection lost to {self.target}")
+                print(f"Connection lost to {self.target}")
 
                 # Record the disconnection event
                 if self.current_session_start:
@@ -205,7 +136,7 @@ class ConnectionMonitor:
                         'session_duration_seconds': session_duration
                     }
                     self.disconnection_events.append(disconnection_event)
-                    self.logger.info(f"Disconnection after {session_duration:.1f} seconds")
+                    print(f"Disconnection after {session_duration:.1f} seconds")
 
                     # Update total uptime
                     self.total_uptime += session_duration
@@ -225,11 +156,10 @@ class ConnectionMonitor:
         return self.is_connected
 
     def _calculate_uptime_percentage(self) -> float:
-        """
-        Calculate the connection uptime percentage.
+        """Calculate the connection uptime percentage.
 
         Returns:
-            float: Uptime percentage (0-100)
+            float: Uptime percentage (0-100).
         """
         if not self.first_seen:
             return 0.0
@@ -252,11 +182,10 @@ class ConnectionMonitor:
             return 0.0
 
     def _check_openvpn_status(self) -> Dict[str, Any]:
-        """
-        Check OpenVPN service status if available.
+        """Check OpenVPN service status if available.
 
         Returns:
-            Dict[str, Any]: OpenVPN status information
+            Dict[str, Any]: OpenVPN status information.
         """
         result = {
             'service_available': False,
@@ -309,22 +238,21 @@ class ConnectionMonitor:
 
                         result['active_clients'] = client_count
                 except Exception as e:
-                    self.logger.error(f"Error reading OpenVPN status: {e}")
+                    print(f"Error reading OpenVPN status: {e}")
 
         except Exception as e:
-            self.logger.error(f"Error checking OpenVPN service: {e}")
+            print(f"Error checking OpenVPN service: {e}")
 
         return result
 
     def _format_uptime(self, seconds: float) -> str:
-        """
-        Format seconds into human readable uptime string.
+        """Format seconds into human readable uptime string.
 
         Args:
-            seconds (float): Duration in seconds
+            seconds (float): Duration in seconds.
 
         Returns:
-            str: Formatted uptime string (e.g. "3d 12h 5m 10s")
+            str: Formatted uptime string (e.g. "3d 12h 5m 10s").
         """
         if seconds is None:
             return "unknown"
@@ -350,76 +278,80 @@ class ConnectionMonitor:
         return " ".join(parts)
 
     def _analyze_connection_stability(self) -> Dict[str, Any]:
-        """
-        Analyze connection stability based on history.
+        """Analyze connection stability based on history.
 
         Returns:
-            Dict[str, Any]: Stability analysis
+            Dict[str, Any]: Stability analysis including rating and reasons.
         """
-        # We need enough history to make an assessment
-        if len(self.status_history) < 5:
-            return {
-                'stability': 'unknown',
-                'reason': 'insufficient data'
-            }
+        # Default stability assessment
+        stability = {
+            'stability': 'unknown',
+            'rating': 0,
+            'reason': 'Not enough data',
+            'recommendations': []
+        }
 
-        # Count transitions (connected->disconnected or vice versa)
-        transitions = 0
-        for i in range(1, len(self.status_history)):
-            if self.status_history[i]['connected'] != self.status_history[i-1]['connected']:
-                transitions += 1
+        # Need at least some history to analyze
+        if not self.status_history or len(self.status_history) < 5:
+            return stability
 
         # Calculate stability metrics
-        uptime_pct = self._calculate_uptime_percentage()
+        total_checks = len(self.status_history)
+        connected_checks = sum(1 for entry in self.status_history if entry['connected'])
+        recent_disconnections = len(self.disconnection_events[-10:]) if self.disconnection_events else 0
+        uptime_percentage = self._calculate_uptime_percentage()
 
-        # Assess stability
-        if transitions == 0:
-            if uptime_pct > 99:
-                stability = 'excellent'
-            elif uptime_pct > 90:
-                stability = 'good'
-            elif uptime_pct > 50:
-                stability = 'fair'
-            else:
-                stability = 'poor'
-        elif transitions < 3:
-            if uptime_pct > 95:
-                stability = 'good'
-            elif uptime_pct > 80:
-                stability = 'fair'
-            else:
-                stability = 'unstable'
+        # Determine stability rating (0-100)
+        rating = min(100, max(0, int(uptime_percentage)))
+
+        # Determine stability category
+        if rating >= 99:
+            stability_category = 'excellent'
+            reason = 'Consistent uptime with minimal disconnections'
+        elif rating >= 95:
+            stability_category = 'good'
+            reason = 'Generally stable with occasional disconnections'
+        elif rating >= 80:
+            stability_category = 'fair'
+            reason = 'Somewhat stable but with periodic disconnections'
+        elif rating >= 50:
+            stability_category = 'poor'
+            reason = 'Frequent disconnections affecting service quality'
         else:
-            if uptime_pct > 90:
-                stability = 'fair'
-            else:
-                stability = 'unstable'
+            stability_category = 'critical'
+            reason = 'Severe connection issues affecting service usability'
 
-        # Determine reason
-        if uptime_pct < 50:
-            reason = 'low uptime percentage'
-        elif transitions > 5:
-            reason = 'frequent disconnections'
-        elif transitions > 0:
-            reason = 'occasional disconnections'
-        else:
-            reason = 'stable connection'
+        # Generate recommendations
+        recommendations = []
+        if rating < 80:
+            recommendations.append('Check network configuration for issues')
+        if recent_disconnections > 5:
+            recommendations.append('Investigate causes of frequent disconnections')
+        if rating < 50:
+            recommendations.append('Consider alternative VPN routing or connectivity')
 
+        # Return analysis
         return {
-            'stability': stability,
+            'stability': stability_category,
+            'rating': rating,
             'reason': reason,
-            'transitions': transitions,
-            'uptime_percentage': uptime_pct
+            'uptime_percentage': uptime_percentage,
+            'recent_disconnections': recent_disconnections,
+            'total_checks': total_checks,
+            'connected_checks': connected_checks,
+            'recommendations': recommendations
         }
 
     def collect(self) -> Dict[str, Any]:
-        """
-        Collect connection metrics.
+        """Collect connection metrics and status information.
 
         Returns:
-            Dict[str, Any]: Dictionary with connection metrics
+            Dict[str, Any]: Dictionary with connection metrics.
         """
         try:
+            # Start with the basic result structure
+            result = self.get_basic_result()
+
             # Check the current connection status
             self._check_connection()
 
@@ -432,30 +364,45 @@ class ConnectionMonitor:
             # Analyze connection stability
             stability_analysis = self._analyze_connection_stability()
 
-            # Add TLS information if it's a hostname
-            tls_info = {}
-            if not re.match(r'^(\d{1,3}\.){3}\d{1,3}$', self.target):
-                tls_info = self.check_tls(self.target)
+            # Get TLS information if it's a hostname
+            tls_info = self.get_tls_info() if self.is_hostname(self.target) else {}
 
-            # Get ICMP metrics
-            icmp_metrics = self._get_icmp_metrics()
+            # Use PingMonitor for connectivity metrics when needed
+            connectivity_metrics = {}
+            if self.is_connected:
+                try:
+                    ping_monitor = PingMonitor(self.target)
+                    ping_result = ping_monitor.ping_target(count=4)
+                    if ping_result.get('status') == 'online':
+                        connectivity_metrics = {
+                            'rtt_stats': ping_result.get('rtt_stats', {}),
+                            'packet_loss_percent': ping_result.get('packet_loss_percent', 0),
+                            'icmp_details': ping_result.get('icmp_details', [])
+                        }
+                except Exception as e:
+                    print(f"Error getting ping metrics: {e}")
 
             # Convert timestamps to strings for JSON serialization
             first_seen_str = self.first_seen.isoformat() if self.first_seen else None
             last_seen_str = self.last_seen.isoformat() if self.last_seen else None
             current_session_start_str = self.current_session_start.isoformat() if self.current_session_start else None
 
+            # Calculate current session duration
+            current_session_duration = None
+            if self.is_connected and self.current_session_start:
+                current_session_duration = (datetime.now() - self.current_session_start).total_seconds()
+
             # Build the result
-            result = {
-                'timestamp': datetime.now().isoformat(),
-                'target': self.target,
+            result.update({
                 'status': {
                     'connected': self.is_connected,
                     'first_seen': first_seen_str,
                     'last_seen': last_seen_str,
                     'current_session_start': current_session_start_str,
-                    'uptime_seconds': self.total_uptime,
-                    'uptime_formatted': self._format_uptime(self.total_uptime),
+                    'current_session_duration': current_session_duration,
+                    'current_session_formatted': self._format_uptime(current_session_duration) if current_session_duration else None,
+                    'uptime_seconds': self.total_uptime + (current_session_duration or 0),
+                    'uptime_formatted': self._format_uptime(self.total_uptime + (current_session_duration or 0)),
                     'uptime_percentage': uptime_percentage,
                     'total_sessions': len(self.disconnection_events) + (1 if self.is_connected else 0)
                 },
@@ -464,14 +411,19 @@ class ConnectionMonitor:
                     'disconnection_events': self.disconnection_events[-10:]  # Last 10 disconnections
                 },
                 'openvpn_status': openvpn_status,
-                'stability_analysis': stability_analysis,
-                'tls_info': tls_info,
-                'icmp_metrics': icmp_metrics
-            }
+                'stability_analysis': stability_analysis
+            })
+
+            # Add optional components if available
+            if tls_info:
+                result['tls_info'] = tls_info
+
+            if connectivity_metrics:
+                result['connectivity'] = connectivity_metrics
 
             return result
         except Exception as e:
-            self.logger.error(f"Error collecting connection metrics: {e}")
+            print(f"Error collecting connection metrics: {e}")
             return {
                 'timestamp': datetime.now().isoformat(),
                 'target': self.target,
@@ -480,25 +432,24 @@ class ConnectionMonitor:
 
 # Standalone testing when script is run directly
 if __name__ == "__main__":
-    # Setup basic logging
+    # Setup basic logging if running standalone
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
         handlers=[logging.StreamHandler()]
     )
-    logger = logging.getLogger('subnetx')
+    logger = logging.getLogger(__name__)
 
     # Test the connection monitor
-    target = "google.com"
-    monitor = ConnectionMonitor(target)
+    targets = ["google.com", "8.8.8.8"]
 
-    print(f"Initial connection check for {target}")
-    results = monitor.collect()
-    print(json.dumps(results, indent=2))
-
-    print("\nWaiting 10 seconds for another check...")
-    time.sleep(10)
-
-    results = monitor.collect()
-    print("\nUpdated connection status:")
-    print(json.dumps(results, indent=2))
+    for target in targets:
+        try:
+            logger.info(f"Testing {target}")
+            monitor = ConnectionMonitor(target)
+            results = monitor.collect()
+            logger.info(f"\nResults for {target}:")
+            logger.info(json.dumps(results, indent=2))
+        except Exception as e:
+            logger.error(f"Failed to collect metrics for {target}: {str(e)}")
+            logger.error(f"Error details: {e.__class__.__name__}")
