@@ -2,6 +2,7 @@
 """
 SubNetx VPN Traffic Monitor
 This script monitors network traffic to/from specified hosts or interfaces.
+Includes TLS verification, ICMP details, and response time metrics.
 """
 
 import subprocess
@@ -9,6 +10,8 @@ import re
 import time
 import json
 import logging
+import ssl
+import socket
 from datetime import datetime
 from typing import Dict, List, Any, Optional, Tuple
 
@@ -27,6 +30,105 @@ class TrafficMonitor:
         self.current_stats = {}
         self.traffic_history = []
         self.logger.info(f"Initialized Traffic Monitor for {target} on interface {self.interface}")
+
+    def check_tls(self, hostname: str, port: int = 443) -> Dict[str, Any]:
+        """
+        Check TLS certificate information for the target host.
+
+        Args:
+            hostname (str): Hostname to check TLS for
+            port (int): Port to check TLS on (default: 443)
+
+        Returns:
+            Dict[str, Any]: TLS certificate information
+        """
+        try:
+            context = ssl.create_default_context()
+            with socket.create_connection((hostname, port)) as sock:
+                with context.wrap_socket(sock, server_hostname=hostname) as ssock:
+                    cert = ssock.getpeercert()
+                    return {
+                        'tls_version': ssock.version(),
+                        'cipher': ssock.cipher(),
+                        'cert_expiry': datetime.strptime(cert['notAfter'], '%b %d %H:%M:%S %Y %Z').isoformat(),
+                        'issuer': dict(x[0] for x in cert['issuer']),
+                        'subject': dict(x[0] for x in cert['subject'])
+                    }
+        except Exception as e:
+            self.logger.error(f"TLS check failed for {hostname}: {e}")
+            return {
+                'tls_version': None,
+                'cipher': None,
+                'cert_expiry': None,
+                'issuer': None,
+                'subject': None,
+                'error': str(e)
+            }
+
+    def _get_icmp_metrics(self, target: str = None) -> Dict[str, Any]:
+        """
+        Collect ICMP ping metrics for the target.
+
+        Args:
+            target (str, optional): IP address to ping. If None, uses self.target.
+
+        Returns:
+            Dict[str, Any]: ICMP metrics including response times
+        """
+        ping_target = target if target else self.target
+        try:
+            # Run ping command with 4 packets
+            result = subprocess.run(
+                ['ping', '-c', '4', ping_target],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+
+            if result.returncode != 0:
+                return {
+                    'success': False,
+                    'error': f"Ping failed with return code {result.returncode}"
+                }
+
+            # Parse the ping output
+            packet_loss_match = re.search(r'(\d+)% packet loss', result.stdout)
+            packet_loss = packet_loss_match.group(1) if packet_loss_match else "100"
+
+            rtt_match = re.search(r'rtt min/avg/max/mdev = ([\d.]+)/([\d.]+)/([\d.]+)/([\d.]+)', result.stdout)
+            if rtt_match:
+                rtt_stats = {
+                    'min': float(rtt_match.group(1)),
+                    'avg': float(rtt_match.group(2)),
+                    'max': float(rtt_match.group(3)),
+                    'mdev': float(rtt_match.group(4))
+                }
+            else:
+                rtt_stats = {'min': 0, 'avg': 0, 'max': 0, 'mdev': 0}
+
+            # Extract ICMP sequence details
+            icmp_details = []
+            for line in result.stdout.split('\n'):
+                if 'icmp_seq=' in line:
+                    icmp_match = re.search(r'icmp_seq=(\d+).*time=([\d.]+)', line)
+                    if icmp_match:
+                        icmp_details.append({
+                            'sequence': int(icmp_match.group(1)),
+                            'response_time': float(icmp_match.group(2))
+                        })
+
+            return {
+                'success': True,
+                'packet_loss': float(packet_loss),
+                'rtt_stats': rtt_stats,
+                'icmp_details': icmp_details
+            }
+        except Exception as e:
+            self.logger.error(f"Error collecting ICMP metrics: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
 
     def _detect_interface(self) -> str:
         """
@@ -251,71 +353,80 @@ class TrafficMonitor:
 
     def collect(self) -> Dict[str, Any]:
         """
-        Collect traffic metrics for the monitored interface.
+        Collect traffic metrics for the target.
 
         Returns:
             Dict[str, Any]: Dictionary with traffic metrics
         """
-        # Store previous stats if we have them
-        if self.current_stats:
+        try:
+            now = time.time()
+            timestamp = datetime.now().isoformat()
+
+            # Get current interface stats
+            self.current_stats = self._get_interface_stats(self.interface)
+
+            # Calculate rates if we have previous stats
+            rates = self._calculate_rates(
+                self.current_stats,
+                self.previous_stats,
+                now - self.last_collection_time if hasattr(self, 'last_collection_time') else 0
+            )
+
+            # Get target-specific traffic if available
+            target_traffic = self._get_target_traffic()
+
+            # Add TLS information if it's a hostname
+            tls_info = {}
+            if not re.match(r'^(\d{1,3}\.){3}\d{1,3}$', self.target):
+                tls_info = self.check_tls(self.target)
+
+            # Get ICMP metrics
+            icmp_metrics = self._get_icmp_metrics()
+
+            # Store stats for next calculation
             self.previous_stats = self.current_stats
+            self.last_collection_time = now
 
-        # Get current interface stats
-        timestamp = datetime.now()
-        self.current_stats = self._get_interface_stats(self.interface)
-        self.current_stats['timestamp'] = timestamp.timestamp()
-
-        # Calculate rates if we have previous stats
-        rates = {}
-        if self.previous_stats:
-            interval = self.current_stats['timestamp'] - self.previous_stats['timestamp']
-            rates = self._calculate_rates(self.current_stats, self.previous_stats, interval)
-
-        # Get target-specific traffic if possible
-        target_traffic = self._get_target_traffic()
-
-        # Build the result
-        result = {
-            'interface': self.interface,
-            'timestamp': timestamp.isoformat(),
-            'stats': {
-                'rx_bytes': self.current_stats.get('rx_bytes', 0),
-                'tx_bytes': self.current_stats.get('tx_bytes', 0),
-                'rx_packets': self.current_stats.get('rx_packets', 0),
-                'tx_packets': self.current_stats.get('tx_packets', 0),
-            },
-            'rates': {
-                'rx_bytes_rate': rates.get('rx_bytes_rate', 0),
-                'tx_bytes_rate': rates.get('tx_bytes_rate', 0),
-                'rx_packets_rate': rates.get('rx_packets_rate', 0),
-                'tx_packets_rate': rates.get('tx_packets_rate', 0),
-            },
-            'human_readable': {
+            # Create human-readable rates
+            human_readable = {
                 'rx_rate': self._format_bytes(rates.get('rx_bytes_rate', 0)),
                 'tx_rate': self._format_bytes(rates.get('tx_bytes_rate', 0)),
                 'total_rx': self._format_bytes(self.current_stats.get('rx_bytes', 0)),
-                'total_tx': self._format_bytes(self.current_stats.get('tx_bytes', 0)),
-            },
-            'target_traffic': target_traffic
-        }
+                'total_tx': self._format_bytes(self.current_stats.get('tx_bytes', 0))
+            }
 
-        # Add to history (keep last 100 entries)
-        self.traffic_history.append({
-            'timestamp': timestamp.isoformat(),
-            'rx_bytes': self.current_stats.get('rx_bytes', 0),
-            'tx_bytes': self.current_stats.get('tx_bytes', 0),
-            'rx_rate': rates.get('rx_bytes_rate', 0),
-            'tx_rate': rates.get('tx_bytes_rate', 0),
-        })
+            # Create result dictionary
+            result = {
+                'timestamp': timestamp,
+                'interface': self.interface,
+                'target': self.target,
+                'current_stats': self.current_stats,
+                'rates': rates,
+                'human_readable': human_readable,
+                'target_traffic': target_traffic,
+                'tls_info': tls_info,
+                'icmp_metrics': icmp_metrics
+            }
 
-        if len(self.traffic_history) > 100:
-            self.traffic_history.pop(0)
+            # Add to history (keep last 100 entries)
+            self.traffic_history.append({
+                'timestamp': timestamp,
+                'rx_rate': rates.get('rx_bytes_rate', 0),
+                'tx_rate': rates.get('tx_bytes_rate', 0)
+            })
 
-        result['history'] = self.traffic_history[-10:]  # Return only the last 10 entries
+            if len(self.traffic_history) > 100:
+                self.traffic_history = self.traffic_history[-100:]
 
-        self.logger.info(f"Traffic stats - RX: {result['human_readable']['rx_rate']}/s, TX: {result['human_readable']['tx_rate']}/s")
-
-        return result
+            return result
+        except Exception as e:
+            self.logger.error(f"Error collecting traffic metrics: {e}")
+            return {
+                'timestamp': datetime.now().isoformat(),
+                'interface': self.interface,
+                'target': self.target,
+                'error': str(e)
+            }
 
 # Standalone testing when script is run directly
 if __name__ == "__main__":

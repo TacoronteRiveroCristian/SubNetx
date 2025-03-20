@@ -2,6 +2,7 @@
 """
 SubNetx VPN Bandwidth Monitor
 This script measures available bandwidth to assess connection quality.
+Includes TLS verification, ICMP details, and response time measurements.
 """
 
 import subprocess
@@ -10,6 +11,9 @@ import json
 import logging
 import requests
 import statistics
+import ssl
+import socket
+import re
 from datetime import datetime
 from typing import Dict, List, Any, Optional, Tuple
 
@@ -34,6 +38,105 @@ class BandwidthMonitor:
         self.test_interval = 3600  # Default test interval: 1 hour
         self.logger = logging.getLogger('subnetx')
         self.logger.info(f"Initialized Bandwidth Monitor for {target}")
+
+    def check_tls(self, hostname: str, port: int = 443) -> Dict[str, Any]:
+        """
+        Check TLS certificate information for the target host.
+
+        Args:
+            hostname (str): Hostname to check TLS for
+            port (int): Port to check TLS on (default: 443)
+
+        Returns:
+            Dict[str, Any]: TLS certificate information
+        """
+        try:
+            context = ssl.create_default_context()
+            with socket.create_connection((hostname, port)) as sock:
+                with context.wrap_socket(sock, server_hostname=hostname) as ssock:
+                    cert = ssock.getpeercert()
+                    return {
+                        'tls_version': ssock.version(),
+                        'cipher': ssock.cipher(),
+                        'cert_expiry': datetime.strptime(cert['notAfter'], '%b %d %H:%M:%S %Y %Z').isoformat(),
+                        'issuer': dict(x[0] for x in cert['issuer']),
+                        'subject': dict(x[0] for x in cert['subject'])
+                    }
+        except Exception as e:
+            self.logger.error(f"TLS check failed for {hostname}: {e}")
+            return {
+                'tls_version': None,
+                'cipher': None,
+                'cert_expiry': None,
+                'issuer': None,
+                'subject': None,
+                'error': str(e)
+            }
+
+    def _get_icmp_metrics(self, target: str = None) -> Dict[str, Any]:
+        """
+        Collect ICMP ping metrics for the target.
+
+        Args:
+            target (str, optional): IP address to ping. If None, uses self.target.
+
+        Returns:
+            Dict[str, Any]: ICMP metrics including response times
+        """
+        ping_target = target if target else self.target
+        try:
+            # Run ping command with 4 packets
+            result = subprocess.run(
+                ['ping', '-c', '4', ping_target],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+
+            if result.returncode != 0:
+                return {
+                    'success': False,
+                    'error': f"Ping failed with return code {result.returncode}"
+                }
+
+            # Parse the ping output
+            packet_loss_match = re.search(r'(\d+)% packet loss', result.stdout)
+            packet_loss = packet_loss_match.group(1) if packet_loss_match else "100"
+
+            rtt_match = re.search(r'rtt min/avg/max/mdev = ([\d.]+)/([\d.]+)/([\d.]+)/([\d.]+)', result.stdout)
+            if rtt_match:
+                rtt_stats = {
+                    'min': float(rtt_match.group(1)),
+                    'avg': float(rtt_match.group(2)),
+                    'max': float(rtt_match.group(3)),
+                    'mdev': float(rtt_match.group(4))
+                }
+            else:
+                rtt_stats = {'min': 0, 'avg': 0, 'max': 0, 'mdev': 0}
+
+            # Extract ICMP sequence details
+            icmp_details = []
+            for line in result.stdout.split('\n'):
+                if 'icmp_seq=' in line:
+                    icmp_match = re.search(r'icmp_seq=(\d+).*time=([\d.]+)', line)
+                    if icmp_match:
+                        icmp_details.append({
+                            'sequence': int(icmp_match.group(1)),
+                            'response_time': float(icmp_match.group(2))
+                        })
+
+            return {
+                'success': True,
+                'packet_loss': float(packet_loss),
+                'rtt_stats': rtt_stats,
+                'icmp_details': icmp_details
+            }
+        except Exception as e:
+            self.logger.error(f"Error collecting ICMP metrics: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
 
     def _download_test(self, url: str, timeout: int = 10) -> Optional[float]:
         """
@@ -292,57 +395,68 @@ class BandwidthMonitor:
 
     def collect(self) -> Dict[str, Any]:
         """
-        Collect bandwidth metrics.
+        Collect bandwidth metrics for the target.
 
         Returns:
             Dict[str, Any]: Dictionary with bandwidth metrics
         """
-        result = {
-            'timestamp': datetime.now().isoformat(),
-            'target': self.target
-        }
+        try:
+            # Get current timestamp
+            timestamp = datetime.now().isoformat()
 
-        # Always measure jitter and latency (fast)
-        jitter_latency = self._get_jitter_latency()
-        result['jitter_latency'] = jitter_latency
-
-        # Run bandwidth tests periodically (resource-intensive)
-        if self._should_run_test():
-            self.logger.info("Running full bandwidth test")
-            bandwidth_test = self._run_speed_tests()
-            result['bandwidth_test'] = bandwidth_test
-        else:
-            # Return the last test results if available
-            if self.download_speeds and self.upload_speeds:
-                last_download = self.download_speeds[-1]['speed']
-                last_upload = self.upload_speeds[-1]['speed']
-                result['bandwidth_test'] = {
-                    'timestamp': datetime.now().isoformat(),
-                    'average_download': last_download,
-                    'average_upload': last_upload,
-                    'download_human': self._format_bytes(last_download),
-                    'upload_human': self._format_bytes(last_upload),
-                    'note': 'Using cached bandwidth test result'
-                }
+            # Run bandwidth test if needed
+            bandwidth_results = {}
+            if self._should_run_test():
+                bandwidth_results = self._run_speed_tests()
             else:
-                result['bandwidth_test'] = {
-                    'note': 'No bandwidth tests run yet'
+                # Calculate averages from historical data
+                if self.download_speeds:
+                    avg_download = statistics.mean([entry['speed'] for entry in self.download_speeds])
+                    bandwidth_results['average_download'] = avg_download
+                    bandwidth_results['download_human'] = self._format_bytes(avg_download)
+
+                if self.upload_speeds:
+                    avg_upload = statistics.mean([entry['speed'] for entry in self.upload_speeds])
+                    bandwidth_results['average_upload'] = avg_upload
+                    bandwidth_results['upload_human'] = self._format_bytes(avg_upload)
+
+            # Add TLS information if it's a hostname
+            tls_info = {}
+            if not re.match(r'^(\d{1,3}\.){3}\d{1,3}$', self.target):
+                tls_info = self.check_tls(self.target)
+
+            # Get jitter and latency metrics
+            jitter_latency = self._get_jitter_latency()
+
+            # Get ICMP metrics
+            icmp_metrics = self._get_icmp_metrics()
+
+            # Build the result
+            result = {
+                'timestamp': timestamp,
+                'target': self.target,
+                'bandwidth': bandwidth_results,
+                'jitter_latency': jitter_latency,
+                'tls_info': tls_info,
+                'icmp_metrics': icmp_metrics,
+                'history': {
+                    'download_speeds': self.download_speeds[-10:],  # Last 10 entries
+                    'upload_speeds': self.upload_speeds[-10:]  # Last 10 entries
+                },
+                'test_info': {
+                    'last_test_time': datetime.fromtimestamp(self.last_test_time).isoformat() if self.last_test_time else None,
+                    'test_interval_seconds': self.test_interval
                 }
+            }
 
-        # Include historical data
-        result['history'] = {
-            'download_speeds': self.download_speeds[-10:],
-            'upload_speeds': self.upload_speeds[-10:]
-        }
-
-        # Log a summary of the results
-        if 'bandwidth_test' in result and 'average_download' in result['bandwidth_test']:
-            self.logger.info(f"Bandwidth: ↓{result['bandwidth_test']['download_human']}/s, ↑{result['bandwidth_test']['upload_human']}/s")
-
-        if 'jitter_latency' in result and result['jitter_latency']['success']:
-            self.logger.info(f"Latency: {result['jitter_latency']['latency_ms']:.2f}ms, Jitter: {result['jitter_latency']['jitter_ms']:.2f}ms")
-
-        return result
+            return result
+        except Exception as e:
+            self.logger.error(f"Error collecting bandwidth metrics: {e}")
+            return {
+                'timestamp': datetime.now().isoformat(),
+                'target': self.target,
+                'error': str(e)
+            }
 
 # Standalone testing when script is run directly
 if __name__ == "__main__":

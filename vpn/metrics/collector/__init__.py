@@ -1,6 +1,7 @@
 """
 SubNetx VPN Metrics Collector Package
 Collection of modules to monitor and collect network metrics for VPN connections.
+Includes TLS verification, ICMP details, and response time measurements across all collectors.
 """
 
 from .ping import VPNPingMonitor
