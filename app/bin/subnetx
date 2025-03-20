@@ -1,44 +1,22 @@
 #!/bin/bash
-# Descripcion: Script principal para gestionar OpenVPN.
+# subnetx - Comando global para gestionar OpenVPN
+# Descripcion: Interfaz interactiva para gestionar OpenVPN
 
-echo ""
-echo "📡 SubnetX - Gestion de OpenVPN"
-echo "--------------------------------"
-echo ""
+# Ruta al script de menu
+MENU_SCRIPT="/app/scripts/openvpn-menu.sh"
 
-# Mostrar ayuda si se pasa "help" como primer argumento.
-if [[ "$1" == "help" ]]; then
-    /app/scripts/openvpn-help.sh
+# Verificar que el script existe
+if [ ! -f "$MENU_SCRIPT" ]; then
+    echo "Error: No se encontro el script de menu en $MENU_SCRIPT"
     exit 1
 fi
 
-COMMAND=$1
-SUBCOMMAND=$2
+# Verificar que el script tiene permisos de ejecucion
+if [ ! -x "$MENU_SCRIPT" ]; then
+    echo "Error: El script no tiene permisos de ejecucion"
+    echo "Ejecute: chmod +x $MENU_SCRIPT"
+    exit 1
+fi
 
-case $COMMAND in
-    setup)
-        /app/scripts/openvpn-setup.sh "${@:2}"
-        ;;
-    start)
-        /app/scripts/openvpn-start.sh
-        ;;
-    stop)
-        /app/scripts/openvpn-stop.sh
-        ;;
-    client)
-        case $SUBCOMMAND in
-            new)
-                /app/scripts/openvpn-client-new.sh "${@:3}"
-                ;;
-            delete)
-                /app/scripts/openvpn-client-delete.sh "${@:3}"
-                ;;
-            *)
-                usage
-                ;;
-        esac
-        ;;
-    *)
-        usage
-        ;;
-esac
+# Ejecutar el menu interactivo
+"$MENU_SCRIPT" "$@"

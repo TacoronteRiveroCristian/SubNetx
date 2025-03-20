@@ -27,6 +27,7 @@ RUN apt-get update && \
     nano \
     git \
     iputils-ping \
+    whiptail \
     net-tools && \
     rm -rf /var/lib/apt/lists/*
 
