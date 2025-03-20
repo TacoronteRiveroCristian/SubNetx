@@ -29,6 +29,25 @@ services:
     networks:
       - subnetx
 
+  # subnetx-monitor:
+  #   build:
+  #     context: ./metrics
+  #     dockerfile: Dockerfile
+  #   container_name: subnetx_monitor
+  #   restart: unless-stopped
+  #   volumes:
+  #     - ./logs:/var/log/openvpn
+  #     - ./logs/subnetx:/var/log/subnetx
+  #   environment:
+  #     - VPN_NETWORK=${VPN_NETWORK}
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "3"
+  #   networks:
+  #     - subnetx 
+
   duckdns:
     image: linuxserver/duckdns
     container_name: subnetx_vpn_duckdns

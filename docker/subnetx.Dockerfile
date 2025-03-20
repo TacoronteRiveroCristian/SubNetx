@@ -37,13 +37,13 @@ RUN mkdir -p ${CERTS_DIR} ${CCD_DIR} ${CLIENTS_DIR} ${LOGS_DIR} ${SERVER_CONF_DI
     touch ${LOGS_DIR}/openvpn.log ${LOGS_DIR}/status.log && \
     chmod 644 ${LOGS_DIR}/openvpn.log ${LOGS_DIR}/status.log
 
-# Copiar fichero de configuracion de red para OpenVPN
-COPY docker/config/openvpn/sysctl.conf /etc/sysctl.conf
-
 # Copiar estrcutura de ficheros
-COPY app/bin/subnetx /usr/local/bin/subnetx
-COPY app/config/ /app/config/
-COPY app/scripts/ /app/scripts/
+COPY vpn/subnetx /usr/local/bin/subnetx
+COPY vpn/config/openvpn /app/config/
+COPY vpn/scripts /app/scripts/
+
+# Mover fichero de configuracion de red para OpenVPN
+RUN mv /app/config/sysctl.conf /etc/sysctl.conf
 
 # Dar permisos iniciales para evitar problemas de acceso durante la configuracion
 RUN chmod +x /usr/local/bin/subnetx /app/scripts/*.sh
