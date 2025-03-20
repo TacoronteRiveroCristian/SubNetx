@@ -28,7 +28,10 @@ RUN apt-get update && \
     git \
     iputils-ping \
     whiptail \
-    net-tools && \
+    net-tools \
+    python3 \
+    python3-pip \
+    python3-venv && \
     rm -rf /var/lib/apt/lists/*
 
 # Crear estructura de directorios para OpenVPN

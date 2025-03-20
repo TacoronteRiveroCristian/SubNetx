@@ -10,6 +10,7 @@ services:
       - SYS_ADMIN
     privileged: true
     volumes:
+      - .:/app
       - ./certs:/etc/openvpn/certs
       - ./logs:/var/log/openvpn
     ports:
@@ -46,7 +47,7 @@ services:
   #       max-size: "10m"
   #       max-file: "3"
   #   networks:
-  #     - subnetx 
+  #     - subnetx
 
   duckdns:
     image: linuxserver/duckdns
