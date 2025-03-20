@@ -6,7 +6,7 @@ CLIENT_NAME="" # Nombre del cliente
 CLIENT_IP="" # IP fija asignada al cliente
 
 # Parsear argumentos
-while [[ "$#" -gt 0 ]]; do # Para cada argumento en la línea de comandos
+while [[ "$#" -gt 0 ]]; do # Para cada argumento en la linea de comandos
     case "$1" in
         --name) # Si el argumento es --name
             CLIENT_NAME="$2" # Asigna el siguiente argumento como nombre del cliente
@@ -44,7 +44,7 @@ fi
 cd "$EASYRSA_DIR" || { echo "❌ Error: No se pudo acceder a $EASYRSA_DIR"; exit 1; }
 
 # Construir el certificado del cliente
-./easyrsa --batch build-client-full "$CLIENT_NAME" nopass # Genera certificado sin contraseña
+./easyrsa --batch build-client-full "$CLIENT_NAME" nopass # Genera certificado sin contrasena
 
 # Verificar si los archivos se crearon correctamente
 if [ ! -f "$EASYRSA_DIR/pki/issued/$CLIENT_NAME.crt" ] || [ ! -f "$EASYRSA_DIR/pki/private/$CLIENT_NAME.key" ]; then # Si no existen los archivos
@@ -53,25 +53,25 @@ if [ ! -f "$EASYRSA_DIR/pki/issued/$CLIENT_NAME.crt" ] || [ ! -f "$EASYRSA_DIR/p
 fi
 
 # Copiar certificados del cliente al directorio centralizado
-echo "📂 Copiando certificados del cliente a la ubicación centralizada..."
-mkdir -p "$CERTS_DIR/clients/$CLIENT_NAME" # Crea directorio específico para el cliente
+echo "📂 Copiando certificados del cliente a la ubicacion centralizada..."
+mkdir -p "$CERTS_DIR/clients/$CLIENT_NAME" # Crea directorio especifico para el cliente
 cp "$EASYRSA_DIR/pki/issued/$CLIENT_NAME.crt" "$CERTS_DIR/clients/$CLIENT_NAME/" # Copia certificado
 cp "$EASYRSA_DIR/pki/private/$CLIENT_NAME.key" "$CERTS_DIR/clients/$CLIENT_NAME/" # Copia clave privada
 
 echo "✅ Certificado y clave generados para $CLIENT_NAME."
 
 # Crear el archivo de configuracion del cliente en el servidor (CCD)
-CCD_FILE="$CCD_DIR/$CLIENT_NAME" # Ruta al archivo de configuración del cliente
+CCD_FILE="$CCD_DIR/$CLIENT_NAME" # Ruta al archivo de configuracion del cliente
 echo "📄 Asignando IP fija al cliente en: $CCD_FILE"
 
 mkdir -p "$CCD_DIR" # Asegura que existe el directorio
 echo "ifconfig-push $CLIENT_IP $VPN_NETMASK" | tee "$CCD_FILE" > /dev/null # Crea el archivo CCD con la IP fija
 
 # Asegurar que existe el directorio de clientes
-mkdir -p "$CLIENTS_DIR" # Crea directorio para archivos de configuración de clientes
+mkdir -p "$CLIENTS_DIR" # Crea directorio para archivos de configuracion de clientes
 
 # Crear el perfil de configuracion del cliente (.ovpn con todo embebido)
-CLIENT_CONFIG="$CLIENTS_DIR/$CLIENT_NAME.ovpn" # Ruta al archivo de configuración
+CLIENT_CONFIG="$CLIENTS_DIR/$CLIENT_NAME.ovpn" # Ruta al archivo de configuracion
 CLIENT_CONFIG_COPY="$CERTS_DIR/clients/$CLIENT_NAME/$CLIENT_NAME.ovpn" # Copia en el directorio centralizado
 
 echo "📄 Creando archivo de configuracion del cliente: $CLIENT_CONFIG"
@@ -113,8 +113,8 @@ EOF
     echo "</tls-auth>"
 } >> "$CLIENT_CONFIG"
 
-# Crear una copia del archivo de configuración en el directorio centralizado
-cp "$CLIENT_CONFIG" "$CLIENT_CONFIG_COPY" # Copia el archivo de configuración
+# Crear una copia del archivo de configuracion en el directorio centralizado
+cp "$CLIENT_CONFIG" "$CLIENT_CONFIG_COPY" # Copia el archivo de configuracion
 
 echo "✅ Cliente creado correctamente con IP fija: $CLIENT_IP"
 echo "📄 Archivo .ovpn (todo embebido): $CLIENT_CONFIG"

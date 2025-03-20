@@ -12,8 +12,6 @@ if [[ "$1" == "help" ]]; then
     exit 1
 fi
 
-source /app/config/openvpn/config.sh
-
 COMMAND=$1
 SUBCOMMAND=$2
 

@@ -1,12 +1,12 @@
 #!/bin/bash
 # Descripcion: Configura OpenVPN, genera certificados, habilita el reenvio de paquetes y configura NAT.
-# Las rutas están definidas como variables de entorno en el Dockerfile para mayor coherencia.
+# Las rutas estan definidas como variables de entorno en el Dockerfile para mayor coherencia.
 
-# Función para manejar errores
+# Funcion para manejar errores
 handle_error() {
     echo "❌ Error: $1" # Muestra mensaje de error
-    echo "❌ La configuración no se completó correctamente." # Indica fallo en la configuración
-    exit 1 # Termina con código de error
+    echo "❌ La configuracion no se completo correctamente." # Indica fallo en la configuracion
+    exit 1 # Termina con codigo de error
 }
 
 # ---------------------------
@@ -29,15 +29,15 @@ required_vars=(
 missing_vars=() # Inicializa array para variables faltantes
 
 for var in "${required_vars[@]}"; do
-    if [ -z "${!var}" ]; then # Verifica si la variable está vacía
-        missing_vars+=("$var") # Añade variable faltante al array
+    if [ -z "${!var}" ]; then # Verifica si la variable esta vacia
+        missing_vars+=("$var") # Anade variable faltante al array
     fi
 done
 
 if [ ${#missing_vars[@]} -ne 0 ]; then # Si hay variables faltantes
     echo "❌ Faltan las siguientes variables de entorno:"
     printf '%s\n' "${missing_vars[@]}" # Imprime cada variable faltante
-    echo "Por favor, consulte la ayuda con --help para más información."
+    echo "Por favor, consulte la ayuda con --help para mas informacion."
     /app/scripts/openvpn-help.sh # Muestra ayuda
     exit 1 # Termina con error
 fi
@@ -55,16 +55,16 @@ chown root:root "$LOGS_DIR/openvpn.log" "$LOGS_DIR/status.log" # Establece propi
 # ---------------------------
 # Generar server.conf
 # ---------------------------
-SERVER_CONF="${SERVER_CONF_DIR}/server.conf" # Ruta al archivo de configuración del servidor
+SERVER_CONF="${SERVER_CONF_DIR}/server.conf" # Ruta al archivo de configuracion del servidor
 SERVER_TEMPLATE="/app/config/openvpn/server.conf.template" # Ruta al template
 
 # Verificar que el template existe
 if [ ! -f "$SERVER_TEMPLATE" ]; then # Verifica si existe el archivo template
-    handle_error "No se encontró el template de server.conf: $SERVER_TEMPLATE"
+    handle_error "No se encontro el template de server.conf: $SERVER_TEMPLATE"
 fi
 
-# Crear directorio para la configuración del servidor si no existe
-mkdir -p "$SERVER_CONF_DIR" # Crea el directorio para la configuración
+# Crear directorio para la configuracion del servidor si no existe
+mkdir -p "$SERVER_CONF_DIR" # Crea el directorio para la configuracion
 
 # Utilizar sed para reemplazar los placeholders con las variables de entorno
 if ! sed -e "s/{{PORT}}/${OPENVPN_PORT}/g" \
@@ -94,7 +94,7 @@ else
     echo "✅ Directorio Easy-RSA ya existe."
 fi
 
-# Copiar vars si está disponible
+# Copiar vars si esta disponible
 EASYRSA_VARS_TEMPLATE="/app/config/openvpn/vars"
 if [ -f "$EASYRSA_VARS_TEMPLATE" ]; then # Si existe el archivo vars template
     cp "$EASYRSA_VARS_TEMPLATE" "$EASYRSA_DIR/vars" # Copia el archivo vars
@@ -121,8 +121,8 @@ fi
 
 # Crear la CA si no existe
 if [ ! -f "$CERTS_DIR/ca.crt" ]; then # Verifica si existe el certificado CA
-    echo "🔏 Generando Autoridad de Certificación (CA)..."
-    if ! ./easyrsa --batch build-ca nopass; then # Genera CA sin contraseña
+    echo "🔏 Generando Autoridad de Certificacion (CA)..."
+    if ! ./easyrsa --batch build-ca nopass; then # Genera CA sin contrasena
         handle_error "Error al generar la CA"
     fi
     if ! cp pki/ca.crt "$CERTS_DIR/"; then # Copia el certificado CA al directorio de certificados
@@ -133,7 +133,7 @@ fi
 # Crear clave y certificado del servidor si no existen
 if [ ! -f "$CERTS_DIR/server.crt" ]; then # Verifica si existe el certificado del servidor
     echo "🔐 Generando clave y certificado del servidor..."
-    if ! ./easyrsa --batch gen-req server nopass; then # Genera solicitud de certificado sin contraseña
+    if ! ./easyrsa --batch gen-req server nopass; then # Genera solicitud de certificado sin contrasena
         handle_error "Error al generar la clave del servidor"
     fi
     if ! echo "yes" | ./easyrsa --batch sign-req server server; then # Firma la solicitud de certificado
@@ -148,13 +148,13 @@ if [ ! -f "$CERTS_DIR/server.crt" ]; then # Verifica si existe el certificado de
 fi
 
 # Generar Diffie-Hellman si no existe
-if [ ! -f "$CERTS_DIR/dh.pem" ]; then # Verifica si existen los parámetros Diffie-Hellman
+if [ ! -f "$CERTS_DIR/dh.pem" ]; then # Verifica si existen los parametros Diffie-Hellman
     echo "🔀 Generando Diffie-Hellman..."
-    if ! ./easyrsa gen-dh; then # Genera parámetros Diffie-Hellman
-        handle_error "Error al generar los parámetros Diffie-Hellman"
+    if ! ./easyrsa gen-dh; then # Genera parametros Diffie-Hellman
+        handle_error "Error al generar los parametros Diffie-Hellman"
     fi
-    if ! cp pki/dh.pem "$CERTS_DIR/"; then # Copia los parámetros al directorio de certificados
-        handle_error "Error al copiar los parámetros Diffie-Hellman"
+    if ! cp pki/dh.pem "$CERTS_DIR/"; then # Copia los parametros al directorio de certificados
+        handle_error "Error al copiar los parametros Diffie-Hellman"
     fi
 fi
 
@@ -183,23 +183,23 @@ Contenido:
 - ca.crt: Certificado de la Autoridad Certificadora
 - server.crt: Certificado del servidor
 - server.key: Clave privada del servidor
-- dh.pem: Parámetros Diffie-Hellman
+- dh.pem: Parametros Diffie-Hellman
 - ta.key: Clave TLS Auth
 - clients/: Directorio con certificados y configuraciones de clientes
 
-Fecha de creación: $(date)
+Fecha de creacion: $(date)
 EOF
 
 # Aplicar los cambios en sysctl sin necesidad de reiniciar
-echo "📡 Configurando reenvío de paquetes..."
-if ! sysctl -w net.ipv4.ip_forward=1; then # Habilita el reenvío de paquetes
-    handle_error "Error al habilitar el reenvío de paquetes"
+echo "📡 Configurando reenvio de paquetes..."
+if ! sysctl -w net.ipv4.ip_forward=1; then # Habilita el reenvio de paquetes
+    handle_error "Error al habilitar el reenvio de paquetes"
 fi
-if ! sysctl -p; then # Aplica configuración de sysctl
-    handle_error "Error al aplicar la configuración de sysctl"
+if ! sysctl -p; then # Aplica configuracion de sysctl
+    handle_error "Error al aplicar la configuracion de sysctl"
 fi
 
-echo "📡 Configurando iptables para enrutar tráfico de la VPN..."
+echo "📡 Configurando iptables para enrutar trafico de la VPN..."
 # Modificar tablas de enrutamiento
 if ! iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE; then # Configura NAT para eth0
     handle_error "Error al configurar iptables para eth0"
@@ -214,9 +214,9 @@ if ! iptables -t nat -L -n -v; then # Muestra reglas de NAT aplicadas
     handle_error "Error al verificar las reglas de iptables"
 fi
 
-echo "✅ Configuración de OpenVPN completada correctamente."
+echo "✅ Configuracion de OpenVPN completada correctamente."
 echo "🔒 Todos los certificados y claves se han almacenado en $CERTS_DIR"
-echo "📝 Para montar este directorio como volumen Docker, añada la siguiente línea a su docker-compose.yml:"
+echo "📝 Para montar este directorio como volumen Docker, anada la siguiente linea a su docker-compose.yml:"
 echo "   volumes:"
 echo "     - ./certs:/etc/openvpn/certs"
 echo "     - ./logs:/var/log/openvpn"

@@ -27,13 +27,13 @@ cd "$EASYRSA_DIR" || { # Cambia al directorio Easy-RSA
 
 echo "🔐 Revocando certificado..."
 if ! ./easyrsa --batch revoke "$CLIENT_NAME"; then # Revoca el certificado
-    echo "⚠️ Advertencia: Error al revocar el certificado. Continuando con la eliminación de archivos."
+    echo "⚠️ Advertencia: Error al revocar el certificado. Continuando con la eliminacion de archivos."
 fi
 
 # Generar una nueva CRL (Certificate Revocation List)
 echo "🔄 Actualizando lista de certificados revocados (CRL)..."
 if ! ./easyrsa gen-crl; then # Genera la CRL
-    echo "⚠️ Advertencia: Error al generar la CRL. Continuando con la eliminación de archivos."
+    echo "⚠️ Advertencia: Error al generar la CRL. Continuando con la eliminacion de archivos."
 else
     # Copiar la CRL al directorio de certificados
     cp -f "$EASYRSA_DIR/pki/crl.pem" "$CERTS_DIR/" # Copia la CRL al directorio de certificados
@@ -43,16 +43,16 @@ fi
 # Eliminar archivos del cliente
 echo "🗑️ Eliminando archivos del cliente..."
 
-# Eliminar configuración específica del cliente (CCD)
+# Eliminar configuracion especifica del cliente (CCD)
 if [ -f "$CCD_DIR/$CLIENT_NAME" ]; then # Si existe el archivo CCD
     rm -f "$CCD_DIR/$CLIENT_NAME" # Elimina el archivo CCD
-    echo "✅ Configuración CCD eliminada."
+    echo "✅ Configuracion CCD eliminada."
 fi
 
 # Eliminar archivo .ovpn
-if [ -f "$CLIENTS_DIR/$CLIENT_NAME.ovpn" ]; then # Si existe el archivo de configuración
-    rm -f "$CLIENTS_DIR/$CLIENT_NAME.ovpn" # Elimina el archivo de configuración
-    echo "✅ Archivo de configuración .ovpn eliminado."
+if [ -f "$CLIENTS_DIR/$CLIENT_NAME.ovpn" ]; then # Si existe el archivo de configuracion
+    rm -f "$CLIENTS_DIR/$CLIENT_NAME.ovpn" # Elimina el archivo de configuracion
+    echo "✅ Archivo de configuracion .ovpn eliminado."
 fi
 
 # Eliminar directorio del cliente en el directorio centralizado
@@ -62,4 +62,4 @@ if [ -d "$CERTS_DIR/clients/$CLIENT_NAME" ]; then # Si existe el directorio del 
 fi
 
 echo "✅ Cliente $CLIENT_NAME eliminado correctamente."
-echo "📝 Nota: Si el servidor OpenVPN estaba en ejecución, deberá reiniciarlo para aplicar los cambios de revocación."
+echo "📝 Nota: Si el servidor OpenVPN estaba en ejecucion, debera reiniciarlo para aplicar los cambios de revocacion."
