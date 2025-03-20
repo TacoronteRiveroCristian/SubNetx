@@ -14,10 +14,11 @@ import logging
 import socket
 import os
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, Any
 
-from .base import BaseMonitor
-from .ping import PingMonitor
+from base import BaseMonitor
+from ping import PingMonitor
+from database import ConnectionDatabase
 
 class ConnectionMonitor(BaseMonitor):
     """Monitor for VPN connection status and stability.
@@ -182,7 +183,7 @@ class ConnectionMonitor(BaseMonitor):
             return 0.0
 
     def _check_openvpn_status(self) -> Dict[str, Any]:
-        """Check OpenVPN service status if available.
+        """Check OpenVPN service status in Docker container.
 
         Returns:
             Dict[str, Any]: OpenVPN status information.
@@ -191,57 +192,57 @@ class ConnectionMonitor(BaseMonitor):
             'service_available': False,
             'is_running': False,
             'uptime': None,
-            'active_clients': 0
+            'active_clients': 0,
+            'tun_interface': False
         }
 
         try:
-            # Check if openvpn service is running
-            service_check = subprocess.run(
-                ['systemctl', 'is-active', 'openvpn'],
-                capture_output=True,
-                text=True
-            )
-
-            result['service_available'] = True
-            result['is_running'] = service_check.stdout.strip() == 'active'
-
-            if result['is_running']:
-                # Get service uptime
-                uptime_check = subprocess.run(
-                    ['systemctl', 'show', 'openvpn', '--property=ActiveEnterTimestamp'],
-                    capture_output=True,
-                    text=True
-                )
-
-                # Parse the timestamp
-                if 'ActiveEnterTimestamp=' in uptime_check.stdout:
-                    timestamp_str = uptime_check.stdout.replace('ActiveEnterTimestamp=', '').strip()
-                    if timestamp_str:
-                        try:
-                            start_time = datetime.strptime(timestamp_str, '%a %Y-%m-%d %H:%M:%S %Z')
-                            uptime_seconds = (datetime.now() - start_time).total_seconds()
-                            result['uptime'] = uptime_seconds
-                        except ValueError:
-                            pass
-
-                # Check for active clients if status log is available
+            # Verificar el archivo PID
+            pid_file = os.getenv('OPENVPN_PID_FILE', '/var/run/openvpn.pid')
+            if os.path.exists(pid_file):
+                with open(pid_file, 'r') as f:
+                    pid = f.read().strip()
+                # Verificar si el proceso existe
                 try:
-                    if os.path.exists('/var/log/openvpn/status.log'):
-                        with open('/var/log/openvpn/status.log', 'r') as f:
-                            status_data = f.read()
+                    subprocess.run(['kill', '-0', pid], check=True)
+                    result['is_running'] = True
+                    result['service_available'] = True
+                except subprocess.CalledProcessError:
+                    result['is_running'] = False
 
-                        # Count client lines
-                        client_count = 0
-                        for line in status_data.split('\n'):
-                            if line.startswith('CLIENT_LIST'):
-                                client_count += 1
+            # Verificar la interfaz TUN
+            tun_device = os.getenv('TUN_DEVICE', 'tun0')
+            try:
+                subprocess.run(['ip', 'link', 'show', tun_device], check=True, capture_output=True)
+                result['tun_interface'] = True
+            except subprocess.CalledProcessError:
+                result['tun_interface'] = False
 
-                        result['active_clients'] = client_count
+            # Verificar procesos OpenVPN
+            try:
+                ps_output = subprocess.run(['ps', 'aux'], capture_output=True, text=True)
+                openvpn_processes = [line for line in ps_output.stdout.split('\n')
+                                   if 'openvpn' in line.lower() and 'server.conf' in line]
+                result['active_clients'] = len(openvpn_processes)
+            except Exception as e:
+                print(f"Error checking OpenVPN processes: {e}")
+
+            # Verificar logs de estado si están disponibles
+            logs_dir = os.getenv('LOGS_DIR', '/var/log/openvpn')
+            status_log = os.path.join(logs_dir, 'status.log')
+            if os.path.exists(status_log):
+                try:
+                    with open(status_log, 'r') as f:
+                        status_data = f.read()
+                    # Contar clientes activos
+                    client_count = sum(1 for line in status_data.split('\n')
+                                     if line.startswith('CLIENT_LIST'))
+                    result['active_clients'] = client_count
                 except Exception as e:
-                    print(f"Error reading OpenVPN status: {e}")
+                    print(f"Error reading status log: {e}")
 
         except Exception as e:
-            print(f"Error checking OpenVPN service: {e}")
+            print(f"Error checking OpenVPN status: {e}")
 
         return result
 
@@ -440,16 +441,48 @@ if __name__ == "__main__":
     )
     logger = logging.getLogger(__name__)
 
-    # Test the connection monitor
+    # Test the connection monitor with database storage
     targets = ["google.com", "8.8.8.8"]
+    db = ConnectionDatabase("vpn_metrics.db")
 
     for target in targets:
         try:
             logger.info(f"Testing {target}")
             monitor = ConnectionMonitor(target)
+
+            # Primera verificación
             results = monitor.collect()
-            logger.info(f"\nResults for {target}:")
+            logger.info(f"\nInitial results for {target}:")
             logger.info(json.dumps(results, indent=2))
+
+            # Simular una conexión
+            if results['status']['connected']:
+                db.record_connection(target)
+                logger.info(f"Recorded connection for {target}")
+
+            # Esperar unos segundos
+            time.sleep(5)
+
+            # Segunda verificación
+            results = monitor.collect()
+            logger.info(f"\nUpdated results for {target}:")
+            logger.info(json.dumps(results, indent=2))
+
+            # Si se desconectó, registrar la desconexión
+            if not results['status']['connected']:
+                db.record_disconnection(target)
+                logger.info(f"Recorded disconnection for {target}")
+
+            # Obtener estadísticas de la base de datos
+            stats = db.get_connection_stats(target)
+            logger.info(f"\nDatabase statistics for {target}:")
+            logger.info(json.dumps(stats, indent=2))
+
+            # Obtener métricas de estabilidad
+            stability = db.get_stability_metrics(target)
+            logger.info(f"\nStability metrics for {target}:")
+            logger.info(json.dumps(stability, indent=2))
+
         except Exception as e:
             logger.error(f"Failed to collect metrics for {target}: {str(e)}")
             logger.error(f"Error details: {e.__class__.__name__}")

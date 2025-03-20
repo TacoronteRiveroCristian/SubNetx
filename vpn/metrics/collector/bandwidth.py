@@ -6,17 +6,16 @@ This module provides functionality to measure available bandwidth and connection
 for VPN connections, focusing on download/upload speeds and jitter measurements.
 """
 
-import subprocess
 import time
 import json
 import logging
 import requests
 import statistics
 from datetime import datetime
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, Any, Optional
 
-from .base import BaseMonitor
-from .ping import PingMonitor
+from base import BaseMonitor
+from ping import PingMonitor
 
 class BandwidthMonitor(BaseMonitor):
     """Monitor for available bandwidth and connection quality.

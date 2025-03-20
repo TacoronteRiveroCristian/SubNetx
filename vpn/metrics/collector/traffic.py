@@ -15,10 +15,10 @@ import logging
 import ssl
 import socket
 from datetime import datetime
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional
 
-from .base import BaseMonitor
-from .ping import PingMonitor
+from base import BaseMonitor
+from ping import PingMonitor
 
 class TrafficMonitor(BaseMonitor):
     """Monitor for network traffic statistics.
