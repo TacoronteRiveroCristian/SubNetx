@@ -4,6 +4,63 @@ SubNetx VPN Bandwidth Monitor
 
 This module provides functionality to measure available bandwidth and connection quality
 for VPN connections, focusing on download/upload speeds and jitter measurements.
+
+JSON Response Format:
+{
+    "timestamp": "ISO-8601 timestamp of the measurement",
+    "target": "Target hostname or IP being monitored",
+    "bandwidth": {
+        "timestamp": "ISO-8601 timestamp of the bandwidth test",
+        "average_download": "Average download speed in bytes per second",
+        "average_upload": "Average upload speed in bytes per second",
+        "download_human": "Human-readable download speed (e.g., '10.5 MB/s')",
+        "upload_human": "Human-readable upload speed (e.g., '5.2 MB/s')",
+        "servers_tested": "Number of servers used in the test",
+        "server_results": {
+            "server_url": {
+                "download_speed": "Download speed in bytes per second",
+                "upload_speed": "Upload speed in bytes per second",
+                "download_human": "Human-readable download speed",
+                "upload_human": "Human-readable upload speed"
+            }
+        }
+    },
+    "network_quality": {
+        "success": "Boolean indicating if measurements were successful",
+        "latency_ms": "Average round-trip time in milliseconds",
+        "jitter_ms": "Network jitter (variation in latency) in milliseconds",
+        "packet_loss_percent": "Percentage of lost packets (0-100)",
+        "error": "Error message if measurements failed"
+    },
+    "historical_data": {
+        "download_speeds": [
+            {
+                "timestamp": "ISO-8601 timestamp",
+                "speed": "Download speed in bytes per second"
+            }
+        ],
+        "upload_speeds": [
+            {
+                "timestamp": "ISO-8601 timestamp",
+                "speed": "Upload speed in bytes per second"
+            }
+        ]
+    }
+}
+
+Metrics Explained:
+- bandwidth: Network throughput measurements
+  * average_download/upload: Mean speeds across all test servers
+  * human-readable: Formatted values for display (B/s, KB/s, MB/s, GB/s)
+  * server_results: Individual results from each test server
+- network_quality: Connection quality metrics
+  * latency: Network delay
+  * jitter: Variation in network delay
+  * packet_loss: Reliability indicator
+- historical_data: Rolling window of previous measurements
+  * Limited to last 100 entries
+  * Used for trend analysis and graphing
+  * Separate tracking for download and upload speeds
 """
 
 import time
@@ -14,8 +71,8 @@ import statistics
 from datetime import datetime
 from typing import Dict, Any, Optional
 
-from base import BaseMonitor
-from ping import PingMonitor
+from vpn.metrics.collector.base import BaseMonitor
+from vpn.metrics.collector.ping import PingMonitor
 
 class BandwidthMonitor(BaseMonitor):
     """Monitor for available bandwidth and connection quality.

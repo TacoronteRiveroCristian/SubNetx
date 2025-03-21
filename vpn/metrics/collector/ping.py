@@ -5,6 +5,53 @@ SubNetx VPN Client Ping Monitor
 This module provides functionality to monitor VPN client connectivity
 through ICMP ping tests, measuring latency, packet loss, and response times.
 It serves as the primary tool for basic connectivity assessment.
+
+JSON Response Format:
+{
+    "timestamp": "ISO-8601 timestamp of the measurement",
+    "target": "Target hostname or IP being monitored",
+    "primary_target": {
+        "ip": "IP address of the target",
+        "status": "Connection status ('online', 'offline', or 'timeout')",
+        "timestamp": "ISO-8601 timestamp of the ping test",
+        "connection_quality": "Quality assessment ('excellent', 'good', 'fair', 'poor', or 'none')",
+        "rtt_stats": {
+            "min_ms": "Minimum round-trip time in milliseconds",
+            "avg_ms": "Average round-trip time in milliseconds",
+            "max_ms": "Maximum round-trip time in milliseconds",
+            "mdev_ms": "Mean deviation of round-trip times in milliseconds"
+        },
+        "icmp_details": [
+            {
+                "sequence": "ICMP sequence number",
+                "response_time_ms": "Response time for this packet in milliseconds"
+            }
+        ],
+        "packet_loss_percent": "Percentage of lost packets (0-100)",
+        "packets": {
+            "transmitted": "Number of packets sent",
+            "received": "Number of packets received"
+        },
+        "raw_output": "Raw output from the ping command",
+        "tls_info": {
+            "certificate": "SSL/TLS certificate information (if applicable)",
+            "expiry": "Certificate expiration date",
+            "issuer": "Certificate issuer details"
+        }
+    }
+}
+
+Metrics Explained:
+- status: Overall connection status of the target
+- connection_quality: Based on packet loss:
+  * excellent: 0% packet loss
+  * good: < 5% packet loss
+  * fair: < 20% packet loss
+  * poor: >= 20% packet loss
+- rtt_stats: Round-trip time statistics showing network latency
+- packet_loss_percent: Percentage of packets that didn't receive a response
+- icmp_details: Detailed information about each ICMP packet sent
+- tls_info: SSL/TLS certificate information for HTTPS targets
 """
 
 import subprocess
@@ -14,7 +61,7 @@ from datetime import datetime
 import logging
 from typing import Dict, List, Any
 
-from base import BaseMonitor
+from vpn.metrics.collector.base import BaseMonitor
 
 class PingMonitor(BaseMonitor):
     """VPN Ping Monitor for measuring network connectivity and latency.

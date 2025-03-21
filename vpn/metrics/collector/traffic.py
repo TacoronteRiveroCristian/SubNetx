@@ -5,6 +5,58 @@ SubNetx VPN Traffic Monitor
 This module provides functionality to monitor network traffic statistics
 for VPN connections, focusing on throughput, packet counts, and traffic
 patterns on specific interfaces or to/from target hosts.
+
+JSON Response Format:
+{
+    "timestamp": "ISO-8601 timestamp of the measurement",
+    "target": "Target hostname or IP being monitored",
+    "traffic": {
+        "interface": "Network interface name (e.g., 'tun0', 'eth0')",
+        "timestamp": "ISO-8601 timestamp of the traffic measurement",
+        "bytes": {
+            "received": "Total bytes received",
+            "sent": "Total bytes sent",
+            "received_rate": "Bytes received per second",
+            "sent_rate": "Bytes sent per second",
+            "received_human": "Human-readable received bytes (e.g., '1.5 MB')",
+            "sent_human": "Human-readable sent bytes (e.g., '2.3 MB')",
+            "received_rate_human": "Human-readable receive rate (e.g., '500 KB/s')",
+            "sent_rate_human": "Human-readable send rate (e.g., '750 KB/s')"
+        },
+        "packets": {
+            "received": "Total packets received",
+            "sent": "Total packets sent",
+            "received_rate": "Packets received per second",
+            "sent_rate": "Packets sent per second"
+        }
+    },
+    "network_quality": {
+        "latency_ms": "Average round-trip time in milliseconds",
+        "packet_loss_percent": "Percentage of lost packets (0-100)",
+        "jitter_ms": "Jitter (mean deviation) in milliseconds"
+    },
+    "historical_data": [
+        // Array of previous traffic measurements (last 100 entries)
+        // Each entry follows the same format as the "traffic" object
+    ]
+}
+
+Metrics Explained:
+- bytes: Network throughput measurements
+  * received/sent: Total data transferred
+  * rates: Current transfer speeds
+  * human-readable: Formatted values for display (B, KB, MB, GB, TB)
+- packets: Network packet statistics
+  * received/sent: Total packet counts
+  * rates: Current packet rates
+- network_quality: Connection quality metrics
+  * latency: Network delay
+  * packet_loss: Reliability indicator
+  * jitter: Network stability indicator
+- historical_data: Rolling window of previous measurements
+  * Used for trend analysis
+  * Limited to last 100 entries
+  * Useful for graphing historical patterns
 """
 
 import subprocess
@@ -17,8 +69,8 @@ import socket
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 
-from base import BaseMonitor
-from ping import PingMonitor
+from vpn.metrics.collector.base import BaseMonitor
+from vpn.metrics.collector.ping import PingMonitor
 
 class TrafficMonitor(BaseMonitor):
     """Monitor for network traffic statistics.

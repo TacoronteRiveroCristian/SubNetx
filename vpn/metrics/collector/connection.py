@@ -5,6 +5,69 @@ SubNetx VPN Connection Monitor
 This module provides functionality to monitor VPN connection status,
 uptime, and stability metrics. It tracks connection events, calculates
 uptime percentages, and analyzes connection patterns.
+
+JSON Response Format:
+{
+    "timestamp": "ISO-8601 timestamp of the measurement",
+    "target": "Target hostname or IP being monitored",
+    "status": {
+        "connected": "Boolean indicating current connection status",
+        "timestamp": "ISO-8601 timestamp of the status check",
+        "last_seen": "ISO-8601 timestamp of last successful connection",
+        "uptime_percentage": "Percentage of time connected (0-100)",
+        "current_session_duration": "Duration of current session in seconds",
+        "total_uptime": "Total time connected in seconds",
+        "total_downtime": "Total time disconnected in seconds"
+    },
+    "openvpn_status": {
+        "service_available": "Boolean indicating if OpenVPN service is available",
+        "is_running": "Boolean indicating if OpenVPN service is running",
+        "uptime": "Service uptime in seconds",
+        "active_clients": "Number of active VPN clients",
+        "tun_interface": "Boolean indicating if TUN interface is active"
+    },
+    "stability_metrics": {
+        "disconnection_count": "Number of disconnections in last 24 hours",
+        "average_session_duration": "Average duration of connection sessions",
+        "longest_session": "Duration of longest connection session",
+        "shortest_session": "Duration of shortest connection session",
+        "reconnection_rate": "Average time between reconnections",
+        "stability_score": "Overall stability score (0-100)"
+    },
+    "connection_history": [
+        {
+            "timestamp": "ISO-8601 timestamp",
+            "connected": "Boolean indicating connection status",
+            "duration": "Duration of this status in seconds"
+        }
+    ],
+    "database_stats": {
+        "total_sessions": "Total number of connection sessions recorded",
+        "total_events": "Total number of connection events recorded",
+        "last_24h_sessions": "Number of sessions in last 24 hours",
+        "last_24h_events": "Number of events in last 24 hours"
+    }
+}
+
+Metrics Explained:
+- status: Current connection state and timing information
+  * connected: Real-time connection status
+  * uptime_percentage: Overall connection reliability
+  * session_duration: Current connection length
+- openvpn_status: OpenVPN service health
+  * service_availability: Service presence
+  * client_count: Active VPN connections
+  * interface_status: Network interface state
+- stability_metrics: Connection reliability analysis
+  * disconnection_count: Frequency of disconnections
+  * session_duration: Connection persistence
+  * stability_score: Overall reliability rating
+- connection_history: Recent status changes
+  * Limited to last 100 entries
+  * Used for trend analysis
+- database_stats: Historical data summary
+  * Total and recent session counts
+  * Event tracking statistics
 """
 
 import subprocess
@@ -29,6 +92,8 @@ class ConnectionMonitor(BaseMonitor):
 
     :param target: Target hostname or IP address to monitor
     :type target: str
+    :param db: Connection database instance, or creates a new one if None
+    :type db: Optional[ConnectionDatabase]
     :ivar connection_history: List of connection status changes
     :type connection_history: List[Dict[str, Any]]
     :ivar disconnection_events: List of disconnection events
@@ -47,13 +112,17 @@ class ConnectionMonitor(BaseMonitor):
     :type total_downtime: float
     :ivar status_history: List of status check results
     :type status_history: List[Dict[str, Any]]
+    :ivar db: Database connection for persistent storage
+    :type db: ConnectionDatabase
     """
 
-    def __init__(self, target: str):
+    def __init__(self, target: str, db=None):
         """Initialize the Connection Monitor.
 
         :param target: Target hostname or IP address to monitor
         :type target: str
+        :param db: Connection database instance, creates a new one if None
+        :type db: Optional[ConnectionDatabase]
         """
         super().__init__(target)
         self.connection_history = []
@@ -65,6 +134,10 @@ class ConnectionMonitor(BaseMonitor):
         self.total_uptime = 0
         self.total_downtime = 0
         self.status_history = []
+
+        # Use provided database or create a new one
+        self.db = db if db else ConnectionDatabase("vpn_metrics.db")
+
         print(f"Initialized Connection Monitor for {target}")
 
         # Attempt initial connection check
@@ -74,6 +147,7 @@ class ConnectionMonitor(BaseMonitor):
         """Check if connection to target is active.
 
         Updates connection state and history based on current status.
+        Records connection/disconnection events in the database.
 
         Returns:
             bool: True if connected, False otherwise.
@@ -85,15 +159,17 @@ class ConnectionMonitor(BaseMonitor):
         try:
             # First try with socket to test TCP connectivity
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(2)  # 2 second timeout
+            sock.settimeout(2)
 
             # Try to resolve hostname first
             try:
+                # Obtain the IP address of the target
                 ip = socket.gethostbyname(self.target)
             except socket.gaierror:
                 # Can't resolve hostname, might be DNS issue
-                ip = self.target  # Just use the target as-is
+                ip = self.target
 
+            # Attempt TCP connection to port 80
             result = sock.connect_ex((ip, 80))
             sock.close()
 
@@ -103,7 +179,7 @@ class ConnectionMonitor(BaseMonitor):
             else:
                 # Fall back to ping if TCP connection fails
                 ping_monitor = PingMonitor(self.target)
-                ping_result = ping_monitor.ping_target(count=1, timeout=2)
+                ping_result = ping_monitor.ping_target(count=1, timeout=2, quiet=True)
                 self.is_connected = ping_result.get('status') == 'online'
 
         except Exception as e:
@@ -112,37 +188,20 @@ class ConnectionMonitor(BaseMonitor):
 
         # Update connection records
         if self.is_connected:
-            # We're connected
+            # We're connected now
             if not was_connected:
-                # This is a new connection
+                # This is a new connection event
                 print(f"Connection established to {self.target}")
-                self.current_session_start = now
+                # Record the connection in the database
+                self.db.record_connection(self.target)
 
-            if self.first_seen is None:
-                self.first_seen = now
-
-            self.last_seen = now
         else:
             # We're disconnected
             if was_connected:
-                # This is a new disconnection
+                # This is a new disconnection event
                 print(f"Connection lost to {self.target}")
-
-                # Record the disconnection event
-                if self.current_session_start:
-                    session_duration = (now - self.current_session_start).total_seconds()
-                    disconnection_event = {
-                        'disconnection_time': now.isoformat(),
-                        'session_start': self.current_session_start.isoformat(),
-                        'session_duration_seconds': session_duration
-                    }
-                    self.disconnection_events.append(disconnection_event)
-                    print(f"Disconnection after {session_duration:.1f} seconds")
-
-                    # Update total uptime
-                    self.total_uptime += session_duration
-
-                self.current_session_start = None
+                # Record the disconnection in the database
+                self.db.record_disconnection(self.target)
 
         # Update status history (keep last 100 entries)
         status_entry = {
@@ -279,69 +338,53 @@ class ConnectionMonitor(BaseMonitor):
         return " ".join(parts)
 
     def _analyze_connection_stability(self) -> Dict[str, Any]:
-        """Analyze connection stability based on history.
+        """Analyze connection stability based on database history.
 
         Returns:
             Dict[str, Any]: Stability analysis including rating and reasons.
         """
+        # Get stability metrics from the database
+        stability_metrics = self.db.get_stability_metrics(self.target)
+
+        # Get current connection stats from database
+        stats = self.db.get_connection_stats(self.target)
+
         # Default stability assessment
         stability = {
-            'stability': 'unknown',
-            'rating': 0,
-            'reason': 'Not enough data',
+            'stability': stability_metrics.get('status', 'unknown'),
+            'rating': stability_metrics.get('stability_rating', 0),
+            'uptime_percentage': stability_metrics.get('uptime_percentage', 0),
+            'recent_disconnections': stability_metrics.get('disconnections_24h', 0),
+            'reason': 'Insufficient data',
             'recommendations': []
         }
 
-        # Need at least some history to analyze
-        if not self.status_history or len(self.status_history) < 5:
-            return stability
+        # Determine reason based on rating
+        rating = stability.get('rating', 0)
 
-        # Calculate stability metrics
-        total_checks = len(self.status_history)
-        connected_checks = sum(1 for entry in self.status_history if entry['connected'])
-        recent_disconnections = len(self.disconnection_events[-10:]) if self.disconnection_events else 0
-        uptime_percentage = self._calculate_uptime_percentage()
-
-        # Determine stability rating (0-100)
-        rating = min(100, max(0, int(uptime_percentage)))
-
-        # Determine stability category
         if rating >= 99:
-            stability_category = 'excellent'
-            reason = 'Consistent uptime with minimal disconnections'
+            stability['reason'] = 'Consistent uptime with minimal disconnections'
         elif rating >= 95:
-            stability_category = 'good'
-            reason = 'Generally stable with occasional disconnections'
+            stability['reason'] = 'Generally stable with occasional disconnections'
         elif rating >= 80:
-            stability_category = 'fair'
-            reason = 'Somewhat stable but with periodic disconnections'
+            stability['reason'] = 'Somewhat stable but with periodic disconnections'
         elif rating >= 50:
-            stability_category = 'poor'
-            reason = 'Frequent disconnections affecting service quality'
+            stability['reason'] = 'Frequent disconnections affecting service quality'
         else:
-            stability_category = 'critical'
-            reason = 'Severe connection issues affecting service usability'
+            stability['reason'] = 'Severe connection issues affecting service usability'
 
         # Generate recommendations
         recommendations = []
         if rating < 80:
             recommendations.append('Check network configuration for issues')
-        if recent_disconnections > 5:
+        if stability['recent_disconnections'] > 5:
             recommendations.append('Investigate causes of frequent disconnections')
         if rating < 50:
             recommendations.append('Consider alternative VPN routing or connectivity')
 
-        # Return analysis
-        return {
-            'stability': stability_category,
-            'rating': rating,
-            'reason': reason,
-            'uptime_percentage': uptime_percentage,
-            'recent_disconnections': recent_disconnections,
-            'total_checks': total_checks,
-            'connected_checks': connected_checks,
-            'recommendations': recommendations
-        }
+        stability['recommendations'] = recommendations
+
+        return stability
 
     def collect(self) -> Dict[str, Any]:
         """Collect connection metrics and status information.
@@ -354,15 +397,15 @@ class ConnectionMonitor(BaseMonitor):
             result = self.get_basic_result()
 
             # Check the current connection status
-            self._check_connection()
+            current_status = self._check_connection()
 
-            # Calculate uptime percentage
-            uptime_percentage = self._calculate_uptime_percentage()
+            # Get connection stats from database
+            db_stats = self.db.get_connection_stats(self.target)
 
             # Check OpenVPN status if available
             openvpn_status = self._check_openvpn_status()
 
-            # Analyze connection stability
+            # Analyze connection stability based on database history
             stability_analysis = self._analyze_connection_stability()
 
             # Get TLS information if it's a hostname
@@ -383,33 +426,30 @@ class ConnectionMonitor(BaseMonitor):
                 except Exception as e:
                     print(f"Error getting ping metrics: {e}")
 
-            # Convert timestamps to strings for JSON serialization
-            first_seen_str = self.first_seen.isoformat() if self.first_seen else None
-            last_seen_str = self.last_seen.isoformat() if self.last_seen else None
-            current_session_start_str = self.current_session_start.isoformat() if self.current_session_start else None
+            # Get current connection session info from database
+            current_session = db_stats.get('current_session', {})
 
-            # Calculate current session duration
-            current_session_duration = None
-            if self.is_connected and self.current_session_start:
-                current_session_duration = (datetime.now() - self.current_session_start).total_seconds()
+            # Calculate connection status metrics
+            connection_status = {
+                'connected': self.is_connected,
+                'first_seen': db_stats.get('monitoring_period', {}).get('first_seen'),
+                'last_seen': db_stats.get('monitoring_period', {}).get('last_seen'),
+                'current_session_start': current_session.get('start_time'),
+                'current_session_duration': current_session.get('duration'),
+                'current_session_formatted': self._format_uptime(current_session.get('duration')),
+                'uptime_seconds': db_stats.get('total_duration', 0),
+                'uptime_formatted': self._format_uptime(db_stats.get('total_duration', 0)),
+                'uptime_percentage': db_stats.get('uptime_percentage', 0),
+                'total_sessions': db_stats.get('total_sessions', 0),
+                'disconnection_count': len(db_stats.get('recent_disconnections', []))
+            }
 
             # Build the result
             result.update({
-                'status': {
-                    'connected': self.is_connected,
-                    'first_seen': first_seen_str,
-                    'last_seen': last_seen_str,
-                    'current_session_start': current_session_start_str,
-                    'current_session_duration': current_session_duration,
-                    'current_session_formatted': self._format_uptime(current_session_duration) if current_session_duration else None,
-                    'uptime_seconds': self.total_uptime + (current_session_duration or 0),
-                    'uptime_formatted': self._format_uptime(self.total_uptime + (current_session_duration or 0)),
-                    'uptime_percentage': uptime_percentage,
-                    'total_sessions': len(self.disconnection_events) + (1 if self.is_connected else 0)
-                },
+                'status': connection_status,
                 'history': {
-                    'status_history': self.status_history[-20:],  # Last 20 status checks
-                    'disconnection_events': self.disconnection_events[-10:]  # Last 10 disconnections
+                    'status_history': self.status_history[-20:],
+                    'disconnection_events': db_stats.get('recent_disconnections', [])
                 },
                 'openvpn_status': openvpn_status,
                 'stability_analysis': stability_analysis
@@ -448,17 +488,12 @@ if __name__ == "__main__":
     for target in targets:
         try:
             logger.info(f"Testing {target}")
-            monitor = ConnectionMonitor(target)
+            monitor = ConnectionMonitor(target, db=db)
 
             # Primera verificación
             results = monitor.collect()
             logger.info(f"\nInitial results for {target}:")
             logger.info(json.dumps(results, indent=2))
-
-            # Simular una conexión
-            if results['status']['connected']:
-                db.record_connection(target)
-                logger.info(f"Recorded connection for {target}")
 
             # Esperar unos segundos
             time.sleep(5)
@@ -467,11 +502,6 @@ if __name__ == "__main__":
             results = monitor.collect()
             logger.info(f"\nUpdated results for {target}:")
             logger.info(json.dumps(results, indent=2))
-
-            # Si se desconectó, registrar la desconexión
-            if not results['status']['connected']:
-                db.record_disconnection(target)
-                logger.info(f"Recorded disconnection for {target}")
 
             # Obtener estadísticas de la base de datos
             stats = db.get_connection_stats(target)

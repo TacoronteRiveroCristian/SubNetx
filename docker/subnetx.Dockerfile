@@ -12,7 +12,8 @@ ENV OPENVPN_DIR="/etc/openvpn" \
     CLIENTS_DIR="/etc/openvpn/clients" \
     LOGS_DIR="/var/log/openvpn" \
     OPENVPN_PID_FILE="/etc/openvpn/openvpn.pid" \
-    SERVER_CONF_DIR="/etc/openvpn/server"
+    SERVER_CONF_DIR="/etc/openvpn/server" \
+    PYTHONPATH="/app"
 
 # Actualizar e instalar paquetes necesarios sin recomendaciones extras
 RUN apt-get update && \
