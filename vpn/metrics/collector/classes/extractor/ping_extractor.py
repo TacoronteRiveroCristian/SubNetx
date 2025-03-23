@@ -73,7 +73,7 @@ class PingExtractor(BaseMonitor):
     :param target: Target hostname or IP address to monitor
     :type target: str
     :ivar results: Storage for ping test results
-    :type results: Dict[str, Any]
+    :type results: Dict[str, Dict[str, Any]]
     """
 
     def __init__(self, target: str) -> None:
@@ -83,7 +83,7 @@ class PingExtractor(BaseMonitor):
         :type target: str
         """
         super().__init__(target)
-        self.results = {}
+        self.results: Dict[str, Dict[str, Any]] = {}
 
     def ping_target(self, count: int = 5) -> Dict[str, Any]:
         """Execute a ping test to the target and process the results.
@@ -99,91 +99,90 @@ class PingExtractor(BaseMonitor):
         """
         # Create basic result structure
         result = {
-            'ip': self.target,
-            'status': 'offline',
-            'timestamp': datetime.now().isoformat(),
-            'connection_quality': 'none',
-            'rtt_stats': {
-                'min_ms': 0,
-                'avg_ms': 0,
-                'max_ms': 0,
-                'mdev_ms': 0
-            },
-            'icmp_details': [],
-            'packet_loss_percent': 100,
-            'packets': {
-                'transmitted': count,
-                'received': 0
-            },
-            'raw_output': ''
+            "ip": self.target,
+            "status": "offline",
+            "timestamp": datetime.now().isoformat(),
+            "connection_quality": "none",
+            "rtt_stats": {"min_ms": 0, "avg_ms": 0, "max_ms": 0, "mdev_ms": 0},
+            "icmp_details": [],
+            "packet_loss_percent": 100,
+            "packets": {"transmitted": count, "received": 0},
+            "raw_output": "",
         }
 
         try:
             # Determine the ping command based on the platform
             # The -c option specifies the count, -W sets the timeout in seconds
-            cmd = ['ping', '-c', str(count), '-W', '2', self.target]
+            cmd = ["ping", "-c", str(count), "-W", "2", self.target]
 
             # Execute the ping command and capture output using 'with' context manager
-            with subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                                  stderr=subprocess.PIPE, text=True) as process:
+            with subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            ) as process:
                 stdout, _ = process.communicate()
 
             # Store the raw output
-            result['raw_output'] = stdout
+            result["raw_output"] = stdout
 
             # Check if the ping was successful (exit code 0)
             if process.returncode == 0:
-                result['status'] = 'online'
+                result["status"] = "online"
 
                 # Parse packet statistics
-                packet_stats = re.search(r'(\d+) packets transmitted, (\d+) received', stdout)
+                packet_stats = re.search(
+                    r"(\d+) packets transmitted, (\d+) received", stdout
+                )
                 if packet_stats:
                     transmitted = int(packet_stats.group(1))
                     received = int(packet_stats.group(2))
-                    result['packets']['transmitted'] = transmitted
-                    result['packets']['received'] = received
+                    result["packets"]["transmitted"] = transmitted
+                    result["packets"]["received"] = received
 
                     # Calculate packet loss percentage
                     if transmitted > 0:
                         packet_loss = 100 - (received / transmitted * 100)
-                        result['packet_loss_percent'] = round(packet_loss, 2)
+                        result["packet_loss_percent"] = round(packet_loss, 2)
 
                 # Parse RTT statistics
-                rtt_stats = re.search(r'min/avg/max/mdev = (\d+\.\d+)/(\d+\.\d+)/(\d+\.\d+)/(\d+\.\d+)', stdout)
+                rtt_stats = re.search(
+                    r"min/avg/max/mdev = (\d+\.\d+)/(\d+\.\d+)/(\d+\.\d+)/(\d+\.\d+)",
+                    stdout,
+                )
                 if rtt_stats:
-                    result['rtt_stats']['min_ms'] = float(rtt_stats.group(1))
-                    result['rtt_stats']['avg_ms'] = float(rtt_stats.group(2))
-                    result['rtt_stats']['max_ms'] = float(rtt_stats.group(3))
-                    result['rtt_stats']['mdev_ms'] = float(rtt_stats.group(4))
+                    result["rtt_stats"]["min_ms"] = float(rtt_stats.group(1))
+                    result["rtt_stats"]["avg_ms"] = float(rtt_stats.group(2))
+                    result["rtt_stats"]["max_ms"] = float(rtt_stats.group(3))
+                    result["rtt_stats"]["mdev_ms"] = float(rtt_stats.group(4))
 
                 # Parse individual ICMP responses
-                icmp_responses = re.finditer(r'icmp_seq=(\d+) ttl=\d+ time=(\d+\.\d+) ms', stdout)
+                icmp_responses = re.finditer(
+                    r"icmp_seq=(\d+) ttl=\d+ time=(\d+\.\d+) ms", stdout
+                )
                 for match in icmp_responses:
                     seq = int(match.group(1))
                     time_ms = float(match.group(2))
-                    result['icmp_details'].append({
-                        'sequence': seq,
-                        'response_time_ms': time_ms
-                    })
+                    result["icmp_details"].append(
+                        {"sequence": seq, "response_time_ms": time_ms}
+                    )
 
                 # Determine connection quality based on packet loss
-                if result['packet_loss_percent'] == 0:
-                    result['connection_quality'] = 'excellent'
-                elif result['packet_loss_percent'] < 5:
-                    result['connection_quality'] = 'good'
-                elif result['packet_loss_percent'] < 20:
-                    result['connection_quality'] = 'fair'
+                if result["packet_loss_percent"] == 0:
+                    result["connection_quality"] = "excellent"
+                elif result["packet_loss_percent"] < 5:
+                    result["connection_quality"] = "good"
+                elif result["packet_loss_percent"] < 20:
+                    result["connection_quality"] = "fair"
                 else:
-                    result['connection_quality'] = 'poor'
+                    result["connection_quality"] = "poor"
             else:
                 # If ping command failed, set to timeout
-                result['status'] = 'timeout'
+                result["status"] = "timeout"
 
         except Exception as e:
             # Log the error and return the default offline result
             print(f"Error executing ping to {self.target}: {str(e)}")
-            result['status'] = 'error'
-            result['error'] = str(e)
+            result["status"] = "error"
+            result["error"] = str(e)
 
         return result
 
@@ -199,7 +198,7 @@ class PingExtractor(BaseMonitor):
         """
         try:
             # Start with the basic result structure
-            result = self.get_basic_result()
+            result: Dict[str, Any] = self.get_basic_result()
 
             # Ping the main target
             ping_result = self.ping_target()
@@ -207,10 +206,10 @@ class PingExtractor(BaseMonitor):
             # Add TLS information for hostnames
             if self.is_hostname(self.target):
                 tls_info = self.get_tls_info()
-                ping_result['tls_info'] = tls_info
+                ping_result["tls_info"] = tls_info
 
             self.results[self.target] = ping_result
-            result['primary_target'] = ping_result
+            result["primary_target"] = ping_result
 
             return result
         except Exception as e:
@@ -223,8 +222,8 @@ if __name__ == "__main__":
     # Setup basic logging if running standalone
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[logging.StreamHandler()]
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        handlers=[logging.StreamHandler()],
     )
     logger = logging.getLogger(__name__)
 

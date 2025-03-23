@@ -9,7 +9,7 @@ then storing the results in the SQLite database.
 
 import json
 import logging
-from typing import Any, Dict, List
+from typing import List
 
 from vpn.metrics.collector.classes.databases.database_ping import PingDatabase
 from vpn.metrics.collector.classes.extractor.ping_extractor import PingExtractor
@@ -17,10 +17,10 @@ from vpn.metrics.conf import LOG_LEVEL, PING_DB_PATH
 
 # Configure logging
 logging.basicConfig(
-    level=LOG_LEVEL,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    level=LOG_LEVEL, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
 
 def test_ping_and_store(targets: List[str]) -> None:
     """
@@ -57,6 +57,7 @@ def test_ping_and_store(targets: List[str]) -> None:
             logger.error(f"Error processing {target}: {str(e)}")
             logger.error(f"Error type: {e.__class__.__name__}")
 
+
 def main() -> None:
     """Main execution function."""
     # Test targets
@@ -65,6 +66,7 @@ def main() -> None:
     logger.info("Starting ping extraction and storage test")
     test_ping_and_store(targets)
     logger.info("Test completed")
+
 
 if __name__ == "__main__":
     main()

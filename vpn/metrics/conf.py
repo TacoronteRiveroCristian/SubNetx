@@ -2,14 +2,15 @@
 
 import logging
 import os
+from typing import Optional
 
 # Working directory
-pythonpath: str | None = os.getenv("PYTHONPATH")
+pythonpath: Optional[str] = os.getenv("PYTHONPATH")
 if pythonpath is None:
     raise ValueError("PYTHONPATH is not set")
-else:
-    assert pythonpath, "PYTHONPATH cannot be empty"
-    WORKING_DIR: str = pythonpath
+
+assert pythonpath, "PYTHONPATH cannot be empty"
+WORKING_DIR: str = pythonpath
 
 # Level of logging
 LOG_LEVEL: int = logging.INFO

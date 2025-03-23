@@ -1,0 +1,16 @@
+# Herramientas de formateo
+black==23.3.0
+isort==5.12.0
+
+# Herramientas de linting y verificación de tipos
+mypy==1.3.0
+pylint==2.17.4
+flake8==6.0.0
+flake8-docstrings==1.7.0
+
+# Herramientas de testing
+pytest==7.3.1
+pytest-cov==4.1.0
+
+# Herramientas de debugging
+debugpy==1.6.7
