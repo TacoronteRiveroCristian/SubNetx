@@ -19,6 +19,7 @@ pip3 install --no-cache-dir \
     pytest-cov \
     flake8 \
     flake8-docstrings \
+    Flake8-pyproject \
     debugpy \
     ipython \
     pre-commit

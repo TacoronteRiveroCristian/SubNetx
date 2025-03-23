@@ -21,6 +21,7 @@ exclude = '''
 # Configuración para isort
 profile = "black"
 line_length = 88
+multi_line_output = 3
 
 [tool.mypy]
 # Configuración para mypy
@@ -48,8 +49,13 @@ disable = [
 ]
 
 [tool.pylint.format]
-max-line-length = 88
+max-line-length = 90
 
 [tool.pylint.design]
 max-args = 6
 max-attributes = 12
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = "E203"
+exclude = [".git", "__pycache__", "build", "dist"]

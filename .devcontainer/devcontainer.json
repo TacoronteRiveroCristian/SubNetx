@@ -34,6 +34,10 @@
                 ],
                 "editor.tabSize": 4,
                 "editor.insertSpaces": true,
+                "[python]": {
+                    "editor.formatOnSave": true,
+                    "editor.defaultFormatter": "ms-python.python"
+                },
                 // File exclusions
                 "files.exclude": {
                     "**/__pycache__": true,

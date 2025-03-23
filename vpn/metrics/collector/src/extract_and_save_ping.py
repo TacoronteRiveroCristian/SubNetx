@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SubNetx VPN Ping Extractor and Storage Test
+SubNetx VPN Ping Extractor and Storage Test.
 
 This script tests the ping extraction and database storage functionality
 by pinging both a valid domain (google.com) and an invalid domain,
@@ -16,9 +16,7 @@ from vpn.metrics.collector.classes.extractor.ping_extractor import PingExtractor
 from vpn.metrics.conf import LOG_LEVEL, PING_DB_PATH
 
 # Configure logging
-logging.basicConfig(
-    level=LOG_LEVEL, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -59,7 +57,7 @@ def test_ping_and_store(targets: List[str]) -> None:
 
 
 def main() -> None:
-    """Main execution function."""
+    """Execute the main ping extraction and storage test."""
     # Test targets
     targets = ["google.com", "invalid.example.domain"]
 
