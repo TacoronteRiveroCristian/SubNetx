@@ -13,6 +13,7 @@ ENV OPENVPN_DIR="/etc/openvpn" \
     LOGS_DIR="/var/log/openvpn" \
     OPENVPN_PID_FILE="/etc/openvpn/openvpn.pid" \
     SERVER_CONF_DIR="/etc/openvpn/server" \
+    WORK_DIR="/app" \
     PYTHONPATH="/app"
 
 # Actualizar e instalar paquetes necesarios sin recomendaciones extras
@@ -32,8 +33,17 @@ RUN apt-get update && \
     net-tools \
     python3 \
     python3-pip \
-    python3-venv && \
+    python3-venv \
+    python3-dev \
+    build-essential \
+    wget \
+    bash-completion \
+    lsb-release && \
     rm -rf /var/lib/apt/lists/*
+
+# Instalar dependencias de Python para metrics
+COPY vpn/metrics/requirements.txt /tmp/
+RUN pip3 install --no-cache-dir -r /tmp/requirements.txt
 
 # Crear estructura de directorios para OpenVPN
 RUN mkdir -p ${CERTS_DIR} ${CCD_DIR} ${CLIENTS_DIR} ${LOGS_DIR} ${SERVER_CONF_DIR} && \
@@ -41,10 +51,10 @@ RUN mkdir -p ${CERTS_DIR} ${CCD_DIR} ${CLIENTS_DIR} ${LOGS_DIR} ${SERVER_CONF_DI
     touch ${LOGS_DIR}/openvpn.log ${LOGS_DIR}/status.log && \
     chmod 644 ${LOGS_DIR}/openvpn.log ${LOGS_DIR}/status.log
 
-# Copiar estrcutura de ficheros
-COPY vpn/subnetx /usr/local/bin/subnetx
-COPY vpn/config/openvpn /app/config/
-COPY vpn/scripts /app/scripts/
+# Copiar estructura de archivos
+COPY vpn/openvpn/src/subnetx /usr/local/bin/subnetx
+COPY vpn/openvpn/config /app/config/
+COPY vpn/openvpn/src/*.sh /app/scripts/
 
 # Mover fichero de configuracion de red para OpenVPN
 RUN mv /app/config/sysctl.conf /etc/sysctl.conf

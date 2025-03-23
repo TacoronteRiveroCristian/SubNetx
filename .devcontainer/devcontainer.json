@@ -1,0 +1,58 @@
+{
+    "name": "SubnetX Development",
+    "dockerComposeFile": "../docker-compose.yaml",
+    "service": "subnetx",
+    "workspaceFolder": "/app",
+    "mounts": [
+        "source=${localWorkspaceFolder},target=/app,type=bind"
+    ],
+    "remoteUser": "root",
+    "overrideCommand": true,
+    "customizations": {
+        "vscode": {
+            "settings": {
+                // "python.defaultInterpreterPath": "/usr/bin/python3",
+                "editor.formatOnSave": true,
+                "editor.codeActionsOnSave": {
+                    "source.organizeImports": "explicit"
+                },
+                "isort.args": [
+                    "--profile",
+                    "black"
+                ],
+                "files.exclude": {
+                    "**/__pycache__": true,
+                    "**/.pytest_cache": true,
+                    "**/*.egg-info": true
+                },
+                "terminal.integrated.defaultProfile.linux": "bash"
+            },
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "ms-python.pylint",
+                "ms-python.black-formatter",
+                "ms-python.isort",
+                "matangover.mypy",
+                "njpwerner.autodocstring",
+                // "streetsidesoftware.code-spell-checker",
+                "yzhang.markdown-all-in-one",
+                "GitHub.copilot",
+                "eamodio.gitlens",
+                "ms-azuretools.vscode-docker",
+                "donjayamanne.python-environment-manager",
+                "VisualStudioExptTeam.vscodeintellicode"
+            ]
+        }
+    },
+    "forwardPorts": [
+        8080,
+        1194
+    ],
+    "shutdownAction": "none",
+    "postCreateCommand": "bash ./.devcontainer/post-create.sh",
+    "features": {
+        "ghcr.io/devcontainers/features/git:1": {},
+        "ghcr.io/devcontainers/features/github-cli:1": {}
+    }
+}
