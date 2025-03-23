@@ -584,8 +584,6 @@ class PingDatabase:
 
 # Standalone testing when script is run directly
 if __name__ == "__main__":
-    import sys
-
     # Setup test database
     db = PingDatabase("test_ping_database.db")
 
