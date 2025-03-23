@@ -8,6 +8,8 @@ echo "⚙️ Setting up development environment..."
 # Install Python development tools
 echo "🐍 Installing Python development tools..."
 pip3 install --no-cache-dir --upgrade pip
+
+# Install specific versions of development tools
 pip3 install --no-cache-dir \
     black \
     isort \
@@ -16,6 +18,8 @@ pip3 install --no-cache-dir \
     pytest \
     pytest-cov \
     flake8 \
+    flake8-docstrings \
+    debugpy \
     ipython \
     pre-commit
 
