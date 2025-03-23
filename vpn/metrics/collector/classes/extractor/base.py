@@ -9,11 +9,13 @@ shared utilities that are used across different collector types.
 """
 
 
-import ssl
-import socket
+import json
 import re
+import socket
+import ssl
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any, Dict
+
 
 class BaseMonitor:
     """Base class for all VPN monitoring collectors.
@@ -57,19 +59,26 @@ class BaseMonitor:
             context = ssl.create_default_context()
 
             # Establish connection and wrap with SSL
-            with socket.create_connection((hostname, port), timeout=5) as sock:
-                with context.wrap_socket(sock, server_hostname=hostname) as ssock:
-                    # Get the certificate details
-                    cert = ssock.getpeercert()
+            with socket.create_connection((hostname, port), timeout=5) as sock, \
+                    context.wrap_socket(sock, server_hostname=hostname) as ssock:
+                # Get the certificate details
+                cert = ssock.getpeercert()
 
-                    # Return TLS information
-                    return {
-                        'tls_version': ssock.version(),
-                        'cipher': ssock.cipher(),
-                        'cert_expiry': datetime.strptime(cert['notAfter'], '%b %d %H:%M:%S %Y %Z').isoformat(),
-                        'issuer': dict(x[0] for x in cert['issuer']),
-                        'subject': dict(x[0] for x in cert['subject'])
-                    }
+                # Check if certificate exists
+                if not cert:
+                    raise ValueError("No certificate found")
+
+                # Return TLS information with safe processing of fields
+                return {
+                    'tls_version': ssock.version(),
+                    'cipher': ssock.cipher(),
+                    'cert_expiry': datetime.strptime(
+                        str(cert.get('notAfter', '')),
+                        '%b %d %H:%M:%S %Y %Z'
+                    ).isoformat(),
+                    'issuer': json.dumps(cert.get('issuer', [])),
+                    'subject': json.dumps(cert.get('subject', []))
+                }
         except Exception as e:
             print(f"TLS check failed for {hostname}: {e}")
             return {
