@@ -35,8 +35,8 @@
                 "editor.tabSize": 4,
                 "editor.insertSpaces": true,
                 "[python]": {
-                    "editor.formatOnSave": true,
-                    "editor.defaultFormatter": "ms-python.python"
+                    "editor.formatOnSave": true
+                    // "editor.defaultFormatter": "ms-python.python"
                 },
                 // File exclusions
                 "files.exclude": {
@@ -55,13 +55,13 @@
                 "ms-python.flake8",
                 "ms-python.mypy-type-checker",
                 "ms-python.debugpy",
-                "njpwerner.autodocstring",
-                "github.copilot",
-                "eamodio.gitlens",
-                "ms-azuretools.vscode-docker",
-                "vscode-icons-team.vscode-icons",
-                "oderwat.indent-rainbow",
-                "qwtel.sqlite-viewer"
+                "njpwerner.autodocstring@0.6.0",
+                "github.copilot@1.133.0",
+                "eamodio.gitlens@14.0.1",
+                "ms-azuretools.vscode-docker@2.27.0",
+                "vscode-icons-team.vscode-icons@12.0.1",
+                "oderwat.indent-rainbow@8.0.1",
+                "qwtel.sqlite-viewer@0.1.2"
             ]
         }
     },

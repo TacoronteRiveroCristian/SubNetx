@@ -59,8 +59,9 @@ class BaseMonitor:
             context = ssl.create_default_context()
 
             # Establish connection and wrap with SSL
-            with socket.create_connection((hostname, port), timeout=5) as sock, \
-                    context.wrap_socket(sock, server_hostname=hostname) as ssock:
+            with socket.create_connection(
+                (hostname, port), timeout=5
+            ) as sock, context.wrap_socket(sock, server_hostname=hostname) as ssock:
                 # Get the certificate details
                 cert = ssock.getpeercert()
 
@@ -70,24 +71,23 @@ class BaseMonitor:
 
                 # Return TLS information with safe processing of fields
                 return {
-                    'tls_version': ssock.version(),
-                    'cipher': ssock.cipher(),
-                    'cert_expiry': datetime.strptime(
-                        str(cert.get('notAfter', '')),
-                        '%b %d %H:%M:%S %Y %Z'
+                    "tls_version": ssock.version(),
+                    "cipher": ssock.cipher(),
+                    "cert_expiry": datetime.strptime(
+                        str(cert.get("notAfter", "")), "%b %d %H:%M:%S %Y %Z"
                     ).isoformat(),
-                    'issuer': json.dumps(cert.get('issuer', [])),
-                    'subject': json.dumps(cert.get('subject', []))
+                    "issuer": json.dumps(cert.get("issuer", [])),
+                    "subject": json.dumps(cert.get("subject", [])),
                 }
         except Exception as e:
             print(f"TLS check failed for {hostname}: {e}")
             return {
-                'tls_version': None,
-                'cipher': None,
-                'cert_expiry': None,
-                'issuer': None,
-                'subject': None,
-                'error': str(e)
+                "tls_version": None,
+                "cipher": None,
+                "cert_expiry": None,
+                "issuer": None,
+                "subject": None,
+                "error": str(e),
             }
 
     def is_hostname(self, target: str) -> bool:
@@ -99,7 +99,7 @@ class BaseMonitor:
         :rtype: bool
         """
         # Simple IP address pattern matching
-        return not re.match(r'^(\d{1,3}\.){3}\d{1,3}$', target)
+        return not re.match(r"^(\d{1,3}\.){3}\d{1,3}$", target)
 
     def get_tls_info(self) -> Dict[str, Any]:
         """Get TLS information for the target if it's a hostname.
@@ -122,7 +122,7 @@ class BaseMonitor:
         if bytes_value is None or bytes_value < 0:
             return "0 B"
 
-        units = ['B', 'KB', 'MB', 'GB', 'TB']
+        units = ["B", "KB", "MB", "GB", "TB"]
         unit_index = 0
 
         # Convert to appropriate unit
@@ -138,10 +138,7 @@ class BaseMonitor:
         :return: Dictionary with timestamp and target
         :rtype: Dict[str, Any]
         """
-        return {
-            'timestamp': datetime.now().isoformat(),
-            'target': self.target
-        }
+        return {"timestamp": datetime.now().isoformat(), "target": self.target}
 
     def collect(self) -> Dict[str, Any]:
         """Collect metrics - to be implemented by subclasses.

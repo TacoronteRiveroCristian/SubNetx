@@ -11,18 +11,19 @@ pip3 install --no-cache-dir --upgrade pip
 
 # Install specific versions of development tools
 pip3 install --no-cache-dir \
-    black \
-    isort \
-    mypy \
-    pylint \
-    pytest \
-    pytest-cov \
-    flake8 \
-    flake8-docstrings \
-    Flake8-pyproject \
-    debugpy \
-    ipython \
-    pre-commit
+    black==25.1.0 \
+    isort==6.0.1 \
+    mypy==1.15.0 \
+    pylint==3.3.6 \
+    pytest==8.3.5 \
+    pytest-cov==6.0.0 \
+    flake8==7.1.2 \
+    flake8-docstrings==1.7.0 \
+    Flake8-pyproject==1.2.3 \
+    debugpy==1.8.13 \
+    ipython==8.34.0 \
+    pre-commit==4.2.0 \
+    ipykernel==6.29.0 \
 
 # Install project dependencies from specific directories
 echo "📦 Installing project dependencies..."

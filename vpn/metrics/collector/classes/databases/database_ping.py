@@ -222,16 +222,12 @@ class PingDatabase:
             target_id = self.add_target(target)
 
             # Extract values from ping data
-            timestamp = primary_target_data.get(
-                "timestamp", datetime.now().isoformat()
-            )
+            timestamp = primary_target_data.get("timestamp", datetime.now().isoformat())
             status = str(primary_target_data.get("status", "unknown"))
             connection_quality = str(
                 primary_target_data.get("connection_quality", "none")
             )
-            packet_loss = float(
-                primary_target_data.get("packet_loss_percent", 0)
-            )
+            packet_loss = float(primary_target_data.get("packet_loss_percent", 0))
 
             # Extract RTT stats
             rtt_stats = primary_target_data.get("rtt_stats", {})
@@ -336,11 +332,7 @@ class PingDatabase:
         issuer = tls_info.get("issuer")
         subject = tls_info.get("subject")
         version = tls_info.get("tls_version")
-        cipher = (
-            json.dumps(tls_info.get("cipher"))
-            if tls_info.get("cipher")
-            else None
-        )
+        cipher = json.dumps(tls_info.get("cipher")) if tls_info.get("cipher") else None
 
         conn.execute(
             """
@@ -467,8 +459,7 @@ class PingDatabase:
             )
 
             quality_counts = {
-                row["connection_quality"]: row["count"]
-                for row in cursor.fetchall()
+                row["connection_quality"]: row["count"] for row in cursor.fetchall()
             }
 
             # Get average RTT and packet loss
@@ -493,9 +484,7 @@ class PingDatabase:
             # Calculate uptime percentage
             total_pings = stats.get("total_pings", 0)
             if total_pings > 0:
-                uptime_percent = (
-                    stats.get("online_count", 0) / total_pings
-                ) * 100
+                uptime_percent = (stats.get("online_count", 0) / total_pings) * 100
             else:
                 uptime_percent = 0
 
@@ -522,9 +511,7 @@ class PingDatabase:
         :return: Number of records deleted
         :rtype: int
         """
-        time_threshold = (
-            datetime.now() - timedelta(days=days_to_keep)
-        ).isoformat()
+        time_threshold = (datetime.now() - timedelta(days=days_to_keep)).isoformat()
 
         with sqlite3.connect(self.db_path) as conn:
             # First get the IDs of ping metrics to delete

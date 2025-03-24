@@ -39,7 +39,6 @@ show_error_codes = true
 disable = [
     "C0111", # missing-docstring
     "C0103", # invalid-name
-    "C0330", # bad-continuation
     "C0326", # bad-whitespace
     "W0621", # redefined-outer-name
     "R0903", # too-few-public-methods
@@ -49,7 +48,7 @@ disable = [
 ]
 
 [tool.pylint.format]
-max-line-length = 90
+max-line-length = 88
 
 [tool.pylint.design]
 max-args = 6
