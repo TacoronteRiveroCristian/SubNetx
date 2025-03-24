@@ -47,27 +47,21 @@
                 "terminal.integrated.defaultProfile.linux": "bash"
             },
             "extensions": [
-                // Core Python support
                 "ms-python.python",
                 "ms-python.vscode-pylance",
-                // Formatting and linting
                 "ms-python.black-formatter",
                 "ms-python.isort",
                 "ms-python.pylint",
                 "ms-python.flake8",
                 "ms-python.mypy-type-checker",
-                // Testing and debugging
                 "ms-python.debugpy",
-                // Documentation
                 "njpwerner.autodocstring",
-                // Git integration
                 "github.copilot",
                 "eamodio.gitlens",
-                // Docker
                 "ms-azuretools.vscode-docker",
-                // UI improvements
                 "vscode-icons-team.vscode-icons",
-                "oderwat.indent-rainbow"
+                "oderwat.indent-rainbow",
+                "qwtel.sqlite-viewer"
             ]
         }
     },
