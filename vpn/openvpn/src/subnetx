@@ -3,7 +3,7 @@
 # Descripcion: Interfaz interactiva para gestionar OpenVPN
 
 # Ruta al script de menu
-MENU_SCRIPT="/app/scripts/openvpn-menu.sh"
+MENU_SCRIPT="/app/scripts/utils/openvpn-menu.sh"
 
 # Verificar que el script existe
 if [ ! -f "$MENU_SCRIPT" ]; then

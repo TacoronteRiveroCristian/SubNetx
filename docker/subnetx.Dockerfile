@@ -51,16 +51,21 @@ RUN mkdir -p ${CERTS_DIR} ${CCD_DIR} ${CLIENTS_DIR} ${LOGS_DIR} ${SERVER_CONF_DI
     touch ${LOGS_DIR}/openvpn.log ${LOGS_DIR}/status.log && \
     chmod 644 ${LOGS_DIR}/openvpn.log ${LOGS_DIR}/status.log
 
+# Crear estructura de directorios para scripts
+RUN mkdir -p /app/scripts/{core,client,utils}
+
 # Copiar estructura de archivos
 COPY vpn/openvpn/src/subnetx /usr/local/bin/subnetx
 COPY vpn/openvpn/config /app/config/
-COPY vpn/openvpn/src/*.sh /app/scripts/
+COPY vpn/openvpn/src/core/*.sh /app/scripts/core/
+COPY vpn/openvpn/src/client/*.sh /app/scripts/client/
+COPY vpn/openvpn/src/utils/*.sh /app/scripts/utils/
 
 # Mover fichero de configuracion de red para OpenVPN
 RUN mv /app/config/sysctl.conf /etc/sysctl.conf
 
 # Dar permisos iniciales para evitar problemas de acceso durante la configuracion
-RUN chmod +x /usr/local/bin/subnetx /app/scripts/*.sh
+RUN chmod +x /usr/local/bin/subnetx /app/scripts/core/*.sh /app/scripts/client/*.sh /app/scripts/utils/*.sh
 
 # Comando por defecto para mantener el contenedor en ejecución
 CMD ["sleep", "infinity"]

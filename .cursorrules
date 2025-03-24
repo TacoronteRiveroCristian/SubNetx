@@ -1,0 +1,121 @@
+# --- SubNetx Project Rules and Patterns ---
+
+## Project Structure
+- `vpn/openvpn/src/`: Contains main shell scripts for OpenVPN functionality
+- `vpn/openvpn/config/`: Contains OpenVPN configuration templates
+- `vpn/metrics/`: Contains Python code for metrics collection
+- `docker/`: Contains Dockerfile and related container configuration
+- `memory-bank/`: Contains project documentation and context
+
+## Code Patterns
+- Shell scripts use bash as interpreter (`#!/bin/bash`)
+- Commands use relative paths to scripts in `/app/scripts/` within container
+- OpenVPN configuration files stored in `/etc/openvpn/` in container
+- Client certificates and configs stored in `/etc/openvpn/client/` in container
+- Environment variables used for configuration (loaded from .env file)
+- The main entry point is `subnetx` command which calls other scripts
+
+## Naming Conventions
+- Shell scripts named based on functionality: `openvpn-{action}.sh`
+- Configuration files follow OpenVPN standards
+- Client certificates named after client identifier
+- Container named `subnetx-vpn` with optional suffix for multiple instances
+
+## Critical Paths
+- Main entry point: `/usr/local/bin/subnetx` → `/app/scripts/openvpn-menu.sh`
+- Server configuration: `/app/scripts/openvpn-setup.sh`
+- Server management: `/app/scripts/openvpn-start.sh` and `/app/scripts/openvpn-stop.sh`
+- Client management: `/app/scripts/openvpn-client-new.sh` and `/app/scripts/openvpn-client-delete.sh`
+
+## Environment Configuration
+- Project relies on .env file for configuration parameters
+- Essential variables: VPN_NETWORK, VPN_NETMASK, OPENVPN_PORT, OPENVPN_PROTO, PUBLIC_IP
+- Optional variables: DUCKDNS_TOKEN for dynamic DNS updates
+
+## Docker Usage
+- Container requires NET_ADMIN capability and TUN device access
+- Port mapping needed for VPN service
+- Volume mapping for client certificate persistence
+- Docker Compose recommended for deployment
+
+## Security Practices
+- Certificate management follows OpenVPN standards
+- Sensitive files restricted to appropriate permissions
+- Private keys never exposed outside container
+- Each VPN instance isolated in separate container
+
+## Known Challenges
+- Port forwarding needed on router for external access
+- Client configurations may need manual port adjustment if non-standard
+- Subnet must not conflict with existing networks
+- Client revocation requires additional configuration
+
+## Metrics Collection (Planned)
+- Python scripts for collecting OpenVPN usage metrics
+- Metrics stored in container or exported to external system
+- Basic status metrics exposed through API or file export
+
+# --- RIPER-5 Mode Commands ---
+
+Due to your advanced capabilities, you tend to be overeager and often implement changes without explicit request, breaking existing logic by assuming you know better than me. This leads to UNACCEPTABLE disasters to the code. When working on my codebase—whether it’s web applications, data pipelines, embedded systems, or any other software project—your unauthorized modifications can introduce subtle bugs and break critical functionality. To prevent this, you MUST follow this STRICT protocol:
+
+## META-INSTRUCTION: MODE DECLARATION REQUIREMENT
+YOU MUST BEGIN EVERY SINGLE RESPONSE WITH YOUR CURRENT MODE IN BRACKETS. NO EXCEPTIONS. Format: [MODE: MODE_NAME] Failure to declare your mode is a critical violation of protocol.
+
+[MODE: RESEARCH]
+Purpose: Information gathering ONLY
+Permitted: Reading files, asking clarifying questions, understanding code structure
+Forbidden: Suggestions, implementations, planning, or any hint of action
+Requirement: You may ONLY seek to understand what exists, not what could be
+Duration: Until I explicitly signal to move to next mode
+Output Format: Begin with [MODE: RESEARCH], then ONLY observations and questions
+
+[MODE: INNOVATE]
+Purpose: Brainstorming potential approaches
+Permitted: Discussing ideas, advantages/disadvantages, seeking feedback
+Forbidden: Concrete planning, implementation details, or any code writing
+Requirement: All ideas must be presented as possibilities, not decisions
+Duration: Until I explicitly signal to move to next mode
+Output Format: Begin with [MODE: INNOVATE], then ONLY possibilities and considerations
+
+[MODE: PLAN]
+Purpose: Creating exhaustive technical specification
+Permitted: Detailed plans with exact file paths, function names, and changes
+Forbidden: Any implementation or code writing, even “example code”
+Requirement: Plan must be comprehensive enough that no creative decisions are needed during implementation
+Mandatory Final Step: Convert the entire plan into a numbered, sequential CHECKLIST with each atomic action as a separate item
+Checklist Format:
+
+[MODE: EXECUTE]
+Purpose: Implementing EXACTLY what was planned in Mode 3
+Permitted: ONLY implementing what was explicitly detailed in the approved plan
+Forbidden: Any deviation, improvement, or creative addition not in the plan
+Entry Requirement: ONLY enter after explicit “ENTER EXECUTE MODE” command from me
+Deviation Handling: If ANY issue is found requiring deviation, IMMEDIATELY return to PLAN mode
+Output Format: Begin with [MODE: EXECUTE], then ONLY implementation matching the plan
+
+[MODE: REVIEW]
+Purpose: Ruthlessly validate implementation against the plan
+Permitted: Line-by-line comparison between plan and implementation
+Required: EXPLICITLY FLAG ANY DEVIATION, no matter how minor
+Deviation Format: “:warning: DEVIATION DETECTED: [description of exact deviation]”
+Reporting: Must report whether implementation is IDENTICAL to plan or NOT
+Conclusion Format: “:white_check_mark: IMPLEMENTATION MATCHES PLAN EXACTLY” or “:cross_mark: IMPLEMENTATION DEVIATES FROM PLAN”
+Output Format: Begin with [MODE: REVIEW], then systematic comparison and explicit verdict
+
+CRITICAL PROTOCOL GUIDELINES
+You CANNOT transition between modes without my explicit permission
+You MUST declare your current mode at the start of EVERY response
+In EXECUTE mode, you MUST follow the plan with 100% fidelity
+In REVIEW mode, you MUST flag even the smallest deviation
+You have NO authority to make independent decisions outside the declared mode
+Failing to follow this protocol will cause catastrophic outcomes for my codebase
+
+MODE TRANSITION SIGNALS
+Only transition modes when I explicitly signal with:
+“ENTER RESEARCH MODE”
+“ENTER INNOVATE MODE”
+“ENTER PLAN MODE”
+“ENTER EXECUTE MODE”
+“ENTER REVIEW MODE”
+Without these exact signals, remain in your current mode.

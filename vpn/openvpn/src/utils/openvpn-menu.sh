@@ -10,12 +10,12 @@
 # =========================================================================
 
 # Rutas a los scripts originales - Centraliza todas las rutas para facilitar cambios
-SETUP_SCRIPT="/app/scripts/openvpn-setup.sh"           # Script de configuracion
-START_SCRIPT="/app/scripts/openvpn-start.sh"           # Script para iniciar el servicio
-STOP_SCRIPT="/app/scripts/openvpn-stop.sh"             # Script para detener el servicio
-CLIENT_NEW_SCRIPT="/app/scripts/openvpn-client-new.sh" # Script para crear clientes
-CLIENT_DEL_SCRIPT="/app/scripts/openvpn-client-delete.sh" # Script para eliminar clientes
-HELP_SCRIPT="/app/scripts/openvpn-help.sh"             # Script de ayuda
+SETUP_SCRIPT="/app/scripts/core/openvpn-setup.sh"           # Script de configuracion
+START_SCRIPT="/app/scripts/core/openvpn-start.sh"           # Script para iniciar el servicio
+STOP_SCRIPT="/app/scripts/core/openvpn-stop.sh"             # Script para detener el servicio
+CLIENT_NEW_SCRIPT="/app/scripts/client/openvpn-client-new.sh" # Script para crear clientes
+CLIENT_DEL_SCRIPT="/app/scripts/client/openvpn-client-delete.sh" # Script para eliminar clientes
+HELP_SCRIPT="/app/scripts/utils/openvpn-help.sh"             # Script de ayuda
 
 # Directorio para logs temporales
 LOG_DIR="/tmp/subnetx"
