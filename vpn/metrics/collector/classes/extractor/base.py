@@ -1,6 +1,5 @@
-#!/usr/bin/env python3
 """
-SubNetx VPN Base Monitor
+SubNetx VPN Base Monitor.
 
 This module provides the base class for all VPN monitoring collectors.
 
@@ -8,13 +7,18 @@ It implements common functionality like TLS verification, and other
 shared utilities that are used across different collector types.
 """
 
-
 import json
 import re
 import socket
 import ssl
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, TypedDict
+
+
+class TlsInfo(TypedDict):
+    certificate: str | None
+    expiry: str | None
+    issuer: str | None
 
 
 class BaseMonitor:
@@ -39,7 +43,7 @@ class BaseMonitor:
         self.target = target
         self.timestamp = datetime.now()
 
-    def check_tls(self, hostname: str, port: int = 443) -> Dict[str, Any]:
+    def check_tls(self, hostname: str, port: int = 443) -> TlsInfo:
         """Check TLS certificate information for the target host.
 
         Attempts to establish a TLS connection to the target host and
@@ -51,7 +55,7 @@ class BaseMonitor:
         :type port: int, optional
         :return: Dictionary containing TLS certificate information including version,
                 cipher, expiry date, issuer and subject. Returns error information if check fails.
-        :rtype: Dict[str, Any]
+        :rtype: TlsInfo
         :raises: Various socket and SSL exceptions may be caught and logged
         """
         try:
@@ -61,7 +65,9 @@ class BaseMonitor:
             # Establish connection and wrap with SSL
             with socket.create_connection(
                 (hostname, port), timeout=5
-            ) as sock, context.wrap_socket(sock, server_hostname=hostname) as ssock:
+            ) as sock, context.wrap_socket(
+                sock, server_hostname=hostname
+            ) as ssock:
                 # Get the certificate details
                 cert = ssock.getpeercert()
 
@@ -71,23 +77,18 @@ class BaseMonitor:
 
                 # Return TLS information with safe processing of fields
                 return {
-                    "tls_version": ssock.version(),
-                    "cipher": ssock.cipher(),
-                    "cert_expiry": datetime.strptime(
+                    "certificate": json.dumps(cert),
+                    "expiry": datetime.strptime(
                         str(cert.get("notAfter", "")), "%b %d %H:%M:%S %Y %Z"
                     ).isoformat(),
                     "issuer": json.dumps(cert.get("issuer", [])),
-                    "subject": json.dumps(cert.get("subject", [])),
                 }
         except Exception as e:
             print(f"TLS check failed for {hostname}: {e}")
             return {
-                "tls_version": None,
-                "cipher": None,
-                "cert_expiry": None,
+                "certificate": None,
+                "expiry": None,
                 "issuer": None,
-                "subject": None,
-                "error": str(e),
             }
 
     def is_hostname(self, target: str) -> bool:
@@ -101,15 +102,15 @@ class BaseMonitor:
         # Simple IP address pattern matching
         return not re.match(r"^(\d{1,3}\.){3}\d{1,3}$", target)
 
-    def get_tls_info(self) -> Dict[str, Any]:
+    def get_tls_info(self) -> TlsInfo:
         """Get TLS information for the target if it's a hostname.
 
         :return: TLS information or empty dict if target is an IP
-        :rtype: Dict[str, Any]
+        :rtype: TlsInfo
         """
         if self.is_hostname(self.target):
             return self.check_tls(self.target)
-        return {}
+        return {"certificate": None, "expiry": None, "issuer": None}
 
     def _format_bytes(self, bytes_value: float) -> str:
         """Format bytes to human-readable format (KB, MB, GB).

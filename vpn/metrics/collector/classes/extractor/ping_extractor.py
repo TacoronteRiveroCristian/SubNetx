@@ -1,5 +1,5 @@
 """
-SubNetx VPN Client Ping Monitor
+SubNetx VPN Client Ping Monitor.
 
 This module provides functionality to monitor VPN client connectivity
 through ICMP ping tests, measuring latency, packet loss, and response times.
@@ -58,9 +58,46 @@ import logging
 import re
 import subprocess
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, List, TypedDict
 
 from vpn.metrics.collector.classes.extractor.base import BaseMonitor
+
+
+class RttStats(TypedDict):
+    min_ms: float
+    avg_ms: float
+    max_ms: float
+    mdev_ms: float
+
+
+class Packets(TypedDict):
+    transmitted: int
+    received: int
+
+
+class IcmpDetail(TypedDict):
+    sequence: int
+    response_time_ms: float
+
+
+class TlsInfo(TypedDict):
+    certificate: str | None
+    expiry: str | None
+    issuer: str | None
+
+
+class PingResult(TypedDict):
+    ip: str
+    status: str
+    timestamp: str
+    connection_quality: str
+    rtt_stats: RttStats
+    icmp_details: List[IcmpDetail]
+    packet_loss_percent: float
+    packets: Packets
+    raw_output: str
+    error: str | None
+    tls_info: TlsInfo | None
 
 
 class PingExtractor(BaseMonitor):
@@ -73,7 +110,7 @@ class PingExtractor(BaseMonitor):
     :param target: Target hostname or IP address to monitor
     :type target: str
     :ivar results: Storage for ping test results
-    :type results: Dict[str, Dict[str, Any]]
+    :type results: Dict[str, PingResult]
     """
 
     def __init__(self, target: str) -> None:
@@ -83,9 +120,9 @@ class PingExtractor(BaseMonitor):
         :type target: str
         """
         super().__init__(target)
-        self.results: Dict[str, Dict[str, Any]] = {}
+        self.results: Dict[str, PingResult] = {}
 
-    def ping_target(self, count: int = 5) -> Dict[str, Any]:
+    def ping_target(self, count: int = 5) -> PingResult:
         """Execute a ping test to the target and process the results.
 
         This method runs the ping command with the specified number of packets
@@ -95,10 +132,10 @@ class PingExtractor(BaseMonitor):
         :param count: Number of ICMP packets to send, defaults to 5
         :type count: int, optional
         :return: Dictionary with parsed ping metrics and status
-        :rtype: Dict[str, Any]
+        :rtype: PingResult
         """
         # Create basic result structure
-        result = {
+        result: PingResult = {
             "ip": self.target,
             "status": "offline",
             "timestamp": datetime.now().isoformat(),
@@ -108,6 +145,8 @@ class PingExtractor(BaseMonitor):
             "packet_loss_percent": 100,
             "packets": {"transmitted": count, "received": 0},
             "raw_output": "",
+            "error": None,
+            "tls_info": None,
         }
 
         try:
@@ -201,7 +240,7 @@ class PingExtractor(BaseMonitor):
             result: Dict[str, Any] = self.get_basic_result()
 
             # Ping the main target
-            ping_result = self.ping_target()
+            ping_result: PingResult = self.ping_target()
 
             # Add TLS information for hostnames
             if self.is_hostname(self.target):
@@ -215,6 +254,14 @@ class PingExtractor(BaseMonitor):
         except Exception as e:
             print(f"Error in ping collection: {e}")
             raise
+
+    def get_tls_info(self) -> TlsInfo:
+        """Get TLS certificate information for the target.
+
+        :return: TLS certificate information
+        :rtype: TlsInfo
+        """
+        return {"certificate": None, "expiry": None, "issuer": None}
 
 
 # Standalone testing when script is run directly

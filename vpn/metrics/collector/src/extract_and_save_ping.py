@@ -16,7 +16,9 @@ from vpn.metrics.collector.classes.extractor.ping_extractor import PingExtractor
 from vpn.metrics.conf import LOG_LEVEL, PING_DB_PATH
 
 # Configure logging
-logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=LOG_LEVEL, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 

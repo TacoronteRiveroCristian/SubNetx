@@ -16,7 +16,7 @@ logging.basicConfig(
     format=LOG_FORMAT,
     stream=sys.stdout,
 )
-logger = logging.getLogger("subnetx-metrics")
+logger = logging.getLogger(__file__)
 
 
 def run_ping_check() -> None:
