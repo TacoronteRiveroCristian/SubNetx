@@ -434,7 +434,40 @@ class PingDatabase:
                 (target, limit, offset),
             )
 
-            return [dict(row) for row in cursor.fetchall()]
+            results = []
+            for row in cursor.fetchall():
+                result = dict(row)
+
+                # Get ICMP details
+                cursor = conn.execute(
+                    """
+                    SELECT sequence, response_time_ms
+                    FROM icmp_details
+                    WHERE ping_metric_id = ?
+                    ORDER BY sequence
+                """,
+                    (row["id"],),
+                )
+                result["icmp_details"] = [
+                    dict(row) for row in cursor.fetchall()
+                ]
+
+                # Get TLS info
+                cursor = conn.execute(
+                    """
+                    SELECT cert_expiry, issuer, subject, version, cipher
+                    FROM tls_info
+                    WHERE ping_metric_id = ?
+                """,
+                    (row["id"],),
+                )
+                tls_row = cursor.fetchone()
+                if tls_row:
+                    result["tls_info"] = dict(tls_row)
+
+                results.append(result)
+
+            return results
 
     def get_connection_quality_summary(
         self, target: str, hours: int = 24

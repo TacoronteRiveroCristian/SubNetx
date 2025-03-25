@@ -5,8 +5,8 @@ import os
 import subprocess
 import sys
 
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.interval import IntervalTrigger
+from apscheduler.schedulers.background import BackgroundScheduler  # type: ignore
+from apscheduler.triggers.interval import IntervalTrigger  # type: ignore
 
 from vpn.metrics.conf import LOG_FORMAT, LOG_LEVEL
 
@@ -22,7 +22,7 @@ logger = logging.getLogger(__file__)
 def run_ping_check() -> None:
     """Run the ping check script."""
     try:
-        script_path = os.path.join("/app/vpn/openvpn/src/core/ping.sh")
+        script_path = os.path.join("vpn/metrics/collector/src/extract_and_save_ping.py")
         result = subprocess.run(
             [script_path], capture_output=True, text=True, check=True
         )
