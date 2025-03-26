@@ -38,7 +38,8 @@ RUN apt-get update && \
     build-essential \
     wget \
     bash-completion \
-    lsb-release && \
+    lsb-release \
+    supervisor && \
     rm -rf /var/lib/apt/lists/*
 
 # Instalar dependencias de Python para metrics
@@ -60,12 +61,26 @@ COPY vpn/openvpn/config /app/config/
 COPY vpn/openvpn/src/core/*.sh /app/scripts/core/
 COPY vpn/openvpn/src/client/*.sh /app/scripts/client/
 COPY vpn/openvpn/src/utils/*.sh /app/scripts/utils/
+COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Copiar módulos Python
+COPY vpn/metrics /app/vpn/metrics/
 
 # Mover fichero de configuracion de red para OpenVPN
 RUN mv /app/config/sysctl.conf /etc/sysctl.conf
 
 # Dar permisos iniciales para evitar problemas de acceso durante la configuracion
-RUN chmod +x /usr/local/bin/subnetx /app/scripts/core/*.sh /app/scripts/client/*.sh /app/scripts/utils/*.sh
+RUN chmod +x /usr/local/bin/subnetx /app/scripts/core/*.sh /app/scripts/client/*.sh /app/scripts/utils/*.sh && \
+    chmod -R 755 /app/vpn
 
-# Comando por defecto para mantener el contenedor en ejecución
-CMD ["sleep", "infinity"]
+# Crear directorio de logs
+RUN mkdir -p /var/log
+
+# Establecer directorio de trabajo
+WORKDIR /app
+
+# Exponer puertos
+EXPOSE 1194/udp 8000
+
+# Establecer punto de entrada a supervisor
+ENTRYPOINT ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

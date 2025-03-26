@@ -10,13 +10,12 @@ services:
       - SYS_ADMIN
     privileged: true
     volumes:
-      - .:/app
       - ./docker/volumes/certs:/etc/openvpn/certs
       - ./docker/volumes/logs:/var/log/openvpn
       - ./databases:/app/databases:cached
     ports:
       - "${OPENVPN_PORT}:${OPENVPN_PORT}/udp"
-      - "8000:8000"  # Puerto para la API
+      - "8000:8000"
     environment:
       - VPN_NETWORK=${VPN_NETWORK}
       - VPN_NETMASK=${VPN_NETMASK}
