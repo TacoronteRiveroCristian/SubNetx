@@ -334,6 +334,40 @@ export default function Home() {
     setSortConfig({ key, direction });
   };
 
+  // Add these helper functions before the return statement
+  const calculateSystemHealth = (targets: TargetWithStatus[]) => {
+    if (targets.length === 0) return 0;
+    const onlineTargets = targets.filter(t => t.latestStatus?.status === 'online').length;
+    return Math.round((onlineTargets / targets.length) * 100);
+  };
+
+  const calculateAverageRTT = (targets: TargetWithStatus[]) => {
+    const validRTTs = targets
+      .filter(t => t.latestStatus?.avg_rtt !== undefined && t.latestStatus.status === 'online')
+      .map(t => t.latestStatus!.avg_rtt);
+    if (validRTTs.length === 0) return 0;
+    return Math.round(validRTTs.reduce((a, b) => a + b, 0) / validRTTs.length);
+  };
+
+  const getConnectionQualityDistribution = (targets: TargetWithStatus[]) => {
+    const distribution = {
+      Excellent: 0,
+      Good: 0,
+      Fair: 0,
+      Poor: 0,
+      None: 0
+    };
+    targets.forEach(t => {
+      const quality = t.latestStatus?.connection_quality.toLowerCase() || 'none';
+      if (quality === 'excellent') distribution.Excellent++;
+      else if (quality === 'good') distribution.Good++;
+      else if (quality === 'fair') distribution.Fair++;
+      else if (quality === 'poor') distribution.Poor++;
+      else distribution.None++;
+    });
+    return distribution;
+  };
+
   return (
     <>
       <Head>
@@ -347,6 +381,14 @@ export default function Home() {
             background-color: ${currentTheme.background};
             color: ${currentTheme.text};
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+          }
+          #__next {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
           }
           .target-row:hover {
             background-color: ${currentTheme.tableRowHover} !important;
@@ -452,10 +494,215 @@ export default function Home() {
         padding: '2rem',
         backgroundColor: currentTheme.background,
         color: currentTheme.text,
-        minHeight: 'calc(100vh - 60px)',
+        flex: 1,
+        overflowY: 'auto',
         width: '100%',
         boxSizing: 'border-box'
       }}>
+        {/* Welcome Message when no monitoring */}
+        {!isMonitoring && !loading && targetsWithStatus.length === 0 && !error && (
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: 'calc(100vh - 200px)',
+            textAlign: 'center',
+            gap: '1rem'
+          }}>
+            <span className="material-icons" style={{
+              fontSize: '64px',
+              color: currentTheme.primary,
+              animation: 'pulse 2s infinite'
+            }}>
+              radar
+            </span>
+            <h2 style={{ margin: 0 }}>Welcome to SubNetx</h2>
+            <p style={{
+              fontSize: '1.1rem',
+              color: currentTheme.text,
+              maxWidth: '500px',
+              lineHeight: '1.5'
+            }}>
+              Click the <strong>Start</strong> button above to begin monitoring your network targets.
+              Real-time statistics and detailed insights will appear here.
+            </p>
+          </div>
+        )}
+
+        {/* Only show dashboard cards when monitoring is active and we have data */}
+        {(isMonitoring || targetsWithStatus.length > 0) && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+            gap: '1rem',
+            marginBottom: '2rem'
+          }}>
+            {/* System Health Card */}
+            <div style={{
+              backgroundColor: currentTheme.cardBackground,
+              padding: '1.2rem',
+              borderRadius: '8px',
+              border: `1px solid ${currentTheme.border}`,
+              transition: 'transform 0.2s, box-shadow 0.2s',
+              cursor: 'pointer',
+              position: 'relative',
+              overflow: 'hidden'
+            }}
+            onMouseEnter={(e) => {
+              const target = e.currentTarget;
+              target.style.transform = 'translateY(-2px)';
+              target.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              const target = e.currentTarget;
+              target.style.transform = 'none';
+              target.style.boxShadow = 'none';
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.8rem', height: '24px' }}>
+                <span className="material-icons" style={{
+                  fontSize: '20px',
+                  color: calculateSystemHealth(targetsWithStatus) >= 80 ? '#4CAF50' :
+                         calculateSystemHealth(targetsWithStatus) >= 60 ? '#FF9800' : '#F44336'
+                }}>
+                  monitoring
+                </span>
+                <h3 style={{ margin: 0, fontSize: '1rem' }}>System Health</h3>
+              </div>
+              <div style={{ fontSize: '1.8rem', fontWeight: 'bold', marginBottom: '0.4rem' }}>
+                {calculateSystemHealth(targetsWithStatus)}%
+              </div>
+              <div style={{ fontSize: '0.85rem', color: currentTheme.text }}>
+                {targetsWithStatus.filter(t => t.latestStatus?.status === 'online').length} of {targetsWithStatus.length} hosts online
+              </div>
+            </div>
+
+            {/* Average RTT Card */}
+            <div style={{
+              backgroundColor: currentTheme.cardBackground,
+              padding: '1.2rem',
+              borderRadius: '8px',
+              border: `1px solid ${currentTheme.border}`,
+              transition: 'transform 0.2s, box-shadow 0.2s',
+              cursor: 'pointer',
+              position: 'relative',
+              overflow: 'hidden'
+            }}
+            onMouseEnter={(e) => {
+              const target = e.currentTarget;
+              target.style.transform = 'translateY(-2px)';
+              target.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              const target = e.currentTarget;
+              target.style.transform = 'none';
+              target.style.boxShadow = 'none';
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.8rem', height: '24px' }}>
+                <span className="material-icons" style={{
+                  fontSize: '20px',
+                  color: calculateAverageRTT(targetsWithStatus) <= 50 ? '#4CAF50' :
+                         calculateAverageRTT(targetsWithStatus) <= 100 ? '#FF9800' : '#F44336'
+                }}>
+                  speed
+                </span>
+                <h3 style={{ margin: 0, fontSize: '1rem' }}>Average RTT</h3>
+              </div>
+              <div style={{ fontSize: '1.8rem', fontWeight: 'bold', marginBottom: '0.4rem' }}>
+                {calculateAverageRTT(targetsWithStatus)} ms
+              </div>
+              <div style={{ fontSize: '0.85rem', color: currentTheme.text }}>
+                Network Latency
+              </div>
+            </div>
+
+            {/* Connection Quality Card */}
+            <div style={{
+              backgroundColor: currentTheme.cardBackground,
+              padding: '1.2rem',
+              borderRadius: '8px',
+              border: `1px solid ${currentTheme.border}`,
+              transition: 'transform 0.2s, box-shadow 0.2s',
+              cursor: 'pointer',
+              position: 'relative',
+              overflow: 'hidden'
+            }}
+            onMouseEnter={(e) => {
+              const target = e.currentTarget;
+              target.style.transform = 'translateY(-2px)';
+              target.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              const target = e.currentTarget;
+              target.style.transform = 'none';
+              target.style.boxShadow = 'none';
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.8rem', height: '24px' }}>
+                <span className="material-icons" style={{ fontSize: '20px', color: currentTheme.primary }}>
+                  signal_cellular_alt
+                </span>
+                <h3 style={{ margin: 0, fontSize: '1rem' }}>Connection Quality</h3>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                {Object.entries(getConnectionQualityDistribution(targetsWithStatus))
+                  .filter(([quality]) => quality !== 'excellent' && quality !== 'none')
+                  .map(([quality, count]) => (
+                    <div key={quality} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{
+                          width: '6px',
+                          height: '6px',
+                          borderRadius: '50%',
+                          backgroundColor: quality === 'Excellent' ? '#4CAF50' :
+                                         quality === 'Good' ? '#8BC34A' :
+                                         quality === 'Fair' ? '#FF9800' :
+                                         quality === 'Poor' ? '#F44336' : '#9E9E9E'
+                        }}></div>
+                        <span style={{ fontSize: '0.85rem' }}>{quality}</span>
+                      </div>
+                      <span style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>{count}</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+
+            {/* Packet Loss Card */}
+            <div style={{
+              backgroundColor: currentTheme.cardBackground,
+              padding: '1.2rem',
+              borderRadius: '8px',
+              border: `1px solid ${currentTheme.border}`,
+              transition: 'transform 0.2s, box-shadow 0.2s',
+              cursor: 'pointer',
+              position: 'relative',
+              overflow: 'hidden'
+            }}
+            onMouseEnter={(e) => {
+              const target = e.currentTarget;
+              target.style.transform = 'translateY(-2px)';
+              target.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              const target = e.currentTarget;
+              target.style.transform = 'none';
+              target.style.boxShadow = 'none';
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.8rem', height: '24px' }}>
+                <span className="material-icons" style={{ fontSize: '20px', color: currentTheme.primary }}>
+                  error_outline
+                </span>
+                <h3 style={{ margin: 0, fontSize: '1rem' }}>Packet Loss</h3>
+              </div>
+              <div style={{ fontSize: '1.8rem', fontWeight: 'bold', marginBottom: '0.4rem' }}>
+                {targetsWithStatus.reduce((acc, t) => acc + (t.latestStatus?.packet_loss_percent || 0), 0) / targetsWithStatus.length}%
+              </div>
+              <div style={{ fontSize: '0.85rem', color: currentTheme.text }}>
+                Average Packet Loss
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Settings Panel */}
         {showSettings && (
           <div style={{
@@ -853,12 +1100,80 @@ export default function Home() {
             ))}
           </div>
         )}
-
-        {/* Show a message when no targets are available */}
-        {!loading && targetsWithStatus.length === 0 && !error && (
-          <p>No targets available. Click the button above to start monitoring.</p>
-        )}
       </main>
+
+      {/* Footer */}
+      <footer style={{
+        backgroundColor: currentTheme.cardBackground,
+        padding: '0.6rem',
+        borderTop: `1px solid ${currentTheme.border}`,
+        width: '100%',
+        boxSizing: 'border-box',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '0.5rem',
+        flexShrink: 0
+      }}>
+        <div style={{
+          fontSize: '0.85rem',
+          color: currentTheme.text,
+          opacity: 0.8
+        }}>
+          © {new Date().getFullYear()} SubNetx. Released under the MIT License.
+        </div>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1.5rem'
+        }}>
+          <a
+            href="mailto:tacoronteriverocristian@gmail.com"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              color: currentTheme.text,
+              textDecoration: 'none',
+              transition: 'color 0.2s',
+              fontSize: '0.85rem'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = currentTheme.primary;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = currentTheme.text;
+            }}
+          >
+            <span className="material-icons" style={{ fontSize: '16px' }}>email</span>
+            Contact
+          </a>
+          <a
+            href="https://github.com/TacoronteRiveroCristian/SubNetx"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              color: currentTheme.text,
+              textDecoration: 'none',
+              transition: 'color 0.2s',
+              fontSize: '0.85rem'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = currentTheme.primary;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = currentTheme.text;
+            }}
+          >
+            <span className="material-icons" style={{ fontSize: '16px' }}>code</span>
+            GitHub
+          </a>
+        </div>
+      </footer>
     </>
   );
 }
