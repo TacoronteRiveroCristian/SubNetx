@@ -104,6 +104,8 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   // State to track refresh interval
   const [refreshInterval, setRefreshInterval] = useState(10);
+  // State to track when data is being updated
+  const [isUpdating, setIsUpdating] = useState(false);
   // Ref to store the interval ID for cleanup
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -146,6 +148,7 @@ export default function Home() {
   // Function to fetch latest status for all targets
   const fetchLatestStatus = async () => {
     try {
+      setIsUpdating(true); // Set updating state to true
       // Make API request to fetch latest status data
       const response = await fetch('/api/targets/latest', {
         headers: {
@@ -165,6 +168,9 @@ export default function Home() {
     } catch (err) {
       console.error('Error fetching latest status:', err);
       // We don't set the error state here to avoid interfering with the targets display
+    } finally {
+      // Reset updating state after a short delay
+      setTimeout(() => setIsUpdating(false), 500);
     }
   };
 
@@ -253,8 +259,29 @@ export default function Home() {
         <title>Target Monitor</title>
         <meta name="description" content="Monitor network targets in real-time" />
         <style>{`
+          body {
+            margin: 0;
+            padding: 0;
+            background-color: ${currentTheme.background};
+            color: ${currentTheme.text};
+          }
           .target-row:hover {
             background-color: ${currentTheme.tableRowHover} !important;
+          }
+          .details-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 1rem;
+          }
+          @media (max-width: 768px) {
+            .details-grid {
+              grid-template-columns: repeat(3, 1fr);
+            }
+          }
+          @media (max-width: 480px) {
+            .details-grid {
+              grid-template-columns: repeat(2, 1fr);
+            }
           }
         `}</style>
       </Head>
@@ -264,7 +291,9 @@ export default function Home() {
         fontFamily: 'sans-serif',
         backgroundColor: currentTheme.background,
         color: currentTheme.text,
-        minHeight: '100vh'
+        minHeight: '100vh',
+        width: '100%',
+        boxSizing: 'border-box'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
           <h1 style={{ margin: 0 }}>Target Monitor</h1>
@@ -388,9 +417,9 @@ export default function Home() {
               width: '10px',
               height: '10px',
               borderRadius: '50%',
-              backgroundColor: currentTheme.secondary,
+              backgroundColor: isUpdating ? '#F44336' : currentTheme.secondary,
               marginRight: '8px',
-              animation: 'pulse 2s infinite'
+              animation: isUpdating ? 'none' : 'pulse 2s infinite'
             }}></div>
             <style jsx>{`
               @keyframes pulse {
@@ -515,17 +544,17 @@ export default function Home() {
             {targetsWithStatus.map(({ target, latestStatus }) => (
               latestStatus && latestStatus.icmp_details.length > 0 && (
                 <div key={`detail-${target.id}`} style={{
-                  marginBottom: '2rem',
-                  padding: '1rem',
+                  marginBottom: '1rem',
+                  padding: '0.5rem',
                   border: `1px solid ${currentTheme.border}`,
                   borderRadius: '4px',
                   backgroundColor: currentTheme.cardBackground
                 }}>
-                  <h3>ICMP Response Details: {target.target}</h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '1rem' }}>
+                  <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.2rem' }}>ICMP Response Details: {target.target}</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.5rem' }}>
                     {latestStatus.icmp_details.map((ping, index) => (
                       <div key={index} style={{
-                        padding: '0.5rem',
+                        padding: '0.3rem',
                         backgroundColor: currentTheme.background,
                         border: `1px solid ${currentTheme.border}`,
                         borderRadius: '4px',
@@ -535,6 +564,7 @@ export default function Home() {
                         <div style={{
                           fontSize: '1.2rem',
                           fontWeight: 'bold',
+                          marginTop: '0.3rem',
                           color: ping.response_time_ms > 100 ? '#F44336' : ping.response_time_ms > 50 ? '#FF9800' : '#4CAF50'
                         }}>
                           {ping.response_time_ms} ms
@@ -542,41 +572,38 @@ export default function Home() {
                       </div>
                     ))}
                   </div>
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                    gap: '1rem',
+                  <div className="details-grid" style={{
                     marginTop: '1rem',
                     backgroundColor: currentTheme.background,
                     padding: '0.5rem',
                     borderRadius: '4px',
                     border: `1px solid ${currentTheme.border}`
                   }}>
-                    <div>
+                    <div style={{ textAlign: 'center' }}>
                       <div style={{ fontSize: '0.8rem', color: currentTheme.text }}>Min RTT</div>
-                      <div style={{ fontSize: '1rem', fontWeight: 'bold' }}>{latestStatus.min_rtt} ms</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 'bold', marginTop: '0.4rem' }}>{latestStatus.min_rtt} ms</div>
                     </div>
-                    <div>
+                    <div style={{ textAlign: 'center' }}>
                       <div style={{ fontSize: '0.8rem', color: currentTheme.text }}>Avg RTT</div>
-                      <div style={{ fontSize: '1rem', fontWeight: 'bold' }}>{latestStatus.avg_rtt} ms</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 'bold', marginTop: '0.4rem' }}>{latestStatus.avg_rtt} ms</div>
                     </div>
-                    <div>
+                    <div style={{ textAlign: 'center' }}>
                       <div style={{ fontSize: '0.8rem', color: currentTheme.text }}>Max RTT</div>
-                      <div style={{ fontSize: '1rem', fontWeight: 'bold' }}>{latestStatus.max_rtt} ms</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 'bold', marginTop: '0.4rem' }}>{latestStatus.max_rtt} ms</div>
                     </div>
-                    <div>
+                    <div style={{ textAlign: 'center' }}>
                       <div style={{ fontSize: '0.8rem', color: currentTheme.text }}>Packet Loss</div>
-                      <div style={{ fontSize: '1rem', fontWeight: 'bold', color: latestStatus.packet_loss_percent > 0 ? '#F44336' : '#4CAF50' }}>
+                      <div style={{ fontSize: '1rem', fontWeight: 'bold', marginTop: '0.4rem', color: latestStatus.packet_loss_percent > 0 ? '#F44336' : '#4CAF50' }}>
                         {latestStatus.packet_loss_percent}%
                       </div>
                     </div>
-                    <div>
+                    <div style={{ textAlign: 'center' }}>
                       <div style={{ fontSize: '0.8rem', color: currentTheme.text }}>Transmitted</div>
-                      <div style={{ fontSize: '1rem', fontWeight: 'bold' }}>{latestStatus.packets_transmitted}</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 'bold', marginTop: '0.4rem' }}>{latestStatus.packets_transmitted}</div>
                     </div>
-                    <div>
+                    <div style={{ textAlign: 'center' }}>
                       <div style={{ fontSize: '0.8rem', color: currentTheme.text }}>Received</div>
-                      <div style={{ fontSize: '1rem', fontWeight: 'bold' }}>{latestStatus.packets_received}</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 'bold', marginTop: '0.4rem' }}>{latestStatus.packets_received}</div>
                     </div>
                   </div>
                 </div>
