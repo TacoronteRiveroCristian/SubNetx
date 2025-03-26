@@ -1,23 +1,19 @@
-# .devcontainer/Dockerfile
+# UI Development Dockerfile
 FROM node:20
 
 # Create app directory
 WORKDIR /app
 
-# Install global tools (optional)
+# Install global tools
 RUN npm install -g npm
 
-# Copy files separately to optimize cache
-COPY ui/package.json ./
-COPY ui/package-lock.json* ./
+# Copy package files
+COPY ui/package*.json ./
 
 # Install dependencies
-RUN npm install
+RUN npm install --omit=optional
 
-# Copy rest of the app
-COPY ui/ .
-
-# Expose port
+# Expose port used by Next.js
 EXPOSE 3200
 
 # Default command

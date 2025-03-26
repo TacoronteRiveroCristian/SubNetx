@@ -19,8 +19,20 @@
                 },
                 "files.watcherExclude": {
                     "**/node_modules/**": true,
-                    "**/.next/**": true
-                }
+                    "**/.next/**": true,
+                    "**/dist/**": true
+                },
+                "files.exclude": {
+                    "**/.git": true,
+                    "**/.svn": true,
+                    "**/.hg": true,
+                    "**/CVS": true,
+                    "**/.DS_Store": true,
+                    "**/Thumbs.db": true
+                },
+                "npm.packageManager": "npm",
+                "npm.runSilent": true,
+                "js/ts.implicitProjectConfig.checkJs": true
             },
             "extensions": [
                 "esbenp.prettier-vscode",
@@ -42,7 +54,7 @@
         3200
     ],
     "updateRemoteUserUID": true,
-    "postStartCommand": "npm install && echo 'Dev container started, node_modules should have proper permissions now'",
+    "postStartCommand": "npm install --omit=optional && echo 'Dev container started, node_modules should have proper permissions now'",
     "postAttachCommand": "npm run dev",
     "features": {
         "github-cli": "latest",
