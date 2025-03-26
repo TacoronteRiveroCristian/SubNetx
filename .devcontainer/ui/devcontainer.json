@@ -2,32 +2,53 @@
     "name": "SubNetx UI Development",
     "dockerComposeFile": "../../docker-compose.yaml",
     "service": "ui",
-    "workspaceFolder": "/workspace/ui",
+    "workspaceFolder": "/app",
     "remoteUser": "node",
     "customizations": {
         "vscode": {
-            "extensions": [
-                "dbaeumer.vscode-eslint",
-                "esbenp.prettier-vscode",
-                "bradlc.vscode-tailwindcss",
-                "ms-vscode.vscode-typescript-next",
-                "formulahendry.auto-rename-tag",
-                "christian-kohler.path-intellisense",
-                "christian-kohler.npm-intellisense",
-                "streetsidesoftware.code-spell-checker"
-            ],
             "settings": {
+                "terminal.integrated.defaultProfile.linux": "bash",
                 "editor.formatOnSave": true,
-                "editor.defaultFormatter": "esbenp.prettier-vscode",
                 "editor.codeActionsOnSave": {
-                    "source.fixAll.eslint": true
+                    "source.fixAll.eslint": "explicit"
+                },
+                "typescript.tsdk": "node_modules/typescript/lib",
+                "emmet.includeLanguages": {
+                    "javascript": "javascriptreact",
+                    "typescript": "typescriptreact"
+                },
+                "files.watcherExclude": {
+                    "**/node_modules/**": true,
+                    "**/.next/**": true
                 }
-            }
+            },
+            "extensions": [
+                "esbenp.prettier-vscode",
+                "dbaeumer.vscode-eslint",
+                "ms-vscode.vscode-typescript-next",
+                "dsznajder.es7-react-js-snippets",
+                "bradlc.vscode-tailwindcss",
+                "streetsidesoftware.code-spell-checker",
+                "christian-kohler.path-intellisense",
+                "mikestead.dotenv",
+                "eamodio.gitlens",
+                "firefox-devtools.vscode-firefox-debug",
+                "ms-azuretools.vscode-docker",
+                "formulahendry.auto-rename-tag"
+            ]
         }
     },
     "forwardPorts": [
-        3001
+        3200
     ],
     "updateRemoteUserUID": true,
-    "postStartCommand": "echo 'Dev container started, node_modules should have proper permissions now'"
+    "postStartCommand": "npm install && echo 'Dev container started, node_modules should have proper permissions now'",
+    "postAttachCommand": "npm run dev",
+    "features": {
+        "github-cli": "latest",
+        "node": {
+            "version": "lts",
+            "nodeGypDependencies": true
+        }
+    }
 }

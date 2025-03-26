@@ -53,24 +53,20 @@ services:
       context: .
       dockerfile: ./docker/ui.Dockerfile
     container_name: subnetx_ui
-    volumes:
-      - ./ui:/workspace/ui:cached
-      - ui-node-modules:/workspace/ui/node_modules
     ports:
-      - "3001:3000"
+      - "3200:3200"
     environment:
       - NODE_ENV=development
       - NEXT_PUBLIC_API_URL=http://subnetx_vpn:8000
       - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+      - NEXT_TELEMETRY_DISABLED=1
     networks:
       - subnetx
     depends_on:
       - subnetx
+    restart: unless-stopped
 
 networks:
   subnetx:
     driver: bridge
-
-volumes:
-  ui-node-modules:
-    name: subnetx-ui-node-modules
