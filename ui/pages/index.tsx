@@ -56,6 +56,8 @@ interface Theme {
   cardBackground: string;
   errorBackground: string;
   statusIndicator: string;
+  navbar: string;
+  buttonHover: string;
 }
 
 const themes = {
@@ -71,6 +73,8 @@ const themes = {
     cardBackground: '#f9f9f9',
     errorBackground: '#FFEBEE',
     statusIndicator: '#E3F2FD',
+    navbar: '#ffffff',
+    buttonHover: '#f0f0f0',
   },
   dark: {
     background: '#1a1a1a',
@@ -84,6 +88,8 @@ const themes = {
     cardBackground: '#2d2d2d',
     errorBackground: '#311111',
     statusIndicator: '#1a237e',
+    navbar: '#1a1a1a',
+    buttonHover: '#2d2d2d',
   },
 };
 
@@ -108,6 +114,12 @@ export default function Home() {
   const [isUpdating, setIsUpdating] = useState(false);
   // Ref to store the interval ID for cleanup
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Add these new states at the top with other states
+  const [sortConfig, setSortConfig] = useState<{
+    key: string;
+    direction: 'ascending' | 'descending';
+  } | null>(null);
+  const [filterText, setFilterText] = useState('');
 
   // Function to fetch targets from the API
   const fetchTargets = async () => {
@@ -253,17 +265,88 @@ export default function Home() {
   // Get current theme colors
   const currentTheme = themes[theme];
 
+  // Add this sorting function before the return statement
+  const sortData = (data: TargetWithStatus[]) => {
+    if (!sortConfig) return data;
+
+    return [...data].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      switch (sortConfig.key) {
+        case 'id':
+          aValue = a.target.id;
+          bValue = b.target.id;
+          break;
+        case 'target':
+          aValue = a.target.target;
+          bValue = b.target.target;
+          break;
+        case 'status':
+          aValue = a.latestStatus?.status || '';
+          bValue = b.latestStatus?.status || '';
+          break;
+        case 'quality':
+          aValue = a.latestStatus?.connection_quality || '';
+          bValue = b.latestStatus?.connection_quality || '';
+          break;
+        case 'packetLoss':
+          aValue = a.latestStatus?.packet_loss_percent || 0;
+          bValue = b.latestStatus?.packet_loss_percent || 0;
+          break;
+        case 'avgRtt':
+          aValue = a.latestStatus?.avg_rtt || 0;
+          bValue = b.latestStatus?.avg_rtt || 0;
+          break;
+        default:
+          return 0;
+      }
+
+      if (aValue < bValue) {
+        return sortConfig.direction === 'ascending' ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return sortConfig.direction === 'ascending' ? 1 : -1;
+      }
+      return 0;
+    });
+  };
+
+  // Add this filter function
+  const filterData = (data: TargetWithStatus[]) => {
+    if (!filterText) return data;
+    const searchTerm = filterText.toLowerCase();
+
+    return data.filter(item =>
+      item.target.target.toLowerCase().includes(searchTerm) ||
+      item.target.description?.toLowerCase().includes(searchTerm) ||
+      item.latestStatus?.status.toLowerCase().includes(searchTerm) ||
+      item.latestStatus?.connection_quality.toLowerCase().includes(searchTerm)
+    );
+  };
+
+  // Add this function to handle sort
+  const requestSort = (key: string) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+
   return (
     <>
       <Head>
-        <title>Target Monitor</title>
+        <title>SubNetx</title>
         <meta name="description" content="Monitor network targets in real-time" />
+        <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
         <style>{`
           body {
             margin: 0;
             padding: 0;
             background-color: ${currentTheme.background};
             color: ${currentTheme.text};
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
           }
           .target-row:hover {
             background-color: ${currentTheme.tableRowHover} !important;
@@ -283,53 +366,96 @@ export default function Home() {
               grid-template-columns: repeat(2, 1fr);
             }
           }
+          .nav-button {
+            background: none;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            color: ${currentTheme.text};
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+          }
+          .nav-button:hover {
+            background-color: ${currentTheme.buttonHover};
+          }
+          .material-icons {
+            font-size: 18px;
+          }
         `}</style>
       </Head>
 
+      <div style={{
+        backgroundColor: currentTheme.navbar,
+        padding: '0.5rem 1.5rem',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 1000,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span className="material-icons" style={{ color: currentTheme.text, fontSize: '22px' }}>
+            wifi_tethering
+          </span>
+          <h1 style={{ margin: 0, fontSize: '1.1rem' }}>SubNetx</h1>
+        </div>
+
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <button
+            onClick={toggleMonitoring}
+            className="nav-button"
+            disabled={loading}
+          >
+            <span className="material-icons">
+              {isMonitoring ? 'stop' : 'play_arrow'}
+            </span>
+            {loading ? 'Loading...' : isMonitoring ? 'Stop' : 'Start'}
+          </button>
+
+          {!isMonitoring && (
+            <button
+              onClick={fetchTargets}
+              className="nav-button"
+              disabled={loading}
+            >
+              <span className="material-icons">refresh</span>
+              {loading ? 'Loading...' : 'Refresh'}
+            </button>
+          )}
+
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="nav-button"
+          >
+            <span className="material-icons">settings</span>
+            Settings
+          </button>
+
+          <button
+            onClick={toggleTheme}
+            className="nav-button"
+          >
+            <span className="material-icons">
+              {theme === 'light' ? 'dark_mode' : 'light_mode'}
+            </span>
+            {theme === 'light' ? 'Dark' : 'Light'}
+          </button>
+        </div>
+      </div>
+
       <main style={{
         padding: '2rem',
-        fontFamily: 'sans-serif',
         backgroundColor: currentTheme.background,
         color: currentTheme.text,
-        minHeight: '100vh',
+        minHeight: 'calc(100vh - 60px)',
         width: '100%',
         boxSizing: 'border-box'
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-          <h1 style={{ margin: 0 }}>Target Monitor</h1>
-          <div>
-            {/* Settings button */}
-            <button
-              onClick={() => setShowSettings(!showSettings)}
-              style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: currentTheme.secondary,
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                marginRight: '1rem'
-              }}
-            >
-              Settings
-            </button>
-            {/* Theme toggle button */}
-            <button
-              onClick={toggleTheme}
-              style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: currentTheme.primary,
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              {theme === 'light' ? '🌙 Dark Mode' : '☀️ Light Mode'}
-            </button>
-          </div>
-        </div>
-
         {/* Settings Panel */}
         {showSettings && (
           <div style={{
@@ -364,43 +490,6 @@ export default function Home() {
             </div>
           </div>
         )}
-
-        <div style={{ marginBottom: '1rem' }}>
-          {/* Button to toggle real-time monitoring */}
-          <button
-            onClick={toggleMonitoring}
-            style={{
-              padding: '0.5rem 1rem',
-              backgroundColor: isMonitoring ? '#F44336' : currentTheme.primary,
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              marginRight: '1rem'
-            }}
-            disabled={loading}
-          >
-            {loading ? 'Loading...' : isMonitoring ? 'Stop Monitoring' : 'Start Real-time Monitoring'}
-          </button>
-
-          {/* Button to manually fetch data */}
-          {!isMonitoring && (
-            <button
-              onClick={fetchTargets}
-              style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: currentTheme.secondary,
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-              disabled={loading}
-            >
-              {loading ? 'Loading...' : 'Fetch Data Manually'}
-            </button>
-          )}
-        </div>
 
         {/* Display monitoring status */}
         {isMonitoring && (
@@ -448,7 +537,34 @@ export default function Home() {
         {/* Display the fetched targets with their latest status */}
         {targetsWithStatus.length > 0 && (
           <div>
-            <h2>Monitored Targets</h2>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1rem'
+            }}>
+              <h2 style={{ margin: 0 }}>Monitored Targets ({targetsWithStatus.length} hosts)</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="material-icons" style={{ color: currentTheme.text, fontSize: '18px' }}>
+                  search
+                </span>
+                <input
+                  type="text"
+                  placeholder="Filter targets..."
+                  value={filterText}
+                  onChange={(e) => setFilterText(e.target.value)}
+                  style={{
+                    padding: '4px 12px',
+                    borderRadius: '4px',
+                    border: `1px solid ${currentTheme.border}`,
+                    backgroundColor: currentTheme.background,
+                    color: currentTheme.text,
+                    width: '200px',
+                    fontSize: '0.9rem'
+                  }}
+                />
+              </div>
+            </div>
             <table style={{
               borderCollapse: 'collapse',
               width: '100%',
@@ -457,17 +573,143 @@ export default function Home() {
             }}>
               <thead>
                 <tr style={{ backgroundColor: currentTheme.tableHeader }}>
-                  <th style={{ border: `1px solid ${currentTheme.border}`, padding: '8px', textAlign: 'left' }}>ID</th>
-                  <th style={{ border: `1px solid ${currentTheme.border}`, padding: '8px', textAlign: 'left' }}>Target</th>
-                  <th style={{ border: `1px solid ${currentTheme.border}`, padding: '8px', textAlign: 'left' }}>Status</th>
+                  <th
+                    onClick={() => requestSort('id')}
+                    style={{
+                      border: `1px solid ${currentTheme.border}`,
+                      padding: '8px',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      userSelect: 'none'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      ID
+                      <span className="material-icons" style={{ fontSize: '16px' }}>
+                        {sortConfig?.key === 'id'
+                          ? sortConfig.direction === 'ascending'
+                            ? 'arrow_upward'
+                            : 'arrow_downward'
+                          : 'unfold_more'
+                        }
+                      </span>
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => requestSort('target')}
+                    style={{
+                      border: `1px solid ${currentTheme.border}`,
+                      padding: '8px',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      userSelect: 'none'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      Target
+                      <span className="material-icons" style={{ fontSize: '16px' }}>
+                        {sortConfig?.key === 'target'
+                          ? sortConfig.direction === 'ascending'
+                            ? 'arrow_upward'
+                            : 'arrow_downward'
+                          : 'unfold_more'
+                        }
+                      </span>
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => requestSort('status')}
+                    style={{
+                      border: `1px solid ${currentTheme.border}`,
+                      padding: '8px',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      userSelect: 'none'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      Status
+                      <span className="material-icons" style={{ fontSize: '16px' }}>
+                        {sortConfig?.key === 'status'
+                          ? sortConfig.direction === 'ascending'
+                            ? 'arrow_upward'
+                            : 'arrow_downward'
+                          : 'unfold_more'
+                        }
+                      </span>
+                    </div>
+                  </th>
                   <th style={{ border: `1px solid ${currentTheme.border}`, padding: '8px', textAlign: 'left' }}>Last Updated</th>
-                  <th style={{ border: `1px solid ${currentTheme.border}`, padding: '8px', textAlign: 'left' }}>Connection Quality</th>
-                  <th style={{ border: `1px solid ${currentTheme.border}`, padding: '8px', textAlign: 'left' }}>Packet Loss</th>
-                  <th style={{ border: `1px solid ${currentTheme.border}`, padding: '8px', textAlign: 'left' }}>Avg RTT (ms)</th>
+                  <th
+                    onClick={() => requestSort('quality')}
+                    style={{
+                      border: `1px solid ${currentTheme.border}`,
+                      padding: '8px',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      userSelect: 'none'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      Connection Quality
+                      <span className="material-icons" style={{ fontSize: '16px' }}>
+                        {sortConfig?.key === 'quality'
+                          ? sortConfig.direction === 'ascending'
+                            ? 'arrow_upward'
+                            : 'arrow_downward'
+                          : 'unfold_more'
+                        }
+                      </span>
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => requestSort('packetLoss')}
+                    style={{
+                      border: `1px solid ${currentTheme.border}`,
+                      padding: '8px',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      userSelect: 'none'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      Packet Loss
+                      <span className="material-icons" style={{ fontSize: '16px' }}>
+                        {sortConfig?.key === 'packetLoss'
+                          ? sortConfig.direction === 'ascending'
+                            ? 'arrow_upward'
+                            : 'arrow_downward'
+                          : 'unfold_more'
+                        }
+                      </span>
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => requestSort('avgRtt')}
+                    style={{
+                      border: `1px solid ${currentTheme.border}`,
+                      padding: '8px',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      userSelect: 'none'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      Avg RTT (ms)
+                      <span className="material-icons" style={{ fontSize: '16px' }}>
+                        {sortConfig?.key === 'avgRtt'
+                          ? sortConfig.direction === 'ascending'
+                            ? 'arrow_upward'
+                            : 'arrow_downward'
+                          : 'unfold_more'
+                        }
+                      </span>
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {targetsWithStatus.map(({ target, latestStatus }) => (
+                {sortData(filterData(targetsWithStatus)).map(({ target, latestStatus }) => (
                   <tr
                     key={target.id}
                     style={{
