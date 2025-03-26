@@ -1,0 +1,33 @@
+{
+    "name": "SubNetx UI Development",
+    "dockerComposeFile": "../../docker-compose.yaml",
+    "service": "ui",
+    "workspaceFolder": "/workspace/ui",
+    "remoteUser": "node",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "dbaeumer.vscode-eslint",
+                "esbenp.prettier-vscode",
+                "bradlc.vscode-tailwindcss",
+                "ms-vscode.vscode-typescript-next",
+                "formulahendry.auto-rename-tag",
+                "christian-kohler.path-intellisense",
+                "christian-kohler.npm-intellisense",
+                "streetsidesoftware.code-spell-checker"
+            ],
+            "settings": {
+                "editor.formatOnSave": true,
+                "editor.defaultFormatter": "esbenp.prettier-vscode",
+                "editor.codeActionsOnSave": {
+                    "source.fixAll.eslint": true
+                }
+            }
+        }
+    },
+    "forwardPorts": [
+        3001
+    ],
+    "updateRemoteUserUID": true,
+    "postStartCommand": "echo 'Dev container started, node_modules should have proper permissions now'"
+}

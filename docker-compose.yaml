@@ -13,8 +13,10 @@ services:
       - .:/app
       - ./docker/volumes/certs:/etc/openvpn/certs
       - ./docker/volumes/logs:/var/log/openvpn
+      - ./databases:/app/databases:cached
     ports:
       - "${OPENVPN_PORT}:${OPENVPN_PORT}/udp"
+      - "8000:8000"  # Puerto para la API
     environment:
       - VPN_NETWORK=${VPN_NETWORK}
       - VPN_NETMASK=${VPN_NETMASK}
@@ -22,6 +24,7 @@ services:
       - OPENVPN_PROTO=${OPENVPN_PROTO}
       - TUN_DEVICE=${TUN_DEVICE}
       - PUBLIC_IP=${PUBLIC_IP}
+      - LOG_LEVEL=INFO
     logging:
       driver: "json-file"
       options:
@@ -45,6 +48,29 @@ services:
     networks:
       - subnetx
 
+  ui:
+    build:
+      context: .
+      dockerfile: ./docker/ui.Dockerfile
+    container_name: subnetx_ui
+    volumes:
+      - ./ui:/workspace/ui:cached
+      - ui-node-modules:/workspace/ui/node_modules
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://subnetx_vpn:8000
+      - WATCHPACK_POLLING=true
+    networks:
+      - subnetx
+    depends_on:
+      - subnetx
+
 networks:
   subnetx:
     driver: bridge
+
+volumes:
+  ui-node-modules:
+    name: subnetx-ui-node-modules

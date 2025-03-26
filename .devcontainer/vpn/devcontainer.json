@@ -1,6 +1,6 @@
 {
     "name": "SubnetX Development",
-    "dockerComposeFile": "../docker-compose.yaml",
+    "dockerComposeFile": "../../docker-compose.yaml",
     "service": "subnetx",
     "workspaceFolder": "/app",
     "mounts": [
