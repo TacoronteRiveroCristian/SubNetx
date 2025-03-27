@@ -71,6 +71,27 @@ services:
       - subnetx
     restart: unless-stopped
 
+  postgres:
+    image: postgres:15-alpine
+    container_name: subnetx_postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    networks:
+      - subnetx
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 networks:
   subnetx:
     driver: bridge
@@ -80,3 +101,5 @@ volumes:
     name: subnetx_ui_node_modules
   ui_next_cache:
     name: subnetx_ui_next_cache
+  postgres_data:
+    name: subnetx_postgres_data

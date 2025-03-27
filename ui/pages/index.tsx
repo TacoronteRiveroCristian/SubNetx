@@ -559,13 +559,19 @@ export default function Home() {
               target.style.transform = 'none';
               target.style.boxShadow = 'none';
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.8rem', height: '24px' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginBottom: '0.8rem',
+                height: '24px'
+              }}>
                 <span className="material-icons" style={{
                   fontSize: '20px',
                   color: calculateSystemHealth(targetsWithStatus) >= 80 ? '#4CAF50' :
                          calculateSystemHealth(targetsWithStatus) >= 60 ? '#FF9800' : '#F44336'
                 }}>
-                  monitoring
+                  monitor_heart
                 </span>
                 <h3 style={{ margin: 0, fontSize: '1rem' }}>System Health</h3>
               </div>
