@@ -132,8 +132,6 @@ export default function Dashboard() {
   const [isUpdating, setIsUpdating] = useState(false);
   // State to track if hamburger menu is open
   const [isHamburgerOpen, setIsHamburgerOpen] = useState(false);
-  // State to track if menu is in closing animation
-  const [isMenuClosing, setIsMenuClosing] = useState(false);
   // Ref to store the interval ID for cleanup
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   // Add these new states at the top with other states
@@ -396,15 +394,6 @@ export default function Dashboard() {
     localStorage.removeItem('isAuthenticated');
     // Redirect to login page
     router.push('/login');
-  };
-
-  // Function to handle menu close with animation
-  const handleMenuClose = () => {
-    setIsMenuClosing(true);
-    setTimeout(() => {
-      setIsHamburgerOpen(false);
-      setIsMenuClosing(false);
-    }, 300); // Match this with the animation duration
   };
 
   return (
@@ -683,8 +672,7 @@ export default function Dashboard() {
             gap: '1rem',
             boxShadow: '-2px 0 8px rgba(0,0,0,0.1)',
             transform: isHamburgerOpen ? 'translateX(0)' : 'translateX(100%)',
-            transition: 'transform 0.3s ease, opacity 0.3s ease',
-            opacity: isHamburgerOpen ? 1 : 0
+            transition: 'transform 0.3s ease'
           }}
         >
           <div style={{
