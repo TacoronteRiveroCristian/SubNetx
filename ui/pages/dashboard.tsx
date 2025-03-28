@@ -7,6 +7,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useEffect, useRef, useState } from 'react';
 import BackgroundEffect from '../components/BackgroundEffect'; // Import BackgroundEffect component
+import Logo from '../components/Logo';
 
 // Define the Target interface to type our data
 interface Target {
@@ -288,42 +289,36 @@ export default function Dashboard() {
   // Get current theme colors
   const currentTheme = themes[theme];
 
-  // Add this sorting function before the return statement
+  // Añadir esta función antes del return del componente Dashboard
+  const getComparableValue = (item: TargetWithStatus, key: string) => {
+    const { target, latestStatus } = item;
+    switch (key) {
+      case 'id':
+        return target.id;
+      case 'target':
+        return target.target.toLowerCase();
+      case 'timestamp':
+        return latestStatus ? new Date(latestStatus.timestamp).getTime() : 0;
+      case 'status':
+        return latestStatus?.status || '';
+      case 'quality':
+        return latestStatus?.connection_quality || '';
+      case 'packetLoss':
+        return latestStatus?.packet_loss_percent || 0;
+      case 'avgRtt':
+        return latestStatus?.avg_rtt || 0;
+      default:
+        return '';
+    }
+  };
+
+  // Modificar la función sortData existente
   const sortData = (data: TargetWithStatus[]) => {
     if (!sortConfig) return data;
 
     return [...data].sort((a, b) => {
-      let aValue: any;
-      let bValue: any;
-
-      switch (sortConfig.key) {
-        case 'id':
-          aValue = a.target.id;
-          bValue = b.target.id;
-          break;
-        case 'target':
-          aValue = a.target.target;
-          bValue = b.target.target;
-          break;
-        case 'status':
-          aValue = a.latestStatus?.status || '';
-          bValue = b.latestStatus?.status || '';
-          break;
-        case 'quality':
-          aValue = a.latestStatus?.connection_quality || '';
-          bValue = b.latestStatus?.connection_quality || '';
-          break;
-        case 'packetLoss':
-          aValue = a.latestStatus?.packet_loss_percent || 0;
-          bValue = b.latestStatus?.packet_loss_percent || 0;
-          break;
-        case 'avgRtt':
-          aValue = a.latestStatus?.avg_rtt || 0;
-          bValue = b.latestStatus?.avg_rtt || 0;
-          break;
-        default:
-          return 0;
-      }
+      const aValue = getComparableValue(a, sortConfig.key);
+      const bValue = getComparableValue(b, sortConfig.key);
 
       if (aValue < bValue) {
         return sortConfig.direction === 'ascending' ? -1 : 1;
@@ -508,14 +503,7 @@ export default function Dashboard() {
           alignItems: 'center'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span className="material-icons" style={{
-              color: currentTheme.primary,
-              fontSize: '24px',
-              animation: 'pulse 2s infinite ease-in-out'
-            }}>
-              hub
-            </span>
-            <h1 style={{ margin: 0, fontSize: '1.1rem' }}>SubNetx Dashboard</h1>
+            <Logo theme={{ primary: currentTheme.primary }} size="small" />
           </div>
 
           <div style={{ display: 'flex', gap: '4px' }}>
@@ -875,94 +863,501 @@ export default function Dashboard() {
               <div style={{ overflowX: 'auto' }}>
                 <table style={{
                   width: '100%',
-                  borderCollapse: 'collapse',
+                  borderCollapse: 'separate',
+                  borderSpacing: '0',
                   backgroundColor: currentTheme.cardBackground,
                   borderRadius: '8px',
-                  overflow: 'hidden'
+                  overflow: 'hidden',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                 }}>
                   <thead>
-                    <tr style={{ backgroundColor: currentTheme.tableHeader }}>
-                      <th style={{ border: `1px solid ${currentTheme.border}`, padding: '12px', textAlign: 'left', cursor: 'pointer' }}
-                          onClick={() => requestSort('id')}>
-                        ID {sortConfig?.key === 'id' && (sortConfig.direction === 'ascending' ? '↑' : '↓')}
+                    <tr style={{
+                      backgroundColor: currentTheme.tableHeader,
+                      height: '40px'
+                    }}>
+                      <th style={{
+                        padding: '8px 12px',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        position: 'relative',
+                        backgroundColor: sortConfig?.key === 'id' ? `${currentTheme.primary}15` : 'transparent',
+                        transition: 'all 0.2s ease',
+                        borderBottom: `2px solid ${currentTheme.border}`,
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        color: currentTheme.text,
+                        opacity: 0.9
+                      }}
+                      onClick={() => requestSort('id')}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = `${currentTheme.primary}25`;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = sortConfig?.key === 'id' ? `${currentTheme.primary}15` : 'transparent';
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          ID
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '2px'
+                          }}>
+                            <span className="material-icons" style={{
+                              fontSize: '14px',
+                              opacity: sortConfig?.key === 'id' ? 1 : 0.5,
+                              color: currentTheme.primary
+                            }}>
+                              {sortConfig?.key === 'id'
+                                ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
+                                : 'sort'
+                              }
+                            </span>
+                            <span style={{
+                              fontSize: '10px',
+                              opacity: 0.6,
+                              color: currentTheme.primary
+                            }}>123</span>
+                          </div>
+                        </div>
                       </th>
-                      <th style={{ border: `1px solid ${currentTheme.border}`, padding: '12px', textAlign: 'left', cursor: 'pointer' }}
-                          onClick={() => requestSort('target')}>
-                        Target {sortConfig?.key === 'target' && (sortConfig.direction === 'ascending' ? '↑' : '↓')}
+                      <th style={{
+                        padding: '8px 12px',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        position: 'relative',
+                        backgroundColor: sortConfig?.key === 'target' ? `${currentTheme.primary}15` : 'transparent',
+                        transition: 'all 0.2s ease',
+                        borderBottom: `2px solid ${currentTheme.border}`,
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        color: currentTheme.text,
+                        opacity: 0.9
+                      }}
+                      onClick={() => requestSort('target')}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = `${currentTheme.primary}25`;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = sortConfig?.key === 'target' ? `${currentTheme.primary}15` : 'transparent';
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          Target
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '2px'
+                          }}>
+                            <span className="material-icons" style={{
+                              fontSize: '14px',
+                              opacity: sortConfig?.key === 'target' ? 1 : 0.5,
+                              color: currentTheme.primary
+                            }}>
+                              {sortConfig?.key === 'target'
+                                ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
+                                : 'sort_by_alpha'
+                              }
+                            </span>
+                            <span style={{
+                              fontSize: '10px',
+                              opacity: 0.6,
+                              color: currentTheme.primary
+                            }}>aZ</span>
+                          </div>
+                        </div>
                       </th>
-                      <th style={{ border: `1px solid ${currentTheme.border}`, padding: '12px', textAlign: 'left', cursor: 'pointer' }}
-                          onClick={() => requestSort('status')}>
-                        Status {sortConfig?.key === 'status' && (sortConfig.direction === 'ascending' ? '↑' : '↓')}
+                      <th style={{
+                        padding: '8px 12px',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        position: 'relative',
+                        backgroundColor: sortConfig?.key === 'timestamp' ? `${currentTheme.primary}15` : 'transparent',
+                        transition: 'all 0.2s ease',
+                        borderBottom: `2px solid ${currentTheme.border}`,
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        color: currentTheme.text,
+                        opacity: 0.9
+                      }}
+                      onClick={() => requestSort('timestamp')}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = `${currentTheme.primary}25`;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = sortConfig?.key === 'timestamp' ? `${currentTheme.primary}15` : 'transparent';
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          Last Update
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '2px'
+                          }}>
+                            <span className="material-icons" style={{
+                              fontSize: '14px',
+                              opacity: sortConfig?.key === 'timestamp' ? 1 : 0.5,
+                              color: currentTheme.primary
+                            }}>
+                              {sortConfig?.key === 'timestamp'
+                                ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
+                                : 'sort'
+                              }
+                            </span>
+                            <span style={{
+                              fontSize: '10px',
+                              opacity: 0.6,
+                              color: currentTheme.primary
+                            }}>123</span>
+                          </div>
+                        </div>
                       </th>
-                      <th style={{ border: `1px solid ${currentTheme.border}`, padding: '12px', textAlign: 'left', cursor: 'pointer' }}
-                          onClick={() => requestSort('quality')}>
-                        Quality {sortConfig?.key === 'quality' && (sortConfig.direction === 'ascending' ? '↑' : '↓')}
+                      <th style={{
+                        padding: '8px 12px',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        position: 'relative',
+                        backgroundColor: sortConfig?.key === 'status' ? `${currentTheme.primary}15` : 'transparent',
+                        transition: 'all 0.2s ease',
+                        borderBottom: `2px solid ${currentTheme.border}`,
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        color: currentTheme.text,
+                        opacity: 0.9
+                      }}
+                      onClick={() => requestSort('status')}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = `${currentTheme.primary}25`;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = sortConfig?.key === 'status' ? `${currentTheme.primary}15` : 'transparent';
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          Status
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '2px'
+                          }}>
+                            <span className="material-icons" style={{
+                              fontSize: '14px',
+                              opacity: sortConfig?.key === 'status' ? 1 : 0.5,
+                              color: currentTheme.primary
+                            }}>
+                              {sortConfig?.key === 'status'
+                                ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
+                                : 'sort'
+                              }
+                            </span>
+                            <span style={{
+                              fontSize: '10px',
+                              opacity: 0.6,
+                              color: currentTheme.primary
+                            }}>123</span>
+                          </div>
+                        </div>
                       </th>
-                      <th style={{ border: `1px solid ${currentTheme.border}`, padding: '12px', textAlign: 'left', cursor: 'pointer' }}
-                          onClick={() => requestSort('packetLoss')}>
-                        Packet Loss {sortConfig?.key === 'packetLoss' && (sortConfig.direction === 'ascending' ? '↑' : '↓')}
+                      <th style={{
+                        padding: '8px 12px',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        position: 'relative',
+                        backgroundColor: sortConfig?.key === 'quality' ? `${currentTheme.primary}15` : 'transparent',
+                        transition: 'all 0.2s ease',
+                        borderBottom: `2px solid ${currentTheme.border}`,
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        color: currentTheme.text,
+                        opacity: 0.9
+                      }}
+                      onClick={() => requestSort('quality')}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = `${currentTheme.primary}25`;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = sortConfig?.key === 'quality' ? `${currentTheme.primary}15` : 'transparent';
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          Quality
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '2px'
+                          }}>
+                            <span className="material-icons" style={{
+                              fontSize: '14px',
+                              opacity: sortConfig?.key === 'quality' ? 1 : 0.5,
+                              color: currentTheme.primary
+                            }}>
+                              {sortConfig?.key === 'quality'
+                                ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
+                                : 'sort'
+                              }
+                            </span>
+                            <span style={{
+                              fontSize: '10px',
+                              opacity: 0.6,
+                              color: currentTheme.primary
+                            }}>123</span>
+                          </div>
+                        </div>
                       </th>
-                      <th style={{ border: `1px solid ${currentTheme.border}`, padding: '12px', textAlign: 'left', cursor: 'pointer' }}
-                          onClick={() => requestSort('avgRtt')}>
-                        Avg RTT {sortConfig?.key === 'avgRtt' && (sortConfig.direction === 'ascending' ? '↑' : '↓')}
+                      <th style={{
+                        padding: '8px 12px',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        position: 'relative',
+                        backgroundColor: sortConfig?.key === 'packetLoss' ? `${currentTheme.primary}15` : 'transparent',
+                        transition: 'all 0.2s ease',
+                        borderBottom: `2px solid ${currentTheme.border}`,
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        color: currentTheme.text,
+                        opacity: 0.9
+                      }}
+                      onClick={() => requestSort('packetLoss')}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = `${currentTheme.primary}25`;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = sortConfig?.key === 'packetLoss' ? `${currentTheme.primary}15` : 'transparent';
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          Packet Loss
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '2px'
+                          }}>
+                            <span className="material-icons" style={{
+                              fontSize: '14px',
+                              opacity: sortConfig?.key === 'packetLoss' ? 1 : 0.5,
+                              color: currentTheme.primary
+                            }}>
+                              {sortConfig?.key === 'packetLoss'
+                                ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
+                                : 'sort'
+                              }
+                            </span>
+                            <span style={{
+                              fontSize: '10px',
+                              opacity: 0.6,
+                              color: currentTheme.primary
+                            }}>123</span>
+                          </div>
+                        </div>
+                      </th>
+                      <th style={{
+                        padding: '8px 12px',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        position: 'relative',
+                        backgroundColor: sortConfig?.key === 'avgRtt' ? `${currentTheme.primary}15` : 'transparent',
+                        transition: 'all 0.2s ease',
+                        borderBottom: `2px solid ${currentTheme.border}`,
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        color: currentTheme.text,
+                        opacity: 0.9
+                      }}
+                      onClick={() => requestSort('avgRtt')}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = `${currentTheme.primary}25`;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = sortConfig?.key === 'avgRtt' ? `${currentTheme.primary}15` : 'transparent';
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          Avg RTT
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '2px'
+                          }}>
+                            <span className="material-icons" style={{
+                              fontSize: '14px',
+                              opacity: sortConfig?.key === 'avgRtt' ? 1 : 0.5,
+                              color: currentTheme.primary
+                            }}>
+                              {sortConfig?.key === 'avgRtt'
+                                ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
+                                : 'sort'
+                              }
+                            </span>
+                            <span style={{
+                              fontSize: '10px',
+                              opacity: 0.6,
+                              color: currentTheme.primary
+                            }}>123</span>
+                          </div>
+                        </div>
                       </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {sortData(filterData(targetsWithStatus)).map(({ target, latestStatus }) => (
+                    {sortData(filterData(targetsWithStatus)).map(({ target, latestStatus }, index) => (
                       <tr
                         key={target.id}
                         style={{
-                          backgroundColor: latestStatus?.status === 'timeout' ? currentTheme.errorBackground : currentTheme.tableRow
+                          backgroundColor: latestStatus?.status === 'timeout'
+                            ? `${currentTheme.errorBackground}80`
+                            : index % 2 === 0
+                              ? currentTheme.tableRow
+                              : `${currentTheme.tableRowHover}30`,
+                          transition: 'all 0.2s ease'
                         }}
                         className="target-row"
-                        onMouseEnter={(e) => {
-                          (e.currentTarget as HTMLElement).style.backgroundColor = currentTheme.tableRowHover;
-                        }}
-                        onMouseLeave={(e) => {
-                          (e.currentTarget as HTMLElement).style.backgroundColor =
-                            latestStatus?.status === 'timeout' ? currentTheme.errorBackground : currentTheme.tableRow;
-                        }}
                       >
-                        <td style={{ border: `1px solid ${currentTheme.border}`, padding: '8px' }}>{target.id}</td>
-                        <td style={{ border: `1px solid ${currentTheme.border}`, padding: '8px', fontWeight: 'bold' }}>{target.target}</td>
-                        <td style={{ border: `1px solid ${currentTheme.border}`, padding: '8px' }}>
+                        <td style={{
+                          padding: '8px 12px',
+                          fontSize: '0.85rem',
+                          borderBottom: `1px solid ${currentTheme.border}30`
+                        }}>{target.id}</td>
+                        <td style={{
+                          padding: '8px 12px',
+                          fontSize: '0.85rem',
+                          fontWeight: '500',
+                          borderBottom: `1px solid ${currentTheme.border}30`
+                        }}>{target.target}</td>
+                        <td style={{
+                          padding: '8px 12px',
+                          fontSize: '0.85rem',
+                          color: `${currentTheme.text}90`,
+                          borderBottom: `1px solid ${currentTheme.border}30`
+                        }}>
+                          {latestStatus ? new Date(latestStatus.timestamp).toLocaleString() : 'N/A'}
+                        </td>
+                        <td style={{
+                          padding: '8px 12px',
+                          fontSize: '0.85rem',
+                          borderBottom: `1px solid ${currentTheme.border}30`
+                        }}>
                           <div style={{
-                            display: 'inline-flex',
+                            color: latestStatus?.status === 'online' ? '#4CAF50' : '#F44336',
+                            fontWeight: '500',
+                            display: 'flex',
                             alignItems: 'center',
-                            gap: '4px',
-                            padding: '4px 8px',
-                            borderRadius: '4px',
-                            backgroundColor: getStatusColor(latestStatus?.connection_quality || 'none'),
-                            color: '#ffffff',
-                            fontSize: '0.9rem'
+                            gap: '4px'
                           }}>
-                            <span className="material-icons" style={{ fontSize: '16px' }}>
-                              {latestStatus?.status === 'online' ? 'check_circle' : 'error'}
-                            </span>
+                            <span style={{
+                              width: '8px',
+                              height: '8px',
+                              borderRadius: '50%',
+                              backgroundColor: latestStatus?.status === 'online' ? '#4CAF50' : '#F44336',
+                              display: 'inline-block'
+                            }}></span>
                             {latestStatus?.status || 'N/A'}
                           </div>
                         </td>
-                        <td style={{ border: `1px solid ${currentTheme.border}`, padding: '8px' }}>
+                        <td style={{
+                          padding: '8px 12px',
+                          fontSize: '0.85rem',
+                          borderBottom: `1px solid ${currentTheme.border}30`
+                        }}>
                           <div style={{
                             color: getStatusColor(latestStatus?.connection_quality || 'none'),
-                            fontWeight: 'bold'
+                            fontWeight: '500',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
                           }}>
+                            <span style={{
+                              width: '8px',
+                              height: '8px',
+                              borderRadius: '50%',
+                              backgroundColor: getStatusColor(latestStatus?.connection_quality || 'none'),
+                              display: 'inline-block'
+                            }}></span>
                             {latestStatus?.connection_quality || 'N/A'}
                           </div>
                         </td>
-                        <td style={{ border: `1px solid ${currentTheme.border}`, padding: '8px' }}>
+                        <td style={{
+                          padding: '8px 12px',
+                          fontSize: '0.85rem',
+                          borderBottom: `1px solid ${currentTheme.border}30`
+                        }}>
                           {latestStatus ? (
                             <div style={{
                               color: latestStatus.packet_loss_percent > 0 ? '#F44336' : '#4CAF50',
-                              fontWeight: 'bold'
+                              fontWeight: '500',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
                             }}>
+                              <span style={{
+                                width: '8px',
+                                height: '8px',
+                                borderRadius: '50%',
+                                backgroundColor: latestStatus.packet_loss_percent > 0 ? '#F44336' : '#4CAF50',
+                                display: 'inline-block'
+                              }}></span>
                               {latestStatus.packet_loss_percent}%
                             </div>
                           ) : 'N/A'}
                         </td>
-                        <td style={{ border: `1px solid ${currentTheme.border}`, padding: '8px', fontWeight: 'bold' }}>
-                          {latestStatus?.avg_rtt || 'N/A'}
+                        <td style={{
+                          padding: '8px 12px',
+                          fontSize: '0.85rem',
+                          fontWeight: '500',
+                          borderBottom: `1px solid ${currentTheme.border}30`
+                        }}>
+                          {latestStatus ? (
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              <span style={{
+                                width: '8px',
+                                height: '8px',
+                                borderRadius: '50%',
+                                backgroundColor: latestStatus.avg_rtt > 100 ? '#F44336' :
+                                               latestStatus.avg_rtt > 50 ? '#FF9800' : '#4CAF50',
+                                display: 'inline-block'
+                              }}></span>
+                              {latestStatus.avg_rtt}
+                            </div>
+                          ) : 'N/A'}
                         </td>
                       </tr>
                     ))}
@@ -970,37 +1365,186 @@ export default function Dashboard() {
                 </table>
               </div>
 
-              {/* ICMP Response Details */}
+              {/* Detailed Online Targets Information */}
               {targetsWithStatus.map(({ target, latestStatus }) => (
-                latestStatus && latestStatus.icmp_details.length > 0 && (
+                latestStatus && latestStatus.status === 'online' && (
                   <div key={`detail-${target.id}`} style={{
-                    marginBottom: '1rem',
-                    padding: '0.5rem',
+                    marginTop: '1rem',
+                    padding: '0.75rem',
                     border: `1px solid ${currentTheme.border}`,
-                    borderRadius: '4px',
+                    borderRadius: '8px',
                     backgroundColor: currentTheme.cardBackground
                   }}>
-                    <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.2rem' }}>ICMP Response Details: {target.target}</h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.5rem' }}>
-                      {latestStatus.icmp_details.map((ping, index) => (
-                        <div key={index} style={{
-                          padding: '0.3rem',
-                          backgroundColor: currentTheme.background,
-                          border: `1px solid ${currentTheme.border}`,
-                          borderRadius: '4px',
-                          textAlign: 'center'
+                    {/* Header with target info */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      marginBottom: '0.5rem'
+                    }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{
+                          fontSize: '1rem',
+                          fontWeight: '500',
+                          color: currentTheme.text
                         }}>
-                          <div style={{ fontSize: '0.8rem', color: currentTheme.text }}>Sequence {ping.sequence}</div>
-                          <div style={{
-                            fontSize: '1.2rem',
-                            fontWeight: 'bold',
-                            marginTop: '0.3rem',
-                            color: ping.response_time_ms > 100 ? '#F44336' : ping.response_time_ms > 50 ? '#FF9800' : '#4CAF50'
-                          }}>
-                            {ping.response_time_ms} ms
+                          {target.target}
+                        </div>
+                        <div style={{
+                          fontSize: '0.75rem',
+                          color: currentTheme.text,
+                          opacity: 0.7
+                        }}>
+                          Last Update: {new Date(latestStatus.timestamp).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Stats Grid */}
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                      gap: '0.5rem',
+                      marginBottom: '0.5rem'
+                    }}>
+                      {/* RTT Stats */}
+                      <div style={{
+                        padding: '0.5rem',
+                        backgroundColor: currentTheme.background,
+                        borderRadius: '6px',
+                        border: `1px solid ${currentTheme.border}`
+                      }}>
+                        <div style={{ fontSize: '0.85rem', color: currentTheme.text, marginBottom: '0.25rem' }}>
+                          RTT Statistics
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem' }}>
+                          <div>
+                            <div style={{ color: currentTheme.text, opacity: 0.8, fontSize: '0.75rem' }}>Min</div>
+                            <div style={{ color: '#4CAF50', fontWeight: '500' }}>{latestStatus.min_rtt} ms</div>
+                          </div>
+                          <div>
+                            <div style={{ color: currentTheme.text, opacity: 0.8, fontSize: '0.75rem' }}>Max</div>
+                            <div style={{ color: '#F44336', fontWeight: '500' }}>{latestStatus.max_rtt} ms</div>
+                          </div>
+                          <div>
+                            <div style={{ color: currentTheme.text, opacity: 0.8, fontSize: '0.75rem' }}>Avg</div>
+                            <div style={{ color: '#2196F3', fontWeight: '500' }}>{latestStatus.avg_rtt} ms</div>
+                          </div>
+                          <div>
+                            <div style={{ color: currentTheme.text, opacity: 0.8, fontSize: '0.75rem' }}>Mdev</div>
+                            <div style={{ color: '#FF9800', fontWeight: '500' }}>{latestStatus.mdev_rtt} ms</div>
                           </div>
                         </div>
-                      ))}
+                      </div>
+
+                      {/* Packet Stats */}
+                      <div style={{
+                        padding: '0.5rem',
+                        backgroundColor: currentTheme.background,
+                        borderRadius: '6px',
+                        border: `1px solid ${currentTheme.border}`
+                      }}>
+                        <div style={{ fontSize: '0.85rem', color: currentTheme.text, marginBottom: '0.25rem' }}>
+                          Packet Statistics
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem' }}>
+                          <div>
+                            <div style={{ color: currentTheme.text, opacity: 0.8, fontSize: '0.75rem' }}>Transmitted</div>
+                            <div style={{ color: currentTheme.primary, fontWeight: '500' }}>
+                              {latestStatus.packets_transmitted}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ color: currentTheme.text, opacity: 0.8, fontSize: '0.75rem' }}>Received</div>
+                            <div style={{ color: currentTheme.primary, fontWeight: '500' }}>
+                              {latestStatus.packets_received}
+                            </div>
+                          </div>
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <div style={{ color: currentTheme.text, opacity: 0.8, fontSize: '0.75rem' }}>Packet Loss</div>
+                            <div style={{
+                              color: latestStatus.packet_loss_percent > 0 ? '#F44336' : '#4CAF50',
+                              fontWeight: '500'
+                            }}>
+                              {latestStatus.packet_loss_percent}%
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* ICMP Response Details */}
+                      <div style={{
+                        padding: '0.5rem',
+                        backgroundColor: currentTheme.background,
+                        borderRadius: '6px',
+                        border: `1px solid ${currentTheme.border}`
+                      }}>
+                        <div style={{ fontSize: '0.85rem', color: currentTheme.text, marginBottom: '0.25rem' }}>
+                          ICMP Response Times
+                        </div>
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(5, 1fr)',
+                          gap: '0.25rem'
+                        }}>
+                          {latestStatus.icmp_details.map((ping, index) => (
+                            <div key={index} style={{
+                              textAlign: 'center',
+                              padding: '0.25rem',
+                              borderRadius: '4px',
+                              backgroundColor: currentTheme.cardBackground
+                            }}>
+                              <div style={{
+                                fontSize: '0.9rem',
+                                fontWeight: '500',
+                                color: ping.response_time_ms > 100 ? '#F44336' :
+                                      ping.response_time_ms > 50 ? '#FF9800' : '#4CAF50'
+                              }}>
+                                {ping.response_time_ms.toFixed(1)}
+                              </div>
+                              <div style={{
+                                fontSize: '0.65rem',
+                                color: currentTheme.text,
+                                opacity: 0.6
+                              }}>
+                                seq {ping.sequence}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* TLS Info if available */}
+                      {latestStatus.tls_info.cert_expiry && (
+                        <div style={{
+                          padding: '0.5rem',
+                          backgroundColor: currentTheme.background,
+                          borderRadius: '6px',
+                          border: `1px solid ${currentTheme.border}`
+                        }}>
+                          <div style={{ fontSize: '0.85rem', color: currentTheme.text, marginBottom: '0.25rem' }}>
+                            TLS Information
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: currentTheme.text }}>
+                            <div style={{ marginBottom: '0.25rem' }}>
+                              <span style={{ opacity: 0.8 }}>Expires:</span>{' '}
+                              {new Date(latestStatus.tls_info.cert_expiry).toLocaleDateString()}
+                            </div>
+                            {latestStatus.tls_info.issuer && (
+                              <div style={{ marginBottom: '0.25rem' }}>
+                                <span style={{ opacity: 0.8 }}>Issuer:</span>{' '}
+                                {latestStatus.tls_info.issuer}
+                              </div>
+                            )}
+                            {latestStatus.tls_info.version && (
+                              <div>
+                                <span style={{ opacity: 0.8 }}>Version:</span>{' '}
+                                {latestStatus.tls_info.version}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )
