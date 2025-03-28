@@ -469,9 +469,9 @@ export default function Dashboard() {
             font-size: 18px;
           }
           @keyframes pulse {
-            0% { opacity: 0.7; transform: scale(1); }
-            50% { opacity: 1; transform: scale(1.1); }
-            100% { opacity: 0.7; transform: scale(1); }
+            0% { opacity: 0.6; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.02); }
+            100% { opacity: 0.6; transform: scale(1); }
           }
           @keyframes spin {
             from { transform: rotate(0deg); }
@@ -502,24 +502,36 @@ export default function Dashboard() {
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1px' }}>
             <Logo theme={{ primary: currentTheme.primary }} size="small" />
           </div>
 
-          <div style={{ display: 'flex', gap: '4px' }}>
+          <div style={{ display: 'flex', gap: '2px' }}>
             <button
               onClick={toggleMonitoring}
               className="nav-button"
               disabled={loading}
-              style={{ position: 'relative', overflow: 'hidden' }}
+              style={{
+                position: 'relative',
+                overflow: 'hidden',
+                gap: '2px',
+                animation: isMonitoring ? 'pulse 2s infinite' : 'none',
+                color: isUpdating ? '#F44336' : isMonitoring ? currentTheme.primary : currentTheme.text
+              }}
             >
               <span className="material-icons" style={{
                 transform: isMonitoring ? 'scale(1)' : 'scale(1.2)',
-                transition: 'transform 0.3s ease',
+                transition: 'all 0.3s ease',
+                color: 'inherit'
               }}>
                 {isMonitoring ? 'motion_photos_pause' : 'play_circle'}
               </span>
-              {loading ? 'Loading...' : isMonitoring ? 'Stop' : 'Start'}
+              <span style={{
+                color: 'inherit',
+                transition: 'color 0.3s ease'
+              }}>
+                {loading ? 'Loading...' : isMonitoring ? 'Stop' : 'Start'}
+              </span>
             </button>
 
             {!isMonitoring && (
@@ -663,8 +675,7 @@ export default function Dashboard() {
                 }}>
                   <span className="material-icons" style={{
                     fontSize: '20px',
-                    color: calculateSystemHealth(targetsWithStatus) >= 80 ? '#4CAF50' :
-                           calculateSystemHealth(targetsWithStatus) >= 60 ? '#FF9800' : '#F44336'
+                    color: currentTheme.primary
                   }}>
                     monitor_heart
                   </span>
@@ -785,33 +796,69 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Monitoring Status Indicator */}
-          {isMonitoring && (
+          {/* Settings Panel */}
+          {showSettings && (
             <div style={{
-              backgroundColor: currentTheme.statusIndicator,
-              padding: '0.5rem 1rem',
-              borderRadius: '4px',
-              marginBottom: '1rem',
-              display: 'flex',
-              alignItems: 'center',
-              color: currentTheme.text
+              position: 'absolute',
+              top: '100%',
+              right: '1rem',
+              backgroundColor: currentTheme.cardBackground,
+              borderRadius: '8px',
+              border: `1px solid ${currentTheme.border}`,
+              padding: '1rem',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              zIndex: 1000,
+              minWidth: '250px',
+              marginTop: '0.5rem'
             }}>
               <div style={{
-                width: '10px',
-                height: '10px',
-                borderRadius: '50%',
-                backgroundColor: isUpdating ? '#F44336' : currentTheme.secondary,
-                marginRight: '8px',
-                animation: isUpdating ? 'none' : 'pulse 2s infinite'
-              }}></div>
-              <style jsx>{`
-                @keyframes pulse {
-                  0% { opacity: 1; }
-                  50% { opacity: 0.3; }
-                  100% { opacity: 1; }
-                }
-              `}</style>
-              Monitoring active - Data refreshes every {refreshInterval} seconds
+                borderBottom: `1px solid ${currentTheme.border}`,
+                paddingBottom: '0.5rem',
+                marginBottom: '1rem'
+              }}>
+                <h3 style={{ margin: 0, fontSize: '1rem', color: currentTheme.text }}>Settings</h3>
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '0.5rem',
+                  fontSize: '0.85rem',
+                  color: currentTheme.text
+                }}>
+                  Monitoring Interval (seconds)
+                </label>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <input
+                    type="range"
+                    min="5"
+                    max="60"
+                    value={refreshInterval}
+                    onChange={(e) => updateRefreshInterval(parseInt(e.target.value))}
+                    style={{ flex: 1 }}
+                  />
+                  <input
+                    type="number"
+                    min="5"
+                    max="60"
+                    value={refreshInterval}
+                    onChange={(e) => updateRefreshInterval(parseInt(e.target.value))}
+                    style={{
+                      width: '60px',
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      border: `1px solid ${currentTheme.border}`,
+                      backgroundColor: currentTheme.background,
+                      color: currentTheme.text,
+                      fontSize: '0.85rem'
+                    }}
+                  />
+                </div>
+              </div>
             </div>
           )}
 
