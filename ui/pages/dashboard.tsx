@@ -132,6 +132,8 @@ export default function Dashboard() {
   const [isUpdating, setIsUpdating] = useState(false);
   // State to track if hamburger menu is open
   const [isHamburgerOpen, setIsHamburgerOpen] = useState(false);
+  // State to track if menu is in closing animation
+  const [isMenuClosing, setIsMenuClosing] = useState(false);
   // Ref to store the interval ID for cleanup
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   // Add these new states at the top with other states
@@ -396,6 +398,15 @@ export default function Dashboard() {
     router.push('/login');
   };
 
+  // Function to handle menu close with animation
+  const handleMenuClose = () => {
+    setIsMenuClosing(true);
+    setTimeout(() => {
+      setIsHamburgerOpen(false);
+      setIsMenuClosing(false);
+    }, 300); // Match this with the animation duration
+  };
+
   return (
     <>
       <Head>
@@ -492,6 +503,42 @@ export default function Dashboard() {
           }
           .hamburger-menu.closing {
             animation: slideOut 0.3s ease forwards;
+          }
+          /* Estilos para el slider */
+          input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+          }
+          input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #4CAF50;
+            border-radius: 50%;
+            cursor: pointer;
+            margin-top: -5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: all 0.2s ease;
+          }
+          input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+          }
+          input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: #4CAF50;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: all 0.2s ease;
+          }
+          input[type="range"]::-moz-range-thumb:hover {
+            transform: scale(1.1);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
           }
         `}</style>
       </Head>
@@ -618,35 +665,47 @@ export default function Dashboard() {
         )}
 
         {/* Hamburger Menu */}
-        <div className={`hamburger-menu ${!isHamburgerOpen ? 'closing' : ''}`} style={{
-          position: 'fixed',
-          top: '60px',
-          right: 0,
-          width: '280px',
-          height: 'calc(100vh - 60px)',
-          backgroundColor: `${currentTheme.cardBackground}99`,
-          backdropFilter: 'blur(10px)',
-          borderLeft: `1px solid ${currentTheme.border}`,
-          padding: '1.5rem 1rem',
-          zIndex: 999,
-          display: isHamburgerOpen ? 'flex' : 'none',
-          flexDirection: 'column',
-          gap: '0.75rem',
-          boxShadow: '-2px 0 8px rgba(0,0,0,0.1)',
-          transform: isHamburgerOpen ? 'translateX(0)' : 'translateX(100%)',
-          transition: 'transform 0.3s ease'
-        }}>
+        <div
+          className={`hamburger-menu ${!isHamburgerOpen ? 'closing' : ''}`}
+          style={{
+            position: 'fixed',
+            top: '60px',
+            right: 0,
+            width: '320px',
+            height: 'calc(100vh - 60px)',
+            backgroundColor: `${currentTheme.cardBackground}99`,
+            backdropFilter: 'blur(10px)',
+            borderLeft: `1px solid ${currentTheme.border}`,
+            padding: '2rem 1.5rem',
+            zIndex: 999,
+            display: isHamburgerOpen ? 'flex' : 'none',
+            flexDirection: 'column',
+            gap: '1rem',
+            boxShadow: '-2px 0 8px rgba(0,0,0,0.1)',
+            transform: isHamburgerOpen ? 'translateX(0)' : 'translateX(100%)',
+            transition: 'transform 0.3s ease, opacity 0.3s ease',
+            opacity: isHamburgerOpen ? 1 : 0
+          }}
+        >
           <div style={{
             borderBottom: `1px solid ${currentTheme.border}`,
-            paddingBottom: '1rem',
+            paddingBottom: '1.5rem',
             marginBottom: '0.5rem'
           }}>
             <h3 style={{
               margin: 0,
-              fontSize: '1.1rem',
+              fontSize: '1.3rem',
               color: currentTheme.text,
-              fontWeight: '500'
-            }}>Menu</h3>
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <span className="material-icons" style={{ fontSize: '24px', color: currentTheme.primary }}>
+                menu
+              </span>
+              Menu
+            </h3>
           </div>
 
           {!isMonitoring && (
@@ -657,57 +716,112 @@ export default function Dashboard() {
               style={{
                 width: '100%',
                 justifyContent: 'flex-start',
-                padding: '12px 16px',
-                borderRadius: '8px',
-                transition: 'all 0.2s ease'
+                padding: '1rem 1.25rem',
+                borderRadius: '12px',
+                transition: 'all 0.2s ease',
+                fontSize: '1rem',
+                backgroundColor: `${currentTheme.buttonHover}30`,
+                border: `1px solid ${currentTheme.border}`
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = `${currentTheme.buttonHover}80`;
+                e.currentTarget.style.backgroundColor = `${currentTheme.buttonHover}50`;
                 e.currentTarget.style.transform = 'translateX(4px)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.backgroundColor = `${currentTheme.buttonHover}30`;
                 e.currentTarget.style.transform = 'translateX(0)';
+                e.currentTarget.style.boxShadow = 'none';
               }}
             >
               <span className="material-icons" style={{
                 animation: isUpdating ? 'spin 1s linear infinite' : 'none',
-                marginRight: '12px'
+                marginRight: '12px',
+                fontSize: '24px'
               }}>
                 refresh
               </span>
-              {loading ? 'Loading...' : 'Refresh'}
+              {loading ? 'Loading...' : 'Refresh Data'}
             </button>
           )}
 
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="nav-button"
-            style={{
-              width: '100%',
-              justifyContent: 'flex-start',
-              padding: '12px 16px',
-              borderRadius: '8px',
-              transition: 'all 0.2s ease'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = `${currentTheme.buttonHover}80`;
-              e.currentTarget.style.transform = 'translateX(4px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.transform = 'translateX(0)';
-            }}
-          >
-            <span className="material-icons" style={{
-              transform: showSettings ? 'rotate(45deg)' : 'rotate(0deg)',
-              transition: 'transform 0.3s ease',
-              marginRight: '12px'
+          <div style={{
+            backgroundColor: `${currentTheme.buttonHover}20`,
+            borderRadius: '12px',
+            padding: '1.25rem',
+            border: `1px solid ${currentTheme.border}`
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              marginBottom: '1rem'
             }}>
-              settings
-            </span>
-            Settings
-          </button>
+              <span className="material-icons" style={{ fontSize: '24px', color: currentTheme.primary }}>
+                settings
+              </span>
+              <h4 style={{ margin: 0, fontSize: '1.1rem', color: currentTheme.text }}>Settings</h4>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{
+                display: 'block',
+                marginBottom: '0.75rem',
+                fontSize: '0.9rem',
+                color: currentTheme.text,
+                opacity: 0.9
+              }}>
+                Monitoring Interval
+              </label>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1rem'
+              }}>
+                <input
+                  type="range"
+                  min="5"
+                  max="60"
+                  value={refreshInterval}
+                  onChange={(e) => updateRefreshInterval(parseInt(e.target.value))}
+                  style={{
+                    flex: 1,
+                    height: '6px',
+                    borderRadius: '3px',
+                    backgroundColor: currentTheme.border,
+                    outline: 'none',
+                    WebkitAppearance: 'none',
+                    appearance: 'none'
+                  }}
+                />
+                <input
+                  type="number"
+                  min="5"
+                  max="60"
+                  value={refreshInterval}
+                  onChange={(e) => updateRefreshInterval(parseInt(e.target.value))}
+                  style={{
+                    width: '70px',
+                    padding: '0.5rem',
+                    borderRadius: '8px',
+                    border: `1px solid ${currentTheme.border}`,
+                    backgroundColor: currentTheme.background,
+                    color: currentTheme.text,
+                    fontSize: '0.9rem',
+                    textAlign: 'center'
+                  }}
+                />
+              </div>
+              <div style={{
+                fontSize: '0.8rem',
+                color: currentTheme.text,
+                opacity: 0.7,
+                marginTop: '0.5rem'
+              }}>
+                {isMonitoring ? `Active - Updates every ${refreshInterval}s` : 'Updates will occur every'}
+              </div>
+            </div>
+          </div>
 
           <button
             onClick={toggleTheme}
@@ -715,27 +829,75 @@ export default function Dashboard() {
             style={{
               width: '100%',
               justifyContent: 'flex-start',
-              padding: '12px 16px',
-              borderRadius: '8px',
-              transition: 'all 0.2s ease'
+              padding: '1rem 1.25rem',
+              borderRadius: '12px',
+              transition: 'all 0.2s ease',
+              fontSize: '1rem',
+              backgroundColor: `${currentTheme.primary}15`,
+              border: `1px solid ${currentTheme.primary}30`,
+              color: currentTheme.primary
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = `${currentTheme.buttonHover}80`;
+              e.currentTarget.style.backgroundColor = `${currentTheme.primary}25`;
               e.currentTarget.style.transform = 'translateX(4px)';
+              e.currentTarget.style.boxShadow = `0 4px 12px ${currentTheme.primary}20`;
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.backgroundColor = `${currentTheme.primary}15`;
               e.currentTarget.style.transform = 'translateX(0)';
+              e.currentTarget.style.boxShadow = 'none';
             }}
           >
             <span className="material-icons" style={{
               transition: 'transform 0.4s ease, opacity 0.3s ease',
               transform: theme === 'light' ? 'translateY(0)' : 'translateY(-2px) rotate(180deg)',
-              marginRight: '12px'
+              marginRight: '12px',
+              fontSize: '24px'
             }}>
               {theme === 'light' ? 'light_mode' : 'dark_mode'}
             </span>
             {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+          </button>
+
+          <button
+            onClick={handleLogout}
+            className="nav-button"
+            style={{
+              width: '100%',
+              justifyContent: 'flex-start',
+              padding: '1rem 1.25rem',
+              borderRadius: '12px',
+              transition: 'all 0.2s ease',
+              fontSize: '1rem',
+              backgroundColor: `${currentTheme.errorBackground}30`,
+              border: `1px solid ${currentTheme.errorBackground}50`,
+              color: '#F44336'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = `${currentTheme.errorBackground}50`;
+              e.currentTarget.style.transform = 'translateX(4px)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(244,67,54,0.2)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = `${currentTheme.errorBackground}30`;
+              e.currentTarget.style.transform = 'translateX(0)';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          >
+            <span className="material-icons" style={{
+              transition: 'transform 0.3s ease',
+              fontSize: '24px',
+              marginRight: '12px'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateX(3px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateX(0)';
+            }}>
+              logout
+            </span>
+            Logout
           </button>
         </div>
 
