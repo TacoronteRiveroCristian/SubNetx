@@ -109,7 +109,7 @@ export default function Home() {
   // State to track if real-time monitoring is active
   const [isMonitoring, setIsMonitoring] = useState(false);
   // State to track the current theme
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   // State to track if settings panel is open
   const [showSettings, setShowSettings] = useState(false);
   // State to track refresh interval

@@ -3,6 +3,7 @@
  * Provides global layouts and handles page transitions
  */
 import { AppProps } from 'next/app'; // Import AppProps type for typing
+import Head from 'next/head';
 import { useRouter } from 'next/router'; // Import useRouter for navigation tracking
 import { useEffect, useState } from 'react'; // Import hooks for state and side effects
 
@@ -38,6 +39,26 @@ export default function App({ Component, pageProps }: AppProps) {
       '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif';
   }, []);
 
-  // Render the current page component with its props
-  return <Component {...pageProps} />;
+  return (
+    <>
+      <Head>
+        <style>{`
+          :root[data-theme='dark'] {
+            color-scheme: dark;
+          }
+
+          html {
+            background-color: #1a1a1a !important;
+            color: #ffffff !important;
+          }
+
+          body {
+            background-color: #1a1a1a !important;
+            color: #ffffff !important;
+          }
+        `}</style>
+      </Head>
+      <Component {...pageProps} />
+    </>
+  );
 }

@@ -6,6 +6,7 @@
 import Head from 'next/head'; // Import Head for document head modifications
 import { useRouter } from 'next/router'; // Import useRouter for navigation
 import { useEffect, useState } from 'react'; // Import useState and useEffect hooks
+import BackgroundEffect from '../components/BackgroundEffect'; // Import BackgroundEffect component
 import Footer from '../components/Footer';
 import Logo from '../components/Logo';
 
@@ -18,7 +19,6 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [mousePosition, setMousePosition] = useState({ x: 50, y: 50 });
 
   // Check if user is already authenticated on mount
   useEffect(() => {
@@ -26,16 +26,6 @@ export default function Login() {
     if (localStorage.getItem('isAuthenticated') === 'true') {
       router.push('/');
     }
-
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePosition({
-        x: (e.clientX / window.innerWidth) * 100,
-        y: (e.clientY / window.innerHeight) * 100
-      });
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
   }, [router]);
 
   // Handle form submission
@@ -109,72 +99,6 @@ export default function Login() {
           z-index: 1;
         }
 
-        .background {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100vw;
-          height: 100vh;
-          background-color: ${theme.background};
-          overflow: hidden;
-          z-index: 0;
-        }
-
-        .network-grid {
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          width: 200vw;
-          height: 200vh;
-          transform-origin: center;
-          transform: translate(-50%, -50%)
-                    perspective(2000px)
-                    rotateX(${(mousePosition.y - 50) * 0.1}deg)
-                    rotateY(${(mousePosition.x - 50) * 0.1}deg);
-          background-image:
-            radial-gradient(circle at ${mousePosition.x}% ${mousePosition.y}%, rgba(102, 187, 106, 0.15) 0%, transparent 35%),
-            repeating-linear-gradient(rgba(255, 255, 255, 0.03) 0px, rgba(255, 255, 255, 0.03) 1px, transparent 1px, transparent 50px),
-            repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.03) 0px, rgba(255, 255, 255, 0.03) 1px, transparent 1px, transparent 50px);
-          mask-image: radial-gradient(circle at center, black 30%, transparent 70%);
-          -webkit-mask-image: radial-gradient(circle at center, black 30%, transparent 70%);
-          transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          opacity: 0.8;
-          will-change: transform;
-          backface-visibility: hidden;
-          transform-style: preserve-3d;
-        }
-
-        .network-dots {
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          width: 200vw;
-          height: 200vh;
-          transform: translate(-50%, -50%);
-          background-image:
-            radial-gradient(circle at ${mousePosition.x}% ${mousePosition.y}%, rgba(102, 187, 106, 0.1) 0%, transparent 25%),
-            radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.08) 2px, transparent 2.5px),
-            radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-          background-size: 100% 100%, 28px 28px, 24px 24px;
-          background-position: center;
-          mask-image: radial-gradient(circle at center, black 40%, transparent 70%);
-          -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 70%);
-          animation: floatDots 120s linear infinite;
-          opacity: 0.9;
-          will-change: transform;
-          backface-visibility: hidden;
-          transform-style: preserve-3d;
-        }
-
-        @keyframes floatDots {
-          from {
-            transform: translate(-50%, -50%) rotate(0deg);
-          }
-          to {
-            transform: translate(-50%, -50%) rotate(360deg);
-          }
-        }
-
         .content {
           position: relative;
           z-index: 1;
@@ -190,10 +114,7 @@ export default function Login() {
       `}</style>
 
       <div className="page-wrapper">
-        <div className="background">
-          <div className="network-grid"></div>
-          <div className="network-dots"></div>
-        </div>
+        <BackgroundEffect theme={{ background: theme.background, primary: theme.primary }} />
 
         <main className="content">
           <div style={{

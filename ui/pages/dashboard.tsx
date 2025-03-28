@@ -6,6 +6,7 @@
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useEffect, useRef, useState } from 'react';
+import BackgroundEffect from '../components/BackgroundEffect'; // Import BackgroundEffect component
 
 // Define the Target interface to type our data
 interface Target {
@@ -136,6 +137,12 @@ export default function Dashboard() {
     direction: 'ascending' | 'descending';
   } | null>(null);
   const [filterText, setFilterText] = useState('');
+
+  // Ensure theme is set to dark on initial render
+  useEffect(() => {
+    // Force dark theme on initial load
+    setTheme('dark');
+  }, []);
 
   // Function to fetch targets from the API
   const fetchTargets = async () => {
@@ -402,8 +409,6 @@ export default function Dashboard() {
           body {
             margin: 0;
             padding: 0;
-            background-color: ${currentTheme.background};
-            color: ${currentTheme.text};
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             overflow: hidden;
             height: 100vh;
@@ -411,8 +416,26 @@ export default function Dashboard() {
           }
           #__next {
             height: 100%;
+            width: 100%;
+            position: relative;
+          }
+          .background-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            background-color: ${currentTheme.background};
+            transition: background-color 0.3s ease;
+          }
+          .content-container {
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
+            background: transparent;
           }
           .target-row:hover {
             background-color: ${currentTheme.tableRowHover} !important;
@@ -450,195 +473,249 @@ export default function Dashboard() {
           .material-icons {
             font-size: 18px;
           }
+          @keyframes pulse {
+            0% { opacity: 0.7; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+            100% { opacity: 0.7; transform: scale(1); }
+          }
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
         `}</style>
       </Head>
 
-      <div style={{
-        backgroundColor: currentTheme.navbar,
-        padding: '0.5rem 1.5rem',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 1000,
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span className="material-icons" style={{ color: currentTheme.text, fontSize: '22px' }}>
-            wifi_tethering
-          </span>
-          <h1 style={{ margin: 0, fontSize: '1.1rem' }}>SubNetx Dashboard</h1>
-        </div>
-
-        <div style={{ display: 'flex', gap: '4px' }}>
-          <button
-            onClick={toggleMonitoring}
-            className="nav-button"
-            disabled={loading}
-          >
-            <span className="material-icons">
-              {isMonitoring ? 'stop' : 'play_arrow'}
-            </span>
-            {loading ? 'Loading...' : isMonitoring ? 'Stop' : 'Start'}
-          </button>
-
-          {!isMonitoring && (
-            <button
-              onClick={fetchTargets}
-              className="nav-button"
-              disabled={loading}
-            >
-              <span className="material-icons">refresh</span>
-              {loading ? 'Loading...' : 'Refresh'}
-            </button>
-          )}
-
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="nav-button"
-          >
-            <span className="material-icons">settings</span>
-            Settings
-          </button>
-
-          <button
-            onClick={toggleTheme}
-            className="nav-button"
-          >
-            <span className="material-icons">
-              {theme === 'light' ? 'dark_mode' : 'light_mode'}
-            </span>
-            {theme === 'light' ? 'Dark' : 'Light'}
-          </button>
-
-          {/* Logout button */}
-          <button
-            onClick={handleLogout}
-            className="nav-button"
-          >
-            <span className="material-icons">logout</span>
-            Logout
-          </button>
-        </div>
+      <div className="background-container">
+        <BackgroundEffect
+          theme={{
+            background: currentTheme.background,
+            primary: currentTheme.primary
+          }}
+        />
       </div>
 
-      <main style={{
-        padding: '2rem',
-        backgroundColor: currentTheme.background,
-        color: currentTheme.text,
-        flex: 1,
-        overflowY: 'auto',
-        width: '100%',
-        boxSizing: 'border-box'
-      }}>
-        {/* Rest of your component content remains the same */}
-        {/* Welcome Message when no monitoring */}
-        {!isMonitoring && !loading && targetsWithStatus.length === 0 && !error && (
+      <div className="content-container">
+        <div style={{
+          backgroundColor: `${currentTheme.navbar}99`, // Added some transparency
+          backdropFilter: 'blur(10px)',
+          padding: '0.5rem 1.5rem',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 1000,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span className="material-icons" style={{
+              color: currentTheme.primary,
+              fontSize: '24px',
+              animation: 'pulse 2s infinite ease-in-out'
+            }}>
+              hub
+            </span>
+            <h1 style={{ margin: 0, fontSize: '1.1rem' }}>SubNetx Dashboard</h1>
+          </div>
+
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <button
+              onClick={toggleMonitoring}
+              className="nav-button"
+              disabled={loading}
+              style={{ position: 'relative', overflow: 'hidden' }}
+            >
+              <span className="material-icons" style={{
+                transform: isMonitoring ? 'scale(1)' : 'scale(1.2)',
+                transition: 'transform 0.3s ease',
+              }}>
+                {isMonitoring ? 'motion_photos_pause' : 'play_circle'}
+              </span>
+              {loading ? 'Loading...' : isMonitoring ? 'Stop' : 'Start'}
+            </button>
+
+            {!isMonitoring && (
+              <button
+                onClick={fetchTargets}
+                className="nav-button"
+                disabled={loading}
+              >
+                <span className="material-icons" style={{
+                  animation: isUpdating ? 'spin 1s linear infinite' : 'none'
+                }}>
+                  refresh
+                </span>
+                {loading ? 'Loading...' : 'Refresh'}
+              </button>
+            )}
+
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className="nav-button"
+            >
+              <span className="material-icons" style={{
+                transform: showSettings ? 'rotate(45deg)' : 'rotate(0deg)',
+                transition: 'transform 0.3s ease'
+              }}>
+                settings
+              </span>
+              Settings
+            </button>
+
+            <button
+              onClick={toggleTheme}
+              className="nav-button"
+            >
+              <span className="material-icons" style={{
+                transition: 'transform 0.4s ease, opacity 0.3s ease',
+                transform: theme === 'light' ? 'translateY(0)' : 'translateY(-2px) rotate(180deg)',
+              }}>
+                {theme === 'light' ? 'light_mode' : 'dark_mode'}
+              </span>
+              {theme === 'light' ? 'Dark' : 'Light'}
+            </button>
+
+            {/* Logout button */}
+            <button
+              onClick={handleLogout}
+              className="nav-button"
+            >
+              <span className="material-icons" style={{
+                transition: 'transform 0.3s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateX(3px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateX(0)';
+              }}>
+                logout
+              </span>
+              Logout
+            </button>
+          </div>
+        </div>
+
+        <main style={{
+          padding: '2rem',
+          flex: 1,
+          overflowY: 'auto',
+          width: '100%',
+          boxSizing: 'border-box',
+          position: 'relative',
+          zIndex: 1,
+          color: currentTheme.text
+        }}>
+          {/* Rest of your component content remains the same */}
+          {/* Welcome Message when no monitoring */}
+          {!isMonitoring && !loading && targetsWithStatus.length === 0 && !error && (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: 'calc(100vh - 200px)',
+              textAlign: 'center',
+              gap: '1rem'
+            }}>
+              <span className="material-icons" style={{
+                fontSize: '64px',
+                color: currentTheme.primary,
+                animation: 'pulse 2s infinite'
+              }}>
+                radar
+              </span>
+              <h2 style={{ margin: 0 }}>Welcome to SubNetx Dashboard</h2>
+              <p style={{
+                fontSize: '1.1rem',
+                color: currentTheme.text,
+                maxWidth: '500px',
+                lineHeight: '1.5'
+              }}>
+                Click the <strong>Start</strong> button above to begin monitoring your network targets.
+                Real-time statistics and detailed insights will appear here.
+              </p>
+            </div>
+          )}
+
+          {/* Your existing dashboard content */}
+        </main>
+
+        <footer style={{
+          backgroundColor: `${currentTheme.cardBackground}99`, // Added some transparency
+          backdropFilter: 'blur(10px)',
+          padding: '0.6rem',
+          borderTop: `1px solid ${currentTheme.border}`,
+          width: '100%',
+          boxSizing: 'border-box',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '0.5rem',
+          flexShrink: 0,
+          position: 'relative',
+          zIndex: 1
+        }}>
+          <div style={{
+            fontSize: '0.85rem',
+            color: currentTheme.text,
+            opacity: 0.8
+          }}>
+            © {new Date().getFullYear()} SubNetx. Released under the MIT License.
+          </div>
           <div style={{
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: 'calc(100vh - 200px)',
-            textAlign: 'center',
-            gap: '1rem'
+            gap: '1.5rem'
           }}>
-            <span className="material-icons" style={{
-              fontSize: '64px',
-              color: currentTheme.primary,
-              animation: 'pulse 2s infinite'
-            }}>
-              radar
-            </span>
-            <h2 style={{ margin: 0 }}>Welcome to SubNetx Dashboard</h2>
-            <p style={{
-              fontSize: '1.1rem',
-              color: currentTheme.text,
-              maxWidth: '500px',
-              lineHeight: '1.5'
-            }}>
-              Click the <strong>Start</strong> button above to begin monitoring your network targets.
-              Real-time statistics and detailed insights will appear here.
-            </p>
+            <a
+              href="mailto:tacoronteriverocristian@gmail.com"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                color: currentTheme.text,
+                textDecoration: 'none',
+                transition: 'color 0.2s',
+                fontSize: '0.85rem'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = currentTheme.primary;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = currentTheme.text;
+              }}
+            >
+              <span className="material-icons" style={{ fontSize: '16px' }}>email</span>
+              Contact
+            </a>
+            <a
+              href="https://github.com/TacoronteRiveroCristian/SubNetx"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                color: currentTheme.text,
+                textDecoration: 'none',
+                transition: 'color 0.2s',
+                fontSize: '0.85rem'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = currentTheme.primary;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = currentTheme.text;
+              }}
+            >
+              <span className="material-icons" style={{ fontSize: '16px' }}>code</span>
+              GitHub
+            </a>
           </div>
-        )}
-
-        {/* Your existing dashboard content */}
-      </main>
-
-      {/* Footer */}
-      <footer style={{
-        backgroundColor: currentTheme.cardBackground,
-        padding: '0.6rem',
-        borderTop: `1px solid ${currentTheme.border}`,
-        width: '100%',
-        boxSizing: 'border-box',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '0.5rem',
-        flexShrink: 0
-      }}>
-        <div style={{
-          fontSize: '0.85rem',
-          color: currentTheme.text,
-          opacity: 0.8
-        }}>
-          © {new Date().getFullYear()} SubNetx. Released under the MIT License.
-        </div>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '1.5rem'
-        }}>
-          <a
-            href="mailto:tacoronteriverocristian@gmail.com"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              color: currentTheme.text,
-              textDecoration: 'none',
-              transition: 'color 0.2s',
-              fontSize: '0.85rem'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = currentTheme.primary;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = currentTheme.text;
-            }}
-          >
-            <span className="material-icons" style={{ fontSize: '16px' }}>email</span>
-            Contact
-          </a>
-          <a
-            href="https://github.com/TacoronteRiveroCristian/SubNetx"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              color: currentTheme.text,
-              textDecoration: 'none',
-              transition: 'color 0.2s',
-              fontSize: '0.85rem'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = currentTheme.primary;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = currentTheme.text;
-            }}
-          >
-            <span className="material-icons" style={{ fontSize: '16px' }}>code</span>
-            GitHub
-          </a>
-        </div>
-      </footer>
+        </footer>
+      </div>
     </>
   );
 }
