@@ -54,8 +54,7 @@
         3200
     ],
     "updateRemoteUserUID": true,
-    "postStartCommand": "npm install --omit=optional && echo 'Dev container started, node_modules should have proper permissions now'",
-    "postAttachCommand": "npm run dev",
+    "postStartCommand": "echo 'Dev container started, node_modules should have proper permissions now'",
     "features": {
         "github-cli": "latest",
         "node": {

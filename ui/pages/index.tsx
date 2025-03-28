@@ -1,5 +1,6 @@
 // pages/index.tsx
 import Head from 'next/head';
+import { useRouter } from 'next/router'; // Import useRouter for navigation to login page
 import { useEffect, useRef, useState } from 'react';
 
 // Define the Target interface to type our data
@@ -94,6 +95,9 @@ const themes = {
 };
 
 export default function Home() {
+  // Add router for navigation to login page
+  const router = useRouter();
+
   // State to store the targets fetched from the API
   const [targets, setTargets] = useState<Target[]>([]);
   // State to store the latest status for each target
@@ -368,6 +372,14 @@ export default function Home() {
     return distribution;
   };
 
+  // Function to handle logout - redirects to login page
+  const handleLogout = () => {
+    // Clear authentication in localStorage
+    localStorage.removeItem('isAuthenticated');
+    // Redirect to login page
+    router.push('/login');
+  };
+
   return (
     <>
       <Head>
@@ -486,6 +498,15 @@ export default function Home() {
               {theme === 'light' ? 'dark_mode' : 'light_mode'}
             </span>
             {theme === 'light' ? 'Dark' : 'Light'}
+          </button>
+
+          {/* Add logout button */}
+          <button
+            onClick={handleLogout}
+            className="nav-button"
+          >
+            <span className="material-icons">logout</span>
+            Logout
           </button>
         </div>
       </div>
