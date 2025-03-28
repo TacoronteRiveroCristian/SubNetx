@@ -685,7 +685,7 @@ export default function Dashboard() {
                   {calculateSystemHealth(targetsWithStatus)}%
                 </div>
                 <div style={{ fontSize: '0.85rem', color: currentTheme.text }}>
-                  Overall System Health
+                  {targetsWithStatus.filter(t => t.latestStatus?.status === 'online').length} of {targetsWithStatus.length} hosts online
                 </div>
               </div>
 
@@ -745,17 +745,78 @@ export default function Dashboard() {
                 target.style.transform = 'none';
                 target.style.boxShadow = 'none';
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.8rem', height: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', height: '24px' }}>
                   <span className="material-icons" style={{ fontSize: '20px', color: currentTheme.primary }}>
                     signal_cellular_alt
                   </span>
                   <h3 style={{ margin: 0, fontSize: '1rem' }}>Connection Quality</h3>
                 </div>
-                <div style={{ fontSize: '1.8rem', fontWeight: 'bold', marginBottom: '0.4rem' }}>
-                  {getConnectionQualityDistribution(targetsWithStatus).Excellent}%
-                </div>
-                <div style={{ fontSize: '0.85rem', color: currentTheme.text }}>
-                  Excellent Connections
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {/* Excellent Connections */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{
+                      width: '10px',
+                      height: '10px',
+                      borderRadius: '50%',
+                      backgroundColor: '#4CAF50',
+                      display: 'inline-block'
+                    }}></span>
+                    <span style={{ fontSize: '0.9rem', color: currentTheme.text }}>
+                      Excellent: {targetsWithStatus.filter(t => t.latestStatus?.connection_quality === 'excellent').length}
+                    </span>
+                  </div>
+                  {/* Good Connections */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{
+                      width: '10px',
+                      height: '10px',
+                      borderRadius: '50%',
+                      backgroundColor: '#8BC34A',
+                      display: 'inline-block'
+                    }}></span>
+                    <span style={{ fontSize: '0.9rem', color: currentTheme.text }}>
+                      Good: {targetsWithStatus.filter(t => t.latestStatus?.connection_quality === 'good').length}
+                    </span>
+                  </div>
+                  {/* Fair Connections */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{
+                      width: '10px',
+                      height: '10px',
+                      borderRadius: '50%',
+                      backgroundColor: '#FFC107',
+                      display: 'inline-block'
+                    }}></span>
+                    <span style={{ fontSize: '0.9rem', color: currentTheme.text }}>
+                      Fair: {targetsWithStatus.filter(t => t.latestStatus?.connection_quality === 'fair').length}
+                    </span>
+                  </div>
+                  {/* Poor Connections */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{
+                      width: '10px',
+                      height: '10px',
+                      borderRadius: '50%',
+                      backgroundColor: '#F44336',
+                      display: 'inline-block'
+                    }}></span>
+                    <span style={{ fontSize: '0.9rem', color: currentTheme.text }}>
+                      Poor: {targetsWithStatus.filter(t => t.latestStatus?.connection_quality === 'poor').length}
+                    </span>
+                  </div>
+                  {/* No Connection/Unknown */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{
+                      width: '10px',
+                      height: '10px',
+                      borderRadius: '50%',
+                      backgroundColor: '#9E9E9E',
+                      display: 'inline-block'
+                    }}></span>
+                    <span style={{ fontSize: '0.9rem', color: currentTheme.text }}>
+                      No Connection: {targetsWithStatus.filter(t => !t.latestStatus || t.latestStatus.connection_quality === 'none').length}
+                    </span>
+                  </div>
                 </div>
               </div>
 
