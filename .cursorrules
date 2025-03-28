@@ -119,3 +119,37 @@ Only transition modes when I explicitly signal with:
 “ENTER EXECUTE MODE”
 “ENTER REVIEW MODE”
 Without these exact signals, remain in your current mode.
+
+COMMIT RULES
+- Commit messages must be in Spanish
+- Each commit should represent a logical and atomic change
+- Use imperative verbs at the start of the message (e.g., "Agrega", "Corrige", "Actualiza")
+- Limit the first line to 50 characters
+- If more detail is needed, add after a blank line
+- No periods at the end of the first line
+- Message structure:
+  ```
+  <type>: <short description in Spanish>
+
+  [optional detailed description in Spanish]
+  ```
+- Allowed commit types:
+  - feat: New functionality
+  - fix: Bug fixes
+  - docs: Documentation changes
+  - style: Format/style changes
+  - refactor: Code refactoring
+  - test: Add/modify tests
+  - chore: Maintenance tasks
+
+GOOD COMMIT EXAMPLES:
+✅ "feat: Agrega validación de usuarios"
+✅ "fix: Corrige error en cálculo de métricas"
+✅ "docs: Actualiza documentación de API"
+
+BAD COMMIT EXAMPLES:
+❌ "cambios varios"
+❌ "arreglando bugs"
+❌ "WIP"
+
+

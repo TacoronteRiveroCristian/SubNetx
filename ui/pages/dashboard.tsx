@@ -606,7 +606,6 @@ export default function Dashboard() {
           zIndex: 1,
           color: currentTheme.text
         }}>
-          {/* Rest of your component content remains the same */}
           {/* Welcome Message when no monitoring */}
           {!isMonitoring && !loading && targetsWithStatus.length === 0 && !error && (
             <div style={{
@@ -638,7 +637,376 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Your existing dashboard content */}
+          {/* Dashboard Panels */}
+          {(isMonitoring || targetsWithStatus.length > 0) && (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+              gap: '1rem',
+              marginBottom: '2rem'
+            }}>
+              {/* System Health Card */}
+              <div style={{
+                backgroundColor: currentTheme.cardBackground,
+                padding: '1.2rem',
+                borderRadius: '8px',
+                border: `1px solid ${currentTheme.border}`,
+                transition: 'transform 0.2s, box-shadow 0.2s',
+                cursor: 'pointer',
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+              onMouseEnter={(e) => {
+                const target = e.currentTarget;
+                target.style.transform = 'translateY(-2px)';
+                target.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+              }}
+              onMouseLeave={(e) => {
+                const target = e.currentTarget;
+                target.style.transform = 'none';
+                target.style.boxShadow = 'none';
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginBottom: '0.8rem',
+                  height: '24px'
+                }}>
+                  <span className="material-icons" style={{
+                    fontSize: '20px',
+                    color: calculateSystemHealth(targetsWithStatus) >= 80 ? '#4CAF50' :
+                           calculateSystemHealth(targetsWithStatus) >= 60 ? '#FF9800' : '#F44336'
+                  }}>
+                    monitor_heart
+                  </span>
+                  <h3 style={{ margin: 0, fontSize: '1rem' }}>System Health</h3>
+                </div>
+                <div style={{ fontSize: '1.8rem', fontWeight: 'bold', marginBottom: '0.4rem' }}>
+                  {calculateSystemHealth(targetsWithStatus)}%
+                </div>
+                <div style={{ fontSize: '0.85rem', color: currentTheme.text }}>
+                  Overall System Health
+                </div>
+              </div>
+
+              {/* Average RTT Card */}
+              <div style={{
+                backgroundColor: currentTheme.cardBackground,
+                padding: '1.2rem',
+                borderRadius: '8px',
+                border: `1px solid ${currentTheme.border}`,
+                transition: 'transform 0.2s, box-shadow 0.2s',
+                cursor: 'pointer',
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+              onMouseEnter={(e) => {
+                const target = e.currentTarget;
+                target.style.transform = 'translateY(-2px)';
+                target.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+              }}
+              onMouseLeave={(e) => {
+                const target = e.currentTarget;
+                target.style.transform = 'none';
+                target.style.boxShadow = 'none';
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.8rem', height: '24px' }}>
+                  <span className="material-icons" style={{ fontSize: '20px', color: currentTheme.primary }}>
+                    speed
+                  </span>
+                  <h3 style={{ margin: 0, fontSize: '1rem' }}>Average RTT</h3>
+                </div>
+                <div style={{ fontSize: '1.8rem', fontWeight: 'bold', marginBottom: '0.4rem' }}>
+                  {calculateAverageRTT(targetsWithStatus)} ms
+                </div>
+                <div style={{ fontSize: '0.85rem', color: currentTheme.text }}>
+                  Round Trip Time
+                </div>
+              </div>
+
+              {/* Connection Quality Distribution Card */}
+              <div style={{
+                backgroundColor: currentTheme.cardBackground,
+                padding: '1.2rem',
+                borderRadius: '8px',
+                border: `1px solid ${currentTheme.border}`,
+                transition: 'transform 0.2s, box-shadow 0.2s',
+                cursor: 'pointer',
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+              onMouseEnter={(e) => {
+                const target = e.currentTarget;
+                target.style.transform = 'translateY(-2px)';
+                target.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+              }}
+              onMouseLeave={(e) => {
+                const target = e.currentTarget;
+                target.style.transform = 'none';
+                target.style.boxShadow = 'none';
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.8rem', height: '24px' }}>
+                  <span className="material-icons" style={{ fontSize: '20px', color: currentTheme.primary }}>
+                    signal_cellular_alt
+                  </span>
+                  <h3 style={{ margin: 0, fontSize: '1rem' }}>Connection Quality</h3>
+                </div>
+                <div style={{ fontSize: '1.8rem', fontWeight: 'bold', marginBottom: '0.4rem' }}>
+                  {getConnectionQualityDistribution(targetsWithStatus).Excellent}%
+                </div>
+                <div style={{ fontSize: '0.85rem', color: currentTheme.text }}>
+                  Excellent Connections
+                </div>
+              </div>
+
+              {/* Packet Loss Card */}
+              <div style={{
+                backgroundColor: currentTheme.cardBackground,
+                padding: '1.2rem',
+                borderRadius: '8px',
+                border: `1px solid ${currentTheme.border}`,
+                transition: 'transform 0.2s, box-shadow 0.2s',
+                cursor: 'pointer',
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+              onMouseEnter={(e) => {
+                const target = e.currentTarget;
+                target.style.transform = 'translateY(-2px)';
+                target.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+              }}
+              onMouseLeave={(e) => {
+                const target = e.currentTarget;
+                target.style.transform = 'none';
+                target.style.boxShadow = 'none';
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.8rem', height: '24px' }}>
+                  <span className="material-icons" style={{ fontSize: '20px', color: currentTheme.primary }}>
+                    error_outline
+                  </span>
+                  <h3 style={{ margin: 0, fontSize: '1rem' }}>Packet Loss</h3>
+                </div>
+                <div style={{ fontSize: '1.8rem', fontWeight: 'bold', marginBottom: '0.4rem' }}>
+                  {targetsWithStatus.reduce((acc, t) => acc + (t.latestStatus?.packet_loss_percent || 0), 0) / targetsWithStatus.length}%
+                </div>
+                <div style={{ fontSize: '0.85rem', color: currentTheme.text }}>
+                  Average Packet Loss
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Monitoring Status Indicator */}
+          {isMonitoring && (
+            <div style={{
+              backgroundColor: currentTheme.statusIndicator,
+              padding: '0.5rem 1rem',
+              borderRadius: '4px',
+              marginBottom: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              color: currentTheme.text
+            }}>
+              <div style={{
+                width: '10px',
+                height: '10px',
+                borderRadius: '50%',
+                backgroundColor: isUpdating ? '#F44336' : currentTheme.secondary,
+                marginRight: '8px',
+                animation: isUpdating ? 'none' : 'pulse 2s infinite'
+              }}></div>
+              <style jsx>{`
+                @keyframes pulse {
+                  0% { opacity: 1; }
+                  50% { opacity: 0.3; }
+                  100% { opacity: 1; }
+                }
+              `}</style>
+              Monitoring active - Data refreshes every {refreshInterval} seconds
+            </div>
+          )}
+
+          {/* Error Message Display */}
+          {error && (
+            <div style={{
+              color: '#F44336',
+              marginBottom: '1rem',
+              padding: '0.5rem',
+              backgroundColor: currentTheme.errorBackground,
+              borderRadius: '4px'
+            }}>
+              Error: {error}
+            </div>
+          )}
+
+          {/* Targets Table */}
+          {targetsWithStatus.length > 0 && (
+            <div>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '1rem'
+              }}>
+                <h2 style={{ margin: 0 }}>Monitored Targets ({targetsWithStatus.length} hosts)</h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="material-icons" style={{ color: currentTheme.text, fontSize: '18px' }}>
+                    search
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Filter targets..."
+                    value={filterText}
+                    onChange={(e) => setFilterText(e.target.value)}
+                    style={{
+                      padding: '4px 12px',
+                      borderRadius: '4px',
+                      border: `1px solid ${currentTheme.border}`,
+                      backgroundColor: currentTheme.background,
+                      color: currentTheme.text,
+                      width: '200px',
+                      fontSize: '0.9rem'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  backgroundColor: currentTheme.cardBackground,
+                  borderRadius: '8px',
+                  overflow: 'hidden'
+                }}>
+                  <thead>
+                    <tr style={{ backgroundColor: currentTheme.tableHeader }}>
+                      <th style={{ border: `1px solid ${currentTheme.border}`, padding: '12px', textAlign: 'left', cursor: 'pointer' }}
+                          onClick={() => requestSort('id')}>
+                        ID {sortConfig?.key === 'id' && (sortConfig.direction === 'ascending' ? '↑' : '↓')}
+                      </th>
+                      <th style={{ border: `1px solid ${currentTheme.border}`, padding: '12px', textAlign: 'left', cursor: 'pointer' }}
+                          onClick={() => requestSort('target')}>
+                        Target {sortConfig?.key === 'target' && (sortConfig.direction === 'ascending' ? '↑' : '↓')}
+                      </th>
+                      <th style={{ border: `1px solid ${currentTheme.border}`, padding: '12px', textAlign: 'left', cursor: 'pointer' }}
+                          onClick={() => requestSort('status')}>
+                        Status {sortConfig?.key === 'status' && (sortConfig.direction === 'ascending' ? '↑' : '↓')}
+                      </th>
+                      <th style={{ border: `1px solid ${currentTheme.border}`, padding: '12px', textAlign: 'left', cursor: 'pointer' }}
+                          onClick={() => requestSort('quality')}>
+                        Quality {sortConfig?.key === 'quality' && (sortConfig.direction === 'ascending' ? '↑' : '↓')}
+                      </th>
+                      <th style={{ border: `1px solid ${currentTheme.border}`, padding: '12px', textAlign: 'left', cursor: 'pointer' }}
+                          onClick={() => requestSort('packetLoss')}>
+                        Packet Loss {sortConfig?.key === 'packetLoss' && (sortConfig.direction === 'ascending' ? '↑' : '↓')}
+                      </th>
+                      <th style={{ border: `1px solid ${currentTheme.border}`, padding: '12px', textAlign: 'left', cursor: 'pointer' }}
+                          onClick={() => requestSort('avgRtt')}>
+                        Avg RTT {sortConfig?.key === 'avgRtt' && (sortConfig.direction === 'ascending' ? '↑' : '↓')}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortData(filterData(targetsWithStatus)).map(({ target, latestStatus }) => (
+                      <tr
+                        key={target.id}
+                        style={{
+                          backgroundColor: latestStatus?.status === 'timeout' ? currentTheme.errorBackground : currentTheme.tableRow
+                        }}
+                        className="target-row"
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLElement).style.backgroundColor = currentTheme.tableRowHover;
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLElement).style.backgroundColor =
+                            latestStatus?.status === 'timeout' ? currentTheme.errorBackground : currentTheme.tableRow;
+                        }}
+                      >
+                        <td style={{ border: `1px solid ${currentTheme.border}`, padding: '8px' }}>{target.id}</td>
+                        <td style={{ border: `1px solid ${currentTheme.border}`, padding: '8px', fontWeight: 'bold' }}>{target.target}</td>
+                        <td style={{ border: `1px solid ${currentTheme.border}`, padding: '8px' }}>
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            backgroundColor: getStatusColor(latestStatus?.connection_quality || 'none'),
+                            color: '#ffffff',
+                            fontSize: '0.9rem'
+                          }}>
+                            <span className="material-icons" style={{ fontSize: '16px' }}>
+                              {latestStatus?.status === 'online' ? 'check_circle' : 'error'}
+                            </span>
+                            {latestStatus?.status || 'N/A'}
+                          </div>
+                        </td>
+                        <td style={{ border: `1px solid ${currentTheme.border}`, padding: '8px' }}>
+                          <div style={{
+                            color: getStatusColor(latestStatus?.connection_quality || 'none'),
+                            fontWeight: 'bold'
+                          }}>
+                            {latestStatus?.connection_quality || 'N/A'}
+                          </div>
+                        </td>
+                        <td style={{ border: `1px solid ${currentTheme.border}`, padding: '8px' }}>
+                          {latestStatus ? (
+                            <div style={{
+                              color: latestStatus.packet_loss_percent > 0 ? '#F44336' : '#4CAF50',
+                              fontWeight: 'bold'
+                            }}>
+                              {latestStatus.packet_loss_percent}%
+                            </div>
+                          ) : 'N/A'}
+                        </td>
+                        <td style={{ border: `1px solid ${currentTheme.border}`, padding: '8px', fontWeight: 'bold' }}>
+                          {latestStatus?.avg_rtt || 'N/A'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* ICMP Response Details */}
+              {targetsWithStatus.map(({ target, latestStatus }) => (
+                latestStatus && latestStatus.icmp_details.length > 0 && (
+                  <div key={`detail-${target.id}`} style={{
+                    marginBottom: '1rem',
+                    padding: '0.5rem',
+                    border: `1px solid ${currentTheme.border}`,
+                    borderRadius: '4px',
+                    backgroundColor: currentTheme.cardBackground
+                  }}>
+                    <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.2rem' }}>ICMP Response Details: {target.target}</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.5rem' }}>
+                      {latestStatus.icmp_details.map((ping, index) => (
+                        <div key={index} style={{
+                          padding: '0.3rem',
+                          backgroundColor: currentTheme.background,
+                          border: `1px solid ${currentTheme.border}`,
+                          borderRadius: '4px',
+                          textAlign: 'center'
+                        }}>
+                          <div style={{ fontSize: '0.8rem', color: currentTheme.text }}>Sequence {ping.sequence}</div>
+                          <div style={{
+                            fontSize: '1.2rem',
+                            fontWeight: 'bold',
+                            marginTop: '0.3rem',
+                            color: ping.response_time_ms > 100 ? '#F44336' : ping.response_time_ms > 50 ? '#FF9800' : '#4CAF50'
+                          }}>
+                            {ping.response_time_ms} ms
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              ))}
+            </div>
+          )}
         </main>
 
         <footer style={{
