@@ -28,9 +28,28 @@ export default function Login() {
 
   // Check if user is already authenticated on mount
   useEffect(() => {
-    // If already authenticated, redirect to home
-    if (localStorage.getItem('isAuthenticated') === 'true') {
-      router.push('/');
+    // Add this check to prevent double redirects
+    if (router.pathname === '/login') {
+      // Use the API verification instead of local storage for consistency
+      fetch('/api/auth/verify', {
+        credentials: 'include',
+      })
+        .then(response => {
+          if (response.ok) {
+            return response.json();
+          }
+          throw new Error('Not authenticated');
+        })
+        .then(data => {
+          // Only redirect if authenticated
+          router.push('/dashboard');
+        })
+        .catch(err => {
+          // User is not authenticated, so it's ok to stay on login page
+          // Clear any leftover auth state to be safe
+          localStorage.removeItem('isAuthenticated');
+          localStorage.removeItem('userRole');
+        });
     }
   }, [router]);
 
@@ -53,6 +72,23 @@ export default function Login() {
         const data = await response.json();
 
         if (response.ok) {
+            // Reset monitoring state in the background before redirecting
+            try {
+                await fetch('/api/system/monitoring', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ isMonitoring: false }),
+                });
+            } catch (error) {
+                console.error('Error resetting monitoring state:', error);
+                // Continue with login even if this fails
+            }
+
+            // Clear any existing monitoring data from localStorage
+            localStorage.removeItem('dashboardData');
+
             // Set authentication in localStorage
             localStorage.setItem('isAuthenticated', 'true');
             // Store user data

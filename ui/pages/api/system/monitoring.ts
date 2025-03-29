@@ -30,6 +30,7 @@ export default async function handler(
       });
       console.log('Current monitoring state:', setting);
 
+      // Retornar el estado del monitoreo (convertir 'true'/'false' string a boolean)
       return res.status(200).json({ isMonitoring: setting?.value === 'true' });
     }
     else if (req.method === 'POST') {
@@ -41,17 +42,35 @@ export default async function handler(
         return res.status(400).json({ error: 'isMonitoring must be a boolean value' });
       }
 
-      const setting = await prisma.systemSettings.upsert({
-        where: { key: 'monitoring_active' },
-        update: { value: String(isMonitoring) },
-        create: {
-          key: 'monitoring_active',
-          value: String(isMonitoring)
-        }
-      });
-      console.log('Updated monitoring state:', setting);
+      // Convertir boolean a string para guardarlo
+      const valueStr = String(isMonitoring);
 
-      return res.status(200).json({ isMonitoring: setting.value === 'true' });
+      try {
+        // Intentar actualizar el registro existente
+        const setting = await prisma.systemSettings.update({
+          where: { key: 'monitoring_active' },
+          data: {
+            value: valueStr,
+            lastUpdated: new Date()
+          }
+        });
+        console.log('Updated monitoring state:', setting);
+
+        return res.status(200).json({ isMonitoring: setting.value === 'true' });
+      } catch (updateError) {
+        // Si el registro no existe, crearlo
+        console.log('Record not found, creating new record');
+        const setting = await prisma.systemSettings.create({
+          data: {
+            key: 'monitoring_active',
+            value: valueStr,
+            lastUpdated: new Date()
+          }
+        });
+        console.log('Created monitoring state:', setting);
+
+        return res.status(200).json({ isMonitoring: setting.value === 'true' });
+      }
     }
 
     // Handle unsupported methods

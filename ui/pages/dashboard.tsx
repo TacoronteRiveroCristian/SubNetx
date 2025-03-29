@@ -106,11 +106,36 @@ export default function Dashboard() {
 
   // Check authentication on mount
   useEffect(() => {
-    // If not authenticated, redirect to login
-    if (localStorage.getItem('isAuthenticated') !== 'true') {
-      router.push('/login');
-    }
-  }, [router]);
+    // Use the API to check authentication instead of localStorage
+    const checkAuth = async () => {
+      try {
+        const response = await fetch('/api/auth/verify', {
+          credentials: 'include',
+        });
+
+        if (!response.ok) {
+          throw new Error('Not authenticated');
+        }
+
+        // User is authenticated, continue with dashboard setup
+        const data = await response.json();
+        // We can set the local storage here for consistency
+        localStorage.setItem('isAuthenticated', 'true');
+        localStorage.setItem('userRole', data.user.role);
+
+        // NO longer fetch targets automatically - let user click Start button
+        // fetchTargets();
+      } catch (error) {
+        // Not authenticated, redirect to login
+        localStorage.removeItem('isAuthenticated');
+        localStorage.removeItem('userRole');
+        router.push('/login');
+      }
+    };
+
+    checkAuth();
+    // Only run this effect once on mount
+  }, []);
 
   // State to store the targets fetched from the API
   const [targets, setTargets] = useState<Target[]>([]);
@@ -120,7 +145,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   // State to track error messages
   const [error, setError] = useState<string | null>(null);
-  // State to track if real-time monitoring is active
+  // State to track if real-time monitoring is active - FORCE to false initially
   const [isMonitoring, setIsMonitoring] = useState(false);
   // State to track the current theme
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
@@ -217,6 +242,12 @@ export default function Dashboard() {
     try {
       const newState = !isMonitoring;
 
+      if (newState) {
+        // Si estamos iniciando el monitoreo, primero limpiamos cualquier dato previo
+        setTargets([]);
+        setLatestStatuses([]);
+      }
+
       // Update monitoring state in the database
       const response = await fetch('/api/system/monitoring', {
         method: 'POST',
@@ -250,27 +281,30 @@ export default function Dashboard() {
     }
   };
 
-  // Effect to fetch initial monitoring state
+  // Effect to fetch initial monitoring state - actualizado para reiniciar siempre
   useEffect(() => {
-    const fetchMonitoringState = async () => {
+    const resetDashboardState = async () => {
       try {
-        const response = await fetch('/api/system/monitoring');
-        if (response.ok) {
-          const data = await response.json();
-          setIsMonitoring(data.isMonitoring);
+        // Siempre reiniciamos todos los estados locales para garantizar pantalla de bienvenida
+        setTargets([]);
+        setLatestStatuses([]);
+        setIsMonitoring(false);
 
-          // If monitoring is active, start the interval
-          if (data.isMonitoring) {
-            fetchTargets();
-            intervalRef.current = setInterval(fetchTargets, refreshInterval * 1000);
-          }
-        }
+        // Forzar el estado a inactivo en el servidor también
+        await fetch('/api/system/monitoring', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ isMonitoring: false }),
+        });
       } catch (error) {
-        console.error('Error fetching monitoring state:', error);
+        console.error('Error resetting dashboard state:', error);
       }
     };
 
-    fetchMonitoringState();
+    // Ejecutar la limpieza inmediatamente al montar el componente
+    resetDashboardState();
 
     // Cleanup interval on unmount
     return () => {
@@ -278,7 +312,26 @@ export default function Dashboard() {
         clearInterval(intervalRef.current);
       }
     };
-  }, [refreshInterval]); // Add refreshInterval as dependency
+  }, []);
+
+  // Interceptar cualquier cambio de ruta para limpiar el estado si se navega fuera del dashboard
+  useEffect(() => {
+    const handleRouteChange = () => {
+      // Si el usuario navega fuera del dashboard, limpiamos el estado
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+
+    // Suscribirse a los eventos de cambio de ruta
+    router.events.on('routeChangeStart', handleRouteChange);
+
+    // Limpieza
+    return () => {
+      router.events.off('routeChangeStart', handleRouteChange);
+    };
+  }, [router.events]);
 
   // Function to update refresh interval
   const updateRefreshInterval = (newInterval: number) => {
@@ -442,35 +495,46 @@ export default function Dashboard() {
     return localStorage.getItem('userRole') === 'admin';
   };
 
-  // Function to handle logout - redirects to login page
-  const handleLogout = async () => {
+  // Function to handle logout - redirects to login page first for better UX
+  const handleLogout = () => {
     try {
-      // If monitoring is active, stop it first
-      if (isMonitoring) {
-        // Update monitoring state in the database
-        await fetch('/api/system/monitoring', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ isMonitoring: false }),
-        });
+      // Eliminamos básicamente solo lo necesario antes de redireccionar
+      localStorage.removeItem('isAuthenticated');
 
-        // Clear the interval
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = null;
-        }
+      // Redirigir INMEDIATAMENTE al usuario, sin esperar ninguna operación asíncrona
+      window.location.href = '/login';
+
+      // Todo lo siguiente se ejecutará en segundo plano después de iniciar la navegación
+
+      // Limpiar localStorage (continuará ejecutándose incluso después de iniciar la navegación)
+      setTimeout(() => {
+        localStorage.clear();
+      }, 0);
+
+      // Detener el intervalo si está activo (esto es síncrono y rápido)
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
 
-      // Clear authentication in localStorage
-      localStorage.removeItem('isAuthenticated');
-      localStorage.removeItem('userId');
-      localStorage.removeItem('userRole');
-      // Redirect to login page
-      router.push('/login');
+      // Ejecutar operaciones de API en segundo plano sin esperar respuestas
+      // Estas solicitudes se completarán incluso si la página ya está cambiando
+      fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      }).catch(() => {}); // ignorar errores en las solicitudes en segundo plano
+
+      fetch('/api/system/monitoring', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isMonitoring: false }),
+      }).catch(() => {}); // ignorar errores
+
     } catch (error) {
-      console.error('Error during logout:', error);
+      // Si hay un error, asegurar que el usuario sea redirigido de todas formas
+      window.location.href = '/login';
     }
   };
 
