@@ -14,10 +14,11 @@ export default async function handler(
   if (req.method === 'GET') {
     try {
       // Fetch all users
-      const users = await prisma.admin.findMany({
+      const users = await prisma.user.findMany({
         select: {
           id: true,
           username: true,
+          role: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -33,15 +34,20 @@ export default async function handler(
     }
   } else if (req.method === 'POST') {
     try {
-      const { username, password } = req.body
+      const { username, password, role } = req.body
 
       // Validate input
       if (!username || !password) {
         return res.status(400).json({ message: 'Username and password are required' })
       }
 
+      // Validate role
+      if (role && !['admin', 'viewer'].includes(role)) {
+        return res.status(400).json({ message: 'Invalid role. Must be either "admin" or "viewer"' })
+      }
+
       // Check if username already exists
-      const existingUser = await prisma.admin.findFirst({
+      const existingUser = await prisma.user.findFirst({
         where: { username }
       })
 
@@ -51,14 +57,16 @@ export default async function handler(
 
       // Hash password and create user
       const hashedPassword = await hash(password, 12)
-      const newUser = await prisma.admin.create({
+      const newUser = await prisma.user.create({
         data: {
           username,
-          password: hashedPassword
+          password: hashedPassword,
+          role: role || 'viewer' // Use provided role or default to viewer
         },
         select: {
           id: true,
           username: true,
+          role: true,
           createdAt: true,
           updatedAt: true
         }

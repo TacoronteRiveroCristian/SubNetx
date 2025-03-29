@@ -4,21 +4,32 @@
  */
 
 import { PrismaClient } from '@prisma/client'
-import { createAdmin } from '../lib/auth'
+import { hash } from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
 async function initDatabase() {
   try {
-    // Check if admin exists
-    const admin = await prisma.admin.findUnique({
+    // Check if admin user already exists
+    const admin = await prisma.user.findUnique({
       where: { username: 'admin' }
     })
 
     // If no admin exists, create default admin
     if (!admin) {
-      await createAdmin('admin', 'admin')
-      console.log('Default admin user created successfully')
+      const defaultUsername = 'admin'
+      const defaultPassword = 'admin'
+      const hashedPassword = await hash(defaultPassword, 12)
+
+      const user = await prisma.user.create({
+        data: {
+          username: defaultUsername,
+          password: hashedPassword,
+          role: 'admin'
+        }
+      })
+
+      console.log('Default admin user created:', user)
     } else {
       console.log('Admin user already exists')
     }

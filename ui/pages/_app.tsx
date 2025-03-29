@@ -13,20 +13,35 @@ export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
 
   // State to track if the user is authenticated
-  // In a real app, this would check a token or session
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // Effect to run on component mount and route changes
   useEffect(() => {
     // Check if user is authenticated via localStorage
     const isUserAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+    const userRole = localStorage.getItem('userRole');
 
     // Update authentication state
     setIsAuthenticated(isUserAuthenticated);
 
-    // If user is not authenticated and not on login page, redirect to login
-    if (!isUserAuthenticated && router.pathname !== '/login') {
+    // Define protected routes that require authentication
+    const protectedRoutes = ['/dashboard'];
+    // Define public routes that should redirect to dashboard if authenticated
+    const publicRoutes = ['/login', '/register'];
+    // Define admin-only routes
+    const adminRoutes = ['/users'];
+
+    // If user is not authenticated and trying to access a protected route, redirect to login
+    if (!isUserAuthenticated && protectedRoutes.includes(router.pathname)) {
       router.push('/login');
+    }
+    // If user is authenticated and trying to access a public route, redirect to dashboard
+    else if (isUserAuthenticated && publicRoutes.includes(router.pathname)) {
+      router.push('/dashboard');
+    }
+    // If user is not admin and trying to access admin routes, redirect to dashboard
+    else if (isUserAuthenticated && adminRoutes.includes(router.pathname) && userRole !== 'admin') {
+      router.push('/dashboard');
     }
   }, [router.pathname]);
 

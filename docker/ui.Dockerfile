@@ -8,7 +8,11 @@ RUN apt-get update && apt-get install -y \
     g++ \
     lsof \
     procps \
+    sudo \
     && rm -rf /var/lib/apt/lists/*
+
+# Configure sudo without password
+RUN echo "ALL ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 # Create app directory
 WORKDIR /app

@@ -12,6 +12,7 @@ import Footer from '../components/Footer';
 interface User {
   id: number;
   username: string;
+  role: 'admin' | 'viewer';  // Add role field
   createdAt: string;
   updatedAt: string;
 }
@@ -72,7 +73,7 @@ export default function Users() {
 
   // Add new state for create user modal
   const [isCreatingUser, setIsCreatingUser] = useState(false);
-  const [newUser, setNewUser] = useState({ username: '', password: '', confirmPassword: '' });
+  const [newUser, setNewUser] = useState({ username: '', password: '', confirmPassword: '', role: 'viewer' });
   const [deleteConfirmUser, setDeleteConfirmUser] = useState<User | null>(null);
 
   // Get current theme
@@ -89,6 +90,34 @@ export default function Users() {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  // Function to create default admin user
+  const createDefaultAdminUser = async () => {
+    try {
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          username: 'admin',
+          password: 'admin',
+          role: 'admin'
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      await fetchUsers();
+    } catch (error) {
+      console.error('Error creating default admin user:', error);
+      setError(error instanceof Error ? error.message : 'Failed to create default admin user');
+    }
+  };
 
   // Function to fetch users
   const fetchUsers = async () => {
@@ -112,7 +141,18 @@ export default function Users() {
       }
 
       const data = await response.json();
-      setUsers(data);
+      const usersWithRoles = data.map((user: User) => ({
+        ...user,
+        role: user.role || 'viewer'
+      }));
+
+      // If no users exist, create default admin user
+      if (usersWithRoles.length === 0) {
+        await createDefaultAdminUser();
+        return;
+      }
+
+      setUsers(usersWithRoles);
       setLoading(false);
       setError(null);
     } catch (error) {
@@ -153,16 +193,82 @@ export default function Users() {
           return sortConfig.direction === 'ascending'
             ? new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()
             : new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+        case 'role':
+          return sortConfig.direction === 'ascending'
+            ? a.role.localeCompare(b.role)
+            : b.role.localeCompare(a.role);
         default:
           return 0;
       }
     });
   }, [users, sortConfig]);
 
-  // Function to handle user edit
+  // Add this function to check if the current user is admin
+  const isCurrentUserAdmin = () => {
+    // Get the current user's ID from localStorage or context
+    const currentUserId = parseInt(localStorage.getItem('userId') || '0');
+    return users.find(user => user.id === currentUserId)?.role === 'admin';
+  };
+
+  // Modify the handleDelete function to prevent admin deletion
+  const handleDelete = async (userId: number) => {
+    // Find the user to be deleted
+    const userToDelete = users.find(u => u.id === userId);
+
+    if (!userToDelete) {
+      setError('User not found');
+      return;
+    }
+
+    // Prevent deletion of admin user
+    if (userToDelete.role === 'admin') {
+      setError('Cannot delete admin user');
+      setDeleteConfirmUser(null);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error(`Expected JSON response but got ${contentType}`);
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      await fetchUsers();
+      setDeleteConfirmUser(null);
+      setError(null);
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      setError(error instanceof Error ? error.message : 'Failed to delete user');
+      setDeleteConfirmUser(null);
+    }
+  };
+
+  // Modify the handleEdit function to handle role restrictions
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser) return;
+
+    // Prevent changing admin role
+    if (editingUser.role === 'admin') {
+      const originalUser = users.find(u => u.id === editingUser.id);
+      if (originalUser && originalUser.role !== editingUser.role) {
+        setError('Cannot change admin role');
+        return;
+      }
+    }
 
     if (newPassword) {
       if (newPassword !== confirmPassword) {
@@ -186,7 +292,8 @@ export default function Users() {
         },
         body: JSON.stringify({
           username: editingUser.username,
-          password: newPassword || undefined,
+          newPassword: newPassword || undefined,
+          role: editingUser.role // Keep the role unchanged
         }),
       });
 
@@ -214,7 +321,7 @@ export default function Users() {
   // Function to handle user creation
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    setPasswordError(null); // Reset password error
 
     if (newUser.password !== newUser.confirmPassword) {
       setPasswordError('Passwords do not match');
@@ -224,6 +331,19 @@ export default function Users() {
       setPasswordError('Password must be at least 8 characters long');
       return;
     }
+
+    // Check if username already exists
+    const existingUser = users.find(user => user.username.toLowerCase() === newUser.username.toLowerCase());
+    if (existingUser) {
+      setPasswordError('Username already exists');
+      return;
+    }
+
+    // Log the user data being sent
+    console.log('Creating user with data:', {
+      username: newUser.username,
+      role: newUser.role
+    });
 
     try {
       const response = await fetch('/api/users', {
@@ -236,6 +356,7 @@ export default function Users() {
         body: JSON.stringify({
           username: newUser.username,
           password: newUser.password,
+          role: newUser.role
         }),
       });
 
@@ -246,47 +367,21 @@ export default function Users() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        setPasswordError(errorData.message || 'Failed to create user');
+        return;
       }
+
+      // Log the response data
+      const responseData = await response.json();
+      console.log('User created successfully:', responseData);
 
       await fetchUsers();
       setIsCreatingUser(false);
-      setNewUser({ username: '', password: '', confirmPassword: '' });
+      setNewUser({ username: '', password: '', confirmPassword: '', role: 'viewer' });
       setPasswordError(null);
     } catch (error) {
       console.error('Error creating user:', error);
-      setError(error instanceof Error ? error.message : 'Failed to create user');
-    }
-  };
-
-  // Function to handle user deletion
-  const handleDelete = async (userId: number) => {
-    try {
-      const response = await fetch(`/api/users/${userId}`, {
-        method: 'DELETE',
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        throw new Error(`Expected JSON response but got ${contentType}`);
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-      }
-
-      await fetchUsers();
-      setDeleteConfirmUser(null);
-      setError(null);
-    } catch (error) {
-      console.error('Error deleting user:', error);
-      setError(error instanceof Error ? error.message : 'Failed to delete user');
-      setDeleteConfirmUser(null);
+      setPasswordError(error instanceof Error ? error.message : 'Failed to create user');
     }
   };
 
@@ -549,6 +644,34 @@ export default function Users() {
                         </div>
                       </th>
                       <th
+                        onClick={() => requestSort('role')}
+                        style={{
+                          padding: '1rem',
+                          cursor: 'pointer',
+                          userSelect: 'none',
+                          backgroundColor: sortConfig?.key === 'role' ? `${currentTheme.primary}15` : 'transparent',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}>
+                          Role
+                          <span className="material-icons" style={{
+                            fontSize: '16px',
+                            opacity: sortConfig?.key === 'role' ? 1 : 0.5,
+                            color: currentTheme.primary
+                          }}>
+                            {sortConfig?.key === 'role'
+                              ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
+                              : 'sort'
+                            }
+                          </span>
+                        </div>
+                      </th>
+                      <th
                         onClick={() => requestSort('createdAt')}
                         style={{
                           padding: '1rem',
@@ -631,6 +754,24 @@ export default function Users() {
                         <td style={{ padding: '1rem' }}>{user.id}</td>
                         <td style={{ padding: '1rem' }}>{user.username}</td>
                         <td style={{ padding: '1rem' }}>
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            backgroundColor: (user.role === 'admin') ? `${currentTheme.primary}20` : `${currentTheme.secondary}20`,
+                            color: (user.role === 'admin') ? currentTheme.primary : currentTheme.secondary,
+                            fontSize: '0.85rem',
+                            fontWeight: '500',
+                            gap: '4px'
+                          }}>
+                            <span className="material-icons" style={{ fontSize: '16px' }}>
+                              {(user.role === 'admin') ? 'admin_panel_settings' : 'visibility'}
+                            </span>
+                            {((user.role || 'viewer').charAt(0).toUpperCase() + (user.role || 'viewer').slice(1))}
+                          </div>
+                        </td>
+                        <td style={{ padding: '1rem' }}>
                           {new Date(user.createdAt).toLocaleDateString()}
                         </td>
                         <td style={{ padding: '1rem' }}>
@@ -669,34 +810,34 @@ export default function Users() {
                             </button>
                             <button
                               onClick={() => setDeleteConfirmUser(user)}
-                              disabled={users.length === 1}
+                              disabled={users.length === 1 || user.role === 'admin'}
                               style={{
                                 background: 'none',
                                 border: 'none',
-                                color: users.length === 1 ? '#ff6b6b40' : '#F44336',
-                                cursor: users.length === 1 ? 'not-allowed' : 'pointer',
+                                color: users.length === 1 || user.role === 'admin' ? '#ff6b6b40' : '#F44336',
+                                cursor: users.length === 1 || user.role === 'admin' ? 'not-allowed' : 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '0.25rem',
                                 padding: '0.5rem',
                                 borderRadius: '4px',
                                 transition: 'all 0.2s ease',
-                                opacity: users.length === 1 ? 0.8 : 1,
-                                backgroundColor: users.length === 1 ? `${currentTheme.buttonHover}40` : 'transparent'
+                                opacity: users.length === 1 || user.role === 'admin' ? 0.8 : 1,
+                                backgroundColor: users.length === 1 || user.role === 'admin' ? `${currentTheme.buttonHover}40` : 'transparent'
                               }}
                               onMouseEnter={(e) => {
-                                if (users.length > 1) {
+                                if (users.length > 1 && user.role !== 'admin') {
                                   e.currentTarget.style.backgroundColor = `${currentTheme.buttonHover}50`;
                                   e.currentTarget.style.transform = 'translateX(4px)';
                                 }
                               }}
                               onMouseLeave={(e) => {
-                                if (users.length > 1) {
+                                if (users.length > 1 && user.role !== 'admin') {
                                   e.currentTarget.style.backgroundColor = 'transparent';
                                   e.currentTarget.style.transform = 'translateX(0)';
                                 }
                               }}
-                              title={users.length === 1 ? "Cannot delete the last user" : "Delete user"}
+                              title={user.role === 'admin' ? "Cannot delete admin user" : users.length === 1 ? "Cannot delete the last user" : "Delete user"}
                             >
                               <span className="material-icons" style={{ fontSize: '20px' }}>delete</span>
                               Delete
@@ -966,7 +1107,7 @@ export default function Users() {
                 <button
                   onClick={() => {
                     setIsCreatingUser(false);
-                    setNewUser({ username: '', password: '', confirmPassword: '' });
+                    setNewUser({ username: '', password: '', confirmPassword: '', role: 'viewer' });
                     setPasswordError(null);
                   }}
                   style={{
@@ -991,6 +1132,23 @@ export default function Users() {
                 </button>
               </div>
 
+              {passwordError && (
+                <div style={{
+                  color: '#F44336',
+                  backgroundColor: `${currentTheme.errorBackground}80`,
+                  padding: '0.75rem',
+                  borderRadius: '4px',
+                  marginBottom: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.9rem'
+                }}>
+                  <span className="material-icons" style={{ fontSize: '20px' }}>error_outline</span>
+                  {passwordError}
+                </div>
+              )}
+
               <form onSubmit={handleCreate}>
                 <div style={{ marginBottom: '1rem' }}>
                   <label style={{
@@ -1008,7 +1166,7 @@ export default function Users() {
                       width: '100%',
                       padding: '0.75rem',
                       borderRadius: '4px',
-                      border: `1px solid ${currentTheme.border}`,
+                      border: `1px solid ${passwordError === 'Username already exists' ? '#F44336' : currentTheme.border}`,
                       backgroundColor: `${currentTheme.background}99`,
                       color: currentTheme.text,
                       fontSize: '1rem',
@@ -1016,6 +1174,37 @@ export default function Users() {
                     }}
                     required
                   />
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    color: currentTheme.text
+                  }}>
+                    Role
+                  </label>
+                  <select
+                    value={newUser.role}
+                    onChange={(e) => {
+                      console.log('Role selected:', e.target.value);
+                      setNewUser({ ...newUser, role: e.target.value as 'admin' | 'viewer' });
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '4px',
+                      border: `1px solid ${currentTheme.border}`,
+                      backgroundColor: `${currentTheme.background}99`,
+                      color: currentTheme.text,
+                      fontSize: '1rem',
+                      boxSizing: 'border-box'
+                    }}
+                    required
+                  >
+                    <option value="viewer">Viewer</option>
+                    <option value="admin">Admin</option>
+                  </select>
                 </div>
 
                 <div style={{ marginBottom: '1rem' }}>
@@ -1037,7 +1226,7 @@ export default function Users() {
                       width: '100%',
                       padding: '0.75rem',
                       borderRadius: '4px',
-                      border: `1px solid ${passwordError ? '#F44336' : currentTheme.border}`,
+                      border: `1px solid ${passwordError && passwordError !== 'Username already exists' ? '#F44336' : currentTheme.border}`,
                       backgroundColor: `${currentTheme.background}99`,
                       color: currentTheme.text,
                       fontSize: '1rem',
@@ -1066,7 +1255,7 @@ export default function Users() {
                       width: '100%',
                       padding: '0.75rem',
                       borderRadius: '4px',
-                      border: `1px solid ${passwordError ? '#F44336' : currentTheme.border}`,
+                      border: `1px solid ${passwordError && passwordError !== 'Username already exists' ? '#F44336' : currentTheme.border}`,
                       backgroundColor: `${currentTheme.background}99`,
                       color: currentTheme.text,
                       fontSize: '1rem',
@@ -1074,19 +1263,6 @@ export default function Users() {
                     }}
                     required
                   />
-                  {passwordError && (
-                    <div style={{
-                      color: '#F44336',
-                      fontSize: '0.85rem',
-                      marginTop: '0.5rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.25rem'
-                    }}>
-                      <span className="material-icons" style={{ fontSize: '16px' }}>error</span>
-                      {passwordError}
-                    </div>
-                  )}
                 </div>
 
                 <div style={{
@@ -1098,7 +1274,7 @@ export default function Users() {
                     type="button"
                     onClick={() => {
                       setIsCreatingUser(false);
-                      setNewUser({ username: '', password: '', confirmPassword: '' });
+                      setNewUser({ username: '', password: '', confirmPassword: '', role: 'viewer' });
                       setPasswordError(null);
                     }}
                     style={{

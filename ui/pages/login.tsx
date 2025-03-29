@@ -55,6 +55,9 @@ export default function Login() {
         if (response.ok) {
             // Set authentication in localStorage
             localStorage.setItem('isAuthenticated', 'true');
+            // Store user data
+            localStorage.setItem('userId', data.user.id.toString());
+            localStorage.setItem('userRole', data.user.role);
             // Clear any previous errors
             setError('');
 
@@ -78,42 +81,54 @@ export default function Login() {
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate passwords match
     if (newPassword !== confirmPassword) {
-        setPasswordError('Passwords do not match');
-        return;
+      setPasswordError('Passwords do not match');
+      return;
     }
 
-    // Validate password strength
     if (newPassword.length < 8) {
-        setPasswordError('Password must be at least 8 characters long');
-        return;
+      setPasswordError('Password must be at least 8 characters long');
+      return;
     }
 
     try {
-        const response = await fetch('/api/auth/change-password', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                username: email,
-                currentPassword: password,
-                newPassword: newPassword
-            }),
-        });
+      const response = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: 'admin',
+          currentPassword: 'admin',
+          newPassword,
+        }),
+      });
 
-        if (response.ok) {
-            // Close the modal and redirect to dashboard
-            setShowSecurityWarning(false);
-            router.push('/dashboard');
-        } else {
-            const data = await response.json();
-            setPasswordError(data.message || 'Failed to change password');
-        }
+      const data = await response.json();
+
+      if (!response.ok) {
+        setPasswordError(data.message);
+        return;
+      }
+
+      // Show success message and indicate if user was promoted to admin
+      const successMessage = data.isAdmin
+        ? 'Password changed successfully! You are now an admin user.'
+        : 'Password changed successfully!';
+
+      setShowSecurityWarning(false);
+      setNewPassword('');
+      setConfirmPassword('');
+      setPasswordError(null);
+
+      // Show success message
+      alert(successMessage);
+
+      // Redirect to dashboard
+      router.push('/dashboard');
     } catch (error) {
-        console.error('Password change error:', error);
-        setPasswordError('An error occurred while changing password');
+      console.error('Error changing password:', error);
+      setPasswordError('Failed to change password. Please try again.');
     }
   };
 

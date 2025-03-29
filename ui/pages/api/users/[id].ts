@@ -22,7 +22,7 @@ export default async function handler(
       }
 
       // Check if username is already taken by another user
-      const existingUser = await prisma.admin.findFirst({
+      const existingUser = await prisma.user.findFirst({
         where: {
           username,
           NOT: {
@@ -46,7 +46,7 @@ export default async function handler(
       }
 
       // Update user
-      const updatedUser = await prisma.admin.update({
+      const updatedUser = await prisma.user.update({
         where: {
           id: parseInt(id as string),
         },
@@ -54,6 +54,7 @@ export default async function handler(
         select: {
           id: true,
           username: true,
+          role: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -69,7 +70,7 @@ export default async function handler(
       const { id } = req.query
 
       // Check if user exists
-      const user = await prisma.admin.findUnique({
+      const user = await prisma.user.findUnique({
         where: { id: parseInt(id as string) }
       })
 
@@ -78,7 +79,7 @@ export default async function handler(
       }
 
       // Count total users
-      const totalUsers = await prisma.admin.count()
+      const totalUsers = await prisma.user.count()
 
       // Don't allow deleting the last user
       if (totalUsers <= 1) {
@@ -86,7 +87,7 @@ export default async function handler(
       }
 
       // Delete user
-      await prisma.admin.delete({
+      await prisma.user.delete({
         where: { id: parseInt(id as string) }
       })
 

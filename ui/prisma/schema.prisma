@@ -15,11 +15,24 @@ datasource db {
   url      = "file:./dev.db"
 }
 
-// Admin model for storing administrator credentials
-model Admin {
+// User model for storing user credentials and roles
+model User {
   id        Int      @id @default(autoincrement())
   username  String   @unique
   password  String
+  role      String   @default("viewer")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@map("users") // This maps the model to a table named "users"
+}
+
+// System settings model for storing global application state
+model SystemSettings {
+  id            Int      @id @default(autoincrement())
+  key           String   @unique
+  value         String
+  lastUpdated   DateTime @updatedAt
+
+  @@map("system_settings") // This maps the model to a table named "system_settings"
 }

@@ -212,31 +212,80 @@ export default function Dashboard() {
     }
   };
 
-  // Function to toggle real-time monitoring
-  const toggleMonitoring = () => {
-    if (isMonitoring) {
-      // Stop monitoring
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-      setIsMonitoring(false);
-    } else {
-      // Start monitoring - fetch targets first, then start the interval
-      fetchTargets().then(() => {
-        // Set up interval to fetch latest status every refreshInterval seconds
-        intervalRef.current = setInterval(fetchLatestStatus, refreshInterval * 1000);
-        setIsMonitoring(true);
+  // Function to toggle monitoring state
+  const toggleMonitoring = async () => {
+    try {
+      const newState = !isMonitoring;
+
+      // Update monitoring state in the database
+      const response = await fetch('/api/system/monitoring', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isMonitoring: newState }),
       });
+
+      if (!response.ok) {
+        throw new Error('Failed to update monitoring state');
+      }
+
+      // Update local state
+      setIsMonitoring(newState);
+
+      if (newState) {
+        // Start monitoring
+        fetchTargets();
+        intervalRef.current = setInterval(fetchTargets, refreshInterval * 1000);
+      } else {
+        // Stop monitoring
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling monitoring:', error);
+      setError('Failed to update monitoring state');
     }
   };
+
+  // Effect to fetch initial monitoring state
+  useEffect(() => {
+    const fetchMonitoringState = async () => {
+      try {
+        const response = await fetch('/api/system/monitoring');
+        if (response.ok) {
+          const data = await response.json();
+          setIsMonitoring(data.isMonitoring);
+
+          // If monitoring is active, start the interval
+          if (data.isMonitoring) {
+            fetchTargets();
+            intervalRef.current = setInterval(fetchTargets, refreshInterval * 1000);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching monitoring state:', error);
+      }
+    };
+
+    fetchMonitoringState();
+
+    // Cleanup interval on unmount
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [refreshInterval]); // Add refreshInterval as dependency
 
   // Function to update refresh interval
   const updateRefreshInterval = (newInterval: number) => {
     setRefreshInterval(newInterval);
     if (isMonitoring && intervalRef.current) {
       clearInterval(intervalRef.current);
-      intervalRef.current = setInterval(fetchLatestStatus, newInterval * 1000);
+      intervalRef.current = setInterval(fetchTargets, newInterval * 1000);
     }
   };
 
@@ -388,12 +437,41 @@ export default function Dashboard() {
     return distribution;
   };
 
+  // Add this function to check if the current user is admin
+  const isCurrentUserAdmin = () => {
+    return localStorage.getItem('userRole') === 'admin';
+  };
+
   // Function to handle logout - redirects to login page
-  const handleLogout = () => {
-    // Clear authentication in localStorage
-    localStorage.removeItem('isAuthenticated');
-    // Redirect to login page
-    router.push('/login');
+  const handleLogout = async () => {
+    try {
+      // If monitoring is active, stop it first
+      if (isMonitoring) {
+        // Update monitoring state in the database
+        await fetch('/api/system/monitoring', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ isMonitoring: false }),
+        });
+
+        // Clear the interval
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+      }
+
+      // Clear authentication in localStorage
+      localStorage.removeItem('isAuthenticated');
+      localStorage.removeItem('userId');
+      localStorage.removeItem('userRole');
+      // Redirect to login page
+      router.push('/login');
+    } catch (error) {
+      console.error('Error during logout:', error);
+    }
   };
 
   return (
@@ -740,40 +818,43 @@ export default function Dashboard() {
               {loading ? 'Loading...' : isMonitoring ? 'Stop' : 'Start'}
             </button>
 
-            <button
-              onClick={() => router.push('/users')}
-              className="nav-button"
-              style={{
-                width: '100%',
-                justifyContent: 'flex-start',
-                padding: '1rem 1.25rem',
-                borderRadius: '12px',
-                transition: 'all 0.2s ease',
-                fontSize: '1rem',
-                backgroundColor: `${currentTheme.primary}15`,
-                border: `1px solid ${currentTheme.primary}30`,
-                color: currentTheme.primary
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = `${currentTheme.primary}25`;
-                e.currentTarget.style.transform = 'translateX(4px)';
-                e.currentTarget.style.boxShadow = `0 4px 12px ${currentTheme.primary}20`;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = `${currentTheme.primary}15`;
-                e.currentTarget.style.transform = 'translateX(0)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-            >
-              <span className="material-icons" style={{
-                transition: 'transform 0.3s ease',
-                fontSize: '24px',
-                marginRight: '12px'
-              }}>
-                people
-              </span>
-              Users
-            </button>
+            {/* Only show Users button for admin users */}
+            {isCurrentUserAdmin() && (
+              <button
+                onClick={() => router.push('/users')}
+                className="nav-button"
+                style={{
+                  width: '100%',
+                  justifyContent: 'flex-start',
+                  padding: '1rem 1.25rem',
+                  borderRadius: '12px',
+                  transition: 'all 0.2s ease',
+                  fontSize: '1rem',
+                  backgroundColor: `${currentTheme.primary}15`,
+                  border: `1px solid ${currentTheme.primary}30`,
+                  color: currentTheme.primary
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = `${currentTheme.primary}25`;
+                  e.currentTarget.style.transform = 'translateX(4px)';
+                  e.currentTarget.style.boxShadow = `0 4px 12px ${currentTheme.primary}20`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = `${currentTheme.primary}15`;
+                  e.currentTarget.style.transform = 'translateX(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <span className="material-icons" style={{
+                  transition: 'transform 0.3s ease',
+                  fontSize: '24px',
+                  marginRight: '12px'
+                }}>
+                  people
+                </span>
+                Users
+              </button>
+            )}
 
             <div style={{
               backgroundColor: `${currentTheme.buttonHover}20`,

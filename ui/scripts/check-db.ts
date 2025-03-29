@@ -9,11 +9,13 @@ const prisma = new PrismaClient()
 
 async function checkDatabase() {
   try {
-    // Get all admins
-    const admins = await prisma.admin.findMany()
+    // Check if any users exist
+    const userCount = await prisma.user.count()
+    console.log(`Found ${userCount} users in database`)
 
-    console.log('Contenido de la tabla Admin:')
-    console.log(JSON.stringify(admins, null, 2))
+    // List all users
+    const users = await prisma.user.findMany()
+    console.log('Users:', users)
   } catch (error) {
     console.error('Error checking database:', error)
   } finally {
