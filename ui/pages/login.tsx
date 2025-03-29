@@ -1,5 +1,5 @@
 /**
- * Login page component with a form that validates admin credentials
+ * Login page component with a form that validates credentials
  * Sets authentication state in localStorage upon successful login
  * Features an interactive 3D background with grid and dots that follow mouse movement
  */
@@ -29,30 +29,35 @@ export default function Login() {
   }, [router]);
 
   // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
-    // Prevent default form submission behavior
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    try {
+        // Call the login API
+        const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                username: email,
+                password: password
+            }),
+        });
 
-    // Basic validation
-    if (!email || !password) {
-      // Set error message if validation fails
-      setError('Please enter both email and password');
-      return;
-    }
-
-    // Check if credentials match admin/admin
-    if (email === 'admin' && password === 'admin') {
-      // Set authentication in localStorage
-      localStorage.setItem('isAuthenticated', 'true');
-
-      // Clear any previous errors
-      setError('');
-
-      // Redirect to home page
-      router.push('/');
-    } else {
-      // Set error for invalid credentials
-      setError('Invalid credentials');
+        if (response.ok) {
+            // Set authentication in localStorage
+            localStorage.setItem('isAuthenticated', 'true');
+            // Clear any previous errors
+            setError('');
+            // Redirect to dashboard
+            router.push('/dashboard');
+        } else {
+            const data = await response.json();
+            setError(data.message || 'Invalid credentials');
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        setError('An error occurred during login');
     }
   };
 
