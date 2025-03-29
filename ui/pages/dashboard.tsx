@@ -887,6 +887,41 @@ export default function Dashboard() {
             </span>
             Logout
           </button>
+
+          <button
+            onClick={() => router.push('/users')}
+            className="nav-button"
+            style={{
+              width: '100%',
+              justifyContent: 'flex-start',
+              padding: '1rem 1.25rem',
+              borderRadius: '12px',
+              transition: 'all 0.2s ease',
+              fontSize: '1rem',
+              backgroundColor: `${currentTheme.secondary}15`,
+              border: `1px solid ${currentTheme.secondary}30`,
+              color: currentTheme.secondary
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = `${currentTheme.secondary}25`;
+              e.currentTarget.style.transform = 'translateX(4px)';
+              e.currentTarget.style.boxShadow = `0 4px 12px ${currentTheme.secondary}20`;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = `${currentTheme.secondary}15`;
+              e.currentTarget.style.transform = 'translateX(0)';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          >
+            <span className="material-icons" style={{
+              transition: 'transform 0.3s ease',
+              fontSize: '24px',
+              marginRight: '12px'
+            }}>
+              people
+            </span>
+            Users
+          </button>
         </div>
 
         <main style={{
