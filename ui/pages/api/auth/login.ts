@@ -18,12 +18,18 @@ export default async function handler(
   try {
     const { username, password } = req.body
 
+    // Check if using default credentials
+    const isDefaultCredentials = username === 'admin' && password === 'admin'
+
     // Verify credentials against database
     const isValid = await verifyAdminCredentials(username, password)
 
     if (isValid) {
       // Set session cookie or JWT token here
-      return res.status(200).json({ message: 'Login successful' })
+      return res.status(200).json({
+        message: 'Login successful',
+        isDefaultCredentials // Add flag to indicate if default credentials were used
+      })
     } else {
       return res.status(401).json({ message: 'Invalid credentials' })
     }

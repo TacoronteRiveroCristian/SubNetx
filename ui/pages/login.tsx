@@ -19,6 +19,12 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  // State for security warning modal
+  const [showSecurityWarning, setShowSecurityWarning] = useState(false);
+  // State for password change form
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
 
   // Check if user is already authenticated on mount
   useEffect(() => {
@@ -44,20 +50,70 @@ export default function Login() {
             }),
         });
 
+        const data = await response.json();
+
         if (response.ok) {
             // Set authentication in localStorage
             localStorage.setItem('isAuthenticated', 'true');
             // Clear any previous errors
             setError('');
-            // Redirect to dashboard
-            router.push('/dashboard');
+
+            // If using default credentials, show security warning
+            if (data.isDefaultCredentials) {
+                setShowSecurityWarning(true);
+            } else {
+                // Redirect to dashboard if not using default credentials
+                router.push('/dashboard');
+            }
         } else {
-            const data = await response.json();
             setError(data.message || 'Invalid credentials');
         }
     } catch (error) {
         console.error('Login error:', error);
         setError('An error occurred during login');
+    }
+  };
+
+  // Handle password change
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Validate passwords match
+    if (newPassword !== confirmPassword) {
+        setPasswordError('Passwords do not match');
+        return;
+    }
+
+    // Validate password strength
+    if (newPassword.length < 8) {
+        setPasswordError('Password must be at least 8 characters long');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/auth/change-password', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                username: email,
+                currentPassword: password,
+                newPassword: newPassword
+            }),
+        });
+
+        if (response.ok) {
+            // Close the modal and redirect to dashboard
+            setShowSecurityWarning(false);
+            router.push('/dashboard');
+        } else {
+            const data = await response.json();
+            setPasswordError(data.message || 'Failed to change password');
+        }
+    } catch (error) {
+        console.error('Password change error:', error);
+        setPasswordError('An error occurred while changing password');
     }
   };
 
@@ -115,6 +171,45 @@ export default function Login() {
           width: 100%;
           box-sizing: border-box;
           padding-bottom: 1rem;
+        }
+
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: rgba(0, 0, 0, 0.7);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 1000;
+        }
+
+        .modal-content {
+          background-color: ${theme.cardBackground};
+          padding: 2rem;
+          border-radius: 8px;
+          width: 90%;
+          max-width: 500px;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .modal-header {
+          display: flex;
+          align-items: center;
+          margin-bottom: 1.5rem;
+        }
+
+        .modal-title {
+          margin: 0;
+          color: #F44336;
+          font-size: 1.5rem;
+        }
+
+        .modal-icon {
+          margin-right: 0.5rem;
+          color: #F44336;
         }
       `}</style>
 
@@ -225,6 +320,105 @@ export default function Login() {
 
         <Footer theme={theme} />
       </div>
+
+      {/* Security Warning Modal */}
+      {showSecurityWarning && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <span className="material-icons modal-icon">warning</span>
+              <h2 className="modal-title">Security Warning</h2>
+            </div>
+            <p style={{ marginBottom: '1.5rem', lineHeight: '1.5' }}>
+              You are currently using the default credentials (admin/admin). For security reasons, please change your password immediately.
+            </p>
+            <form onSubmit={handlePasswordChange}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '0.5rem',
+                  fontWeight: 500
+                }}>
+                  New Password
+                </label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '4px',
+                    border: `1px solid ${theme.border}`,
+                    backgroundColor: theme.background,
+                    color: theme.text,
+                    fontSize: '1rem',
+                    height: '48px',
+                    boxSizing: 'border-box'
+                  }}
+                  placeholder="Enter new password"
+                />
+              </div>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '0.5rem',
+                  fontWeight: 500
+                }}>
+                  Confirm New Password
+                </label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '4px',
+                    border: `1px solid ${theme.border}`,
+                    backgroundColor: theme.background,
+                    color: theme.text,
+                    fontSize: '1rem',
+                    height: '48px',
+                    boxSizing: 'border-box'
+                  }}
+                  placeholder="Confirm new password"
+                />
+              </div>
+              {passwordError && (
+                <div style={{
+                  backgroundColor: '#FFEBEE',
+                  color: '#D32F2F',
+                  padding: '0.75rem',
+                  marginBottom: '1rem',
+                  borderRadius: '4px',
+                  fontWeight: 500
+                }}>
+                  {passwordError}
+                </div>
+              )}
+              <button
+                type="submit"
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  backgroundColor: theme.primary,
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontSize: '1rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                  height: '48px'
+                }}
+              >
+                Change Password
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </>
   );
 }
