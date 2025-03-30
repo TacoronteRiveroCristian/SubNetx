@@ -111,6 +111,12 @@ export default function Dashboard() {
       try {
         const response = await fetch('/api/auth/verify', {
           credentials: 'include',
+          // Add cache control to prevent browser caching authentication status
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
         });
 
         if (!response.ok) {
@@ -127,9 +133,16 @@ export default function Dashboard() {
         // fetchTargets();
       } catch (error) {
         // Not authenticated, redirect to login
+        console.error('Authentication error:', error);
         localStorage.removeItem('isAuthenticated');
         localStorage.removeItem('userRole');
-        router.push('/login');
+        localStorage.removeItem('userId');
+        localStorage.removeItem('dashboardMonitoring');
+        localStorage.removeItem('dashboardTargets');
+        localStorage.removeItem('dashboardStatuses');
+
+        // Use replace to prevent back button from returning to dashboard
+        window.location.replace('/login');
       }
     };
 
@@ -264,12 +277,19 @@ export default function Dashboard() {
       // Update local state
       setIsMonitoring(newState);
 
+      // Save monitoring state to localStorage for persistence across navigation
+      localStorage.setItem('dashboardMonitoring', String(newState));
+
       if (newState) {
         // Start monitoring
-        fetchTargets();
+        await fetchTargets();
+        // Clear any existing interval before setting a new one
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
         intervalRef.current = setInterval(fetchTargets, refreshInterval * 1000);
       } else {
-        // Stop monitoring
+        // Stop monitoring but KEEP the state in localStorage for persistence
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
           intervalRef.current = null;
@@ -281,47 +301,78 @@ export default function Dashboard() {
     }
   };
 
-  // Effect to fetch initial monitoring state - actualizado para reiniciar siempre
+  // Effect to fetch initial monitoring state - modificado para restaurar estado
   useEffect(() => {
-    const resetDashboardState = async () => {
+    const initializeDashboardState = async () => {
       try {
-        // Siempre reiniciamos todos los estados locales para garantizar pantalla de bienvenida
-        setTargets([]);
-        setLatestStatuses([]);
-        setIsMonitoring(false);
+        // Check if isAuthenticated is true but monitoring state is undefined
+        const isLoggedIn = localStorage.getItem('isAuthenticated') === 'true';
+        const savedMonitoring = localStorage.getItem('dashboardMonitoring');
 
-        // Forzar el estado a inactivo en el servidor también
-        await fetch('/api/system/monitoring', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ isMonitoring: false }),
-        });
+        // Only check timestamp for initial login, not for navigation between pages
+        const loginTimestamp = localStorage.getItem('loginTimestamp');
+        const currentTime = Date.now();
+        // Consider it a new login only if there's no monitoring state and we have a recent timestamp
+        const isNewLogin = !savedMonitoring &&
+          (!loginTimestamp || (currentTime - parseInt(loginTimestamp, 10)) > 3600000); // 1 hour timeout for session
+
+        if (isNewLogin && isLoggedIn) {
+          // Store new login timestamp
+          localStorage.setItem('loginTimestamp', currentTime.toString());
+          // Initialize with empty state
+          setTargets([]);
+          setLatestStatuses([]);
+          setIsMonitoring(false);
+          // Clear any previously stored monitoring state
+          localStorage.removeItem('dashboardMonitoring');
+          localStorage.removeItem('dashboardTargets');
+          localStorage.removeItem('dashboardStatuses');
+          return;
+        }
+
+        // If we have a saved monitoring state, restore it
+        if (savedMonitoring === 'true' && isLoggedIn) {
+          // Restore monitoring state
+          setIsMonitoring(true);
+
+          // Fetch data and start monitoring
+          await fetchTargets();
+          if (!intervalRef.current) {
+            intervalRef.current = setInterval(fetchTargets, refreshInterval * 1000);
+          }
+        } else if (isLoggedIn) {
+          // User is logged in but monitoring is not active
+          setTargets([]);
+          setLatestStatuses([]);
+          setIsMonitoring(false);
+        }
       } catch (error) {
-        console.error('Error resetting dashboard state:', error);
+        console.error('Error initializing dashboard state:', error);
       }
     };
 
-    // Ejecutar la limpieza inmediatamente al montar el componente
-    resetDashboardState();
+    // Execute initialization immediately when component mounts
+    initializeDashboardState();
 
-    // Cleanup interval on unmount
+    // Cleanup interval on unmount but DON'T reset monitoring state
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, []);
-
-  // Interceptar cualquier cambio de ruta para limpiar el estado si se navega fuera del dashboard
-  useEffect(() => {
-    const handleRouteChange = () => {
-      // Si el usuario navega fuera del dashboard, limpiamos el estado
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
+    };
+  }, []);
+
+  // Interceptar cualquier cambio de ruta para mantener el estado pero limpiar recursos
+  useEffect(() => {
+    const handleRouteChange = () => {
+      // Solo limpiamos el intervalo para evitar fugas de memoria, pero mantenemos el estado
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+
+      // No reseteamos el estado de isMonitoring aquí para que persista entre navegaciones
     };
 
     // Suscribirse a los eventos de cambio de ruta
@@ -498,32 +549,17 @@ export default function Dashboard() {
   // Function to handle logout - redirects to login page first for better UX
   const handleLogout = () => {
     try {
-      // Eliminamos básicamente solo lo necesario antes de redireccionar
-      localStorage.removeItem('isAuthenticated');
+      // Primero redirigir al usuario para evitar cambios en la UI
+      // Las limpiezas se harán en segundo plano
+      window.location.replace('/login');
 
-      // Redirigir INMEDIATAMENTE al usuario, sin esperar ninguna operación asíncrona
-      window.location.href = '/login';
-
-      // Todo lo siguiente se ejecutará en segundo plano después de iniciar la navegación
-
-      // Limpiar localStorage (continuará ejecutándose incluso después de iniciar la navegación)
-      setTimeout(() => {
-        localStorage.clear();
-      }, 0);
-
-      // Detener el intervalo si está activo (esto es síncrono y rápido)
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-
-      // Ejecutar operaciones de API en segundo plano sin esperar respuestas
-      // Estas solicitudes se completarán incluso si la página ya está cambiando
+      // Luego hacer la llamada al API de logout para invalidar la sesión
       fetch('/api/auth/logout', {
         method: 'POST',
         credentials: 'include',
-      }).catch(() => {}); // ignorar errores en las solicitudes en segundo plano
+      }).catch(() => {}); // Ignorar errores, ya estamos redirigiendo
 
+      // Reset server monitoring state
       fetch('/api/system/monitoring', {
         method: 'POST',
         headers: {
@@ -532,9 +568,30 @@ export default function Dashboard() {
         body: JSON.stringify({ isMonitoring: false }),
       }).catch(() => {}); // ignorar errores
 
+      // Also reset any target data in session
+      fetch('/api/system/reset', {
+        method: 'POST',
+      }).catch(() => {}); // ignorar errores
+
+      // Detener el intervalo si está activo
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+
+      // Estas operaciones ocurrirán, pero el usuario ya estará en la página de login
+      // así que no verá ningún cambio en la UI
+      localStorage.removeItem('isAuthenticated');
+      localStorage.removeItem('dashboardMonitoring');
+      localStorage.removeItem('userRole');
+      localStorage.removeItem('userId');
+      localStorage.removeItem('dashboardTargets');
+      localStorage.removeItem('dashboardStatuses');
+      localStorage.removeItem('loginTimestamp');
+
     } catch (error) {
       // Si hay un error, asegurar que el usuario sea redirigido de todas formas
-      window.location.href = '/login';
+      window.location.replace('/login');
     }
   };
 
@@ -1499,14 +1556,9 @@ export default function Dashboard() {
                             }}>
                               {sortConfig?.key === 'id'
                                 ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
-                                : 'sort'
+                                : 'tag'
                               }
                             </span>
-                            <span style={{
-                              fontSize: '10px',
-                              opacity: 0.6,
-                              color: currentTheme.primary
-                            }}>123</span>
                           </div>
                         </div>
                       </th>
@@ -1550,14 +1602,9 @@ export default function Dashboard() {
                             }}>
                               {sortConfig?.key === 'target'
                                 ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
-                                : 'sort_by_alpha'
+                                : 'language'
                               }
                             </span>
-                            <span style={{
-                              fontSize: '10px',
-                              opacity: 0.6,
-                              color: currentTheme.primary
-                            }}>aZ</span>
                           </div>
                         </div>
                       </th>
@@ -1601,14 +1648,9 @@ export default function Dashboard() {
                             }}>
                               {sortConfig?.key === 'timestamp'
                                 ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
-                                : 'sort'
+                                : 'schedule'
                               }
                             </span>
-                            <span style={{
-                              fontSize: '10px',
-                              opacity: 0.6,
-                              color: currentTheme.primary
-                            }}>123</span>
                           </div>
                         </div>
                       </th>
@@ -1652,14 +1694,9 @@ export default function Dashboard() {
                             }}>
                               {sortConfig?.key === 'status'
                                 ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
-                                : 'sort'
+                                : 'info'
                               }
                             </span>
-                            <span style={{
-                              fontSize: '10px',
-                              opacity: 0.6,
-                              color: currentTheme.primary
-                            }}>123</span>
                           </div>
                         </div>
                       </th>
@@ -1703,14 +1740,9 @@ export default function Dashboard() {
                             }}>
                               {sortConfig?.key === 'quality'
                                 ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
-                                : 'sort'
+                                : 'signal_cellular_alt'
                               }
                             </span>
-                            <span style={{
-                              fontSize: '10px',
-                              opacity: 0.6,
-                              color: currentTheme.primary
-                            }}>123</span>
                           </div>
                         </div>
                       </th>
@@ -1754,14 +1786,9 @@ export default function Dashboard() {
                             }}>
                               {sortConfig?.key === 'packetLoss'
                                 ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
-                                : 'sort'
+                                : 'error_outline'
                               }
                             </span>
-                            <span style={{
-                              fontSize: '10px',
-                              opacity: 0.6,
-                              color: currentTheme.primary
-                            }}>123</span>
                           </div>
                         </div>
                       </th>
@@ -1805,14 +1832,9 @@ export default function Dashboard() {
                             }}>
                               {sortConfig?.key === 'avgRtt'
                                 ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
-                                : 'sort'
+                                : 'speed'
                               }
                             </span>
-                            <span style={{
-                              fontSize: '10px',
-                              opacity: 0.6,
-                              color: currentTheme.primary
-                            }}>123</span>
                           </div>
                         </div>
                       </th>

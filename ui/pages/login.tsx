@@ -86,8 +86,14 @@ export default function Login() {
                 // Continue with login even if this fails
             }
 
-            // Clear any existing monitoring data from localStorage
+            // Clear all existing monitoring data
             localStorage.removeItem('dashboardData');
+            localStorage.removeItem('dashboardMonitoring');
+            localStorage.removeItem('dashboardTargets');
+            localStorage.removeItem('dashboardStatuses');
+
+            // Set login timestamp to mark this as a fresh login
+            localStorage.setItem('loginTimestamp', Date.now().toString());
 
             // Set authentication in localStorage
             localStorage.setItem('isAuthenticated', 'true');
@@ -102,7 +108,8 @@ export default function Login() {
                 setShowSecurityWarning(true);
             } else {
                 // Redirect to dashboard if not using default credentials
-                router.push('/dashboard');
+                // Use replace instead of push to prevent back navigation to login
+                router.replace('/dashboard');
             }
         } else {
             setError(data.message || 'Invalid credentials');
@@ -161,7 +168,7 @@ export default function Login() {
       alert(successMessage);
 
       // Redirect to dashboard
-      router.push('/dashboard');
+      router.replace('/dashboard');
     } catch (error) {
       console.error('Error changing password:', error);
       setPasswordError('Failed to change password. Please try again.');

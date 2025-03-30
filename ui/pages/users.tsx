@@ -598,14 +598,9 @@ export default function Users() {
                             }}>
                               {sortConfig?.key === 'id'
                                 ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
-                                : 'sort'
+                                : 'tag'
                               }
                             </span>
-                            <span style={{
-                              fontSize: '10px',
-                              opacity: 0.6,
-                              color: currentTheme.primary
-                            }}>123</span>
                           </div>
                         </div>
                       </th>
@@ -638,7 +633,7 @@ export default function Users() {
                           }}>
                             {sortConfig?.key === 'username'
                               ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
-                              : 'sort_by_alpha'
+                              : 'person'
                             }
                           </span>
                         </div>
@@ -666,7 +661,7 @@ export default function Users() {
                           }}>
                             {sortConfig?.key === 'role'
                               ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
-                              : 'sort'
+                              : 'admin_panel_settings'
                             }
                           </span>
                         </div>
@@ -700,7 +695,7 @@ export default function Users() {
                           }}>
                             {sortConfig?.key === 'createdAt'
                               ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
-                              : 'schedule'
+                              : 'calendar_today'
                             }
                           </span>
                         </div>
@@ -734,7 +729,7 @@ export default function Users() {
                           }}>
                             {sortConfig?.key === 'updatedAt'
                               ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
-                              : 'schedule'
+                              : 'update'
                             }
                           </span>
                         </div>

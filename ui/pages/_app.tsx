@@ -46,7 +46,8 @@ export default function App({ Component, pageProps }: AppProps) {
           localStorage.setItem('userRole', data.user.role);
           localStorage.setItem('userId', data.user.id.toString());
 
-          // Limpiar cualquier dato relacionado con el monitoreo
+          // NO limpiar el estado de monitoreo al navegar entre páginas
+          // Sólo limpiar otros datos que podrían ser problemáticos
           localStorage.removeItem('dashboardData');
           localStorage.removeItem('monitoringActive');
         }

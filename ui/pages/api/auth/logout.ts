@@ -18,9 +18,14 @@ export default async function handler(
   try {
     // Reset monitoring state to false when a user logs out
     try {
-      await prisma.systemSettings.update({
+      await prisma.systemSettings.upsert({
         where: { key: 'monitoring_active' },
-        data: {
+        update: {
+          value: 'false',
+          lastUpdated: new Date()
+        },
+        create: {
+          key: 'monitoring_active',
           value: 'false',
           lastUpdated: new Date()
         }
@@ -30,8 +35,18 @@ export default async function handler(
       // Continue with logout even if resetting monitoring fails
     }
 
-    // Clear the authentication cookie
-    res.setHeader('Set-Cookie', 'token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0');
+    // Clear all possible authentication cookies to ensure session is terminated
+    const cookieOptions = 'Path=/; HttpOnly; SameSite=Strict; Max-Age=0';
+    res.setHeader('Set-Cookie', [
+      `token=; ${cookieOptions}`,
+      `session=; ${cookieOptions}`,
+      `auth=; ${cookieOptions}`
+    ]);
+
+    // Add cache control headers to prevent browsers from caching the response
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
 
     return res.status(200).json({ message: 'Logged out successfully' });
   } catch (error) {
