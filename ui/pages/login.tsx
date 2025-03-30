@@ -28,28 +28,48 @@ export default function Login() {
 
   // Check if user is already authenticated on mount
   useEffect(() => {
-    // Add this check to prevent double redirects
+    // Verificar autenticación solo si estamos en la página de login
     if (router.pathname === '/login') {
-      // Use the API verification instead of local storage for consistency
-      fetch('/api/auth/verify', {
-        credentials: 'include',
-      })
-        .then(response => {
-          if (response.ok) {
-            return response.json();
+      // Primero verificar localStorage para evitar peticiones innecesarias
+      if (localStorage.getItem('isAuthenticated') !== 'true') {
+        // Si no hay datos de autenticación en localStorage, verificar con el servidor
+        fetch('/api/auth/verify', {
+          credentials: 'include',
+          // Añadir cabeceras para evitar caché
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
           }
-          throw new Error('Not authenticated');
         })
-        .then(data => {
-          // Only redirect if authenticated
-          router.push('/dashboard');
-        })
-        .catch(err => {
-          // User is not authenticated, so it's ok to stay on login page
-          // Clear any leftover auth state to be safe
-          localStorage.removeItem('isAuthenticated');
-          localStorage.removeItem('userRole');
-        });
+          .then(response => {
+            if (response.ok) {
+              return response.json();
+            }
+            throw new Error('Not authenticated');
+          })
+          .then(data => {
+            // Si estamos autenticados según el servidor, actualizar localStorage y redirigir
+            localStorage.setItem('isAuthenticated', 'true');
+            localStorage.setItem('userRole', data.user.role);
+            localStorage.setItem('userId', data.user.id.toString());
+
+            // Redirigir al dashboard
+            router.replace('/dashboard');
+          })
+          .catch(err => {
+            // Usuario no autenticado, limpiar cualquier dato residual
+            localStorage.removeItem('isAuthenticated');
+            localStorage.removeItem('userRole');
+            localStorage.removeItem('userId');
+            localStorage.removeItem('dashboardMonitoring');
+            localStorage.removeItem('dashboardTargets');
+            localStorage.removeItem('dashboardStatuses');
+          });
+      } else {
+        // Si tenemos datos de autenticación en localStorage, redirigir directamente
+        router.replace('/dashboard');
+      }
     }
   }, [router]);
 

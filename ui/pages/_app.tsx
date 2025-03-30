@@ -59,7 +59,7 @@ export default function App({ Component, pageProps }: AppProps) {
         // Define routes
         const protectedRoutes = ['/dashboard'];
         const publicRoutes = ['/login', '/register'];
-        const adminRoutes = ['/users'];
+        const adminRoutes = ['/users', '/server'];
 
         // Handle redirects for authenticated users - avoid infinite redirects
         if (publicRoutes.includes(currentPath)) {
@@ -79,10 +79,10 @@ export default function App({ Component, pageProps }: AppProps) {
 
         // Redirect to login if trying to access protected routes - avoid infinite redirects
         const currentPath = router.pathname;
-        const protectedRoutes = ['/dashboard', '/users'];
+        const protectedRoutes = ['/dashboard', '/users', '/server'];
         if (protectedRoutes.includes(currentPath)) {
           setIsRedirecting(true);
-          router.push('/login');
+          window.location.replace('/login');
         }
       } finally {
         setIsLoading(false);

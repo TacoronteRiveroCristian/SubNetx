@@ -7,6 +7,7 @@ import { useRouter } from 'next/router';
 import React, { useEffect, useState } from 'react';
 import BackgroundEffect from '../components/BackgroundEffect';
 import Footer from '../components/Footer';
+import Logo from '../components/Logo';
 
 // Define User interface
 interface User {
@@ -59,6 +60,7 @@ export default function Users() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string>('');
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [newPassword, setNewPassword] = useState('');
@@ -75,6 +77,8 @@ export default function Users() {
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [newUser, setNewUser] = useState({ username: '', password: '', confirmPassword: '', role: 'viewer' });
   const [deleteConfirmUser, setDeleteConfirmUser] = useState<User | null>(null);
+  // Agregar estado para el menú hamburguesa
+  const [isHamburgerOpen, setIsHamburgerOpen] = useState(false);
 
   // Get current theme
   const currentTheme = themes[theme];
@@ -85,6 +89,16 @@ export default function Users() {
       router.push('/login');
     }
   }, [router]);
+
+  // Load theme from localStorage
+  useEffect(() => {
+    // Check if theme preference exists in localStorage
+    const savedTheme = localStorage.getItem('appTheme');
+    if (savedTheme === 'light' || savedTheme === 'dark') {
+      setTheme(savedTheme);
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+  }, []);
 
   // Fetch users on mount
   useEffect(() => {
@@ -210,49 +224,47 @@ export default function Users() {
     return users.find(user => user.id === currentUserId)?.role === 'admin';
   };
 
-  // Modify the handleDelete function to prevent admin deletion
-  const handleDelete = async (userId: number) => {
-    // Find the user to be deleted
-    const userToDelete = users.find(u => u.id === userId);
-
-    if (!userToDelete) {
-      setError('User not found');
+  // Function to handle deletion confirmation
+  const handleDeleteConfirmation = (user: User) => {
+    // Don't allow deleting the last user or an admin
+    if (users.length === 1 || user.role === 'admin') {
+      setError(user.role === 'admin'
+        ? 'Cannot delete admin users.'
+        : 'Cannot delete the last user in the system.');
       return;
     }
 
-    // Prevent deletion of admin user
-    if (userToDelete.role === 'admin') {
-      setError('Cannot delete admin user');
-      setDeleteConfirmUser(null);
-      return;
-    }
+    setDeleteConfirmUser(user);
+  };
+
+  // Function to handle the actual deletion
+  const handleDeleteUser = async () => {
+    if (!deleteConfirmUser) return;
 
     try {
-      const response = await fetch(`/api/users/${userId}`, {
+      setError('');
+      const response = await fetch(`/api/users/${deleteConfirmUser.id}`, {
         method: 'DELETE',
         headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
         },
       });
 
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        throw new Error(`Expected JSON response but got ${contentType}`);
-      }
-
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        throw new Error(errorData.error || 'Failed to delete user');
       }
 
-      await fetchUsers();
+      // Remove the user from the local state
+      setUsers(users.filter(user => user.id !== deleteConfirmUser.id));
       setDeleteConfirmUser(null);
-      setError(null);
-    } catch (error) {
-      console.error('Error deleting user:', error);
-      setError(error instanceof Error ? error.message : 'Failed to delete user');
-      setDeleteConfirmUser(null);
+
+      // Show success message
+      setSuccessMessage('User deleted successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
+
+    } catch (err) {
+      setError((err as Error).message);
     }
   };
 
@@ -385,6 +397,37 @@ export default function Users() {
     }
   };
 
+  // Function to handle logout
+  const handleLogout = async () => {
+    try {
+      // Restaurar el tema oscuro por defecto antes de cerrar sesión
+      localStorage.setItem('appTheme', 'dark');
+
+      // Limpiar localStorage primero
+      localStorage.removeItem('isAuthenticated');
+      localStorage.removeItem('userRole');
+      localStorage.removeItem('userId');
+
+      // PRIMERO hacer la llamada al API de logout para invalidar la sesión
+      // y esperar a que termine antes de redirigir
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      // Finalmente redirigir al usuario después de limpiar todo
+      window.location.replace('/login');
+    } catch (error) {
+      // Si hay un error, asegurar que el usuario sea redirigido de todas formas
+      // Intentar limpiar las cookies localmente primero
+      localStorage.removeItem('isAuthenticated');
+      localStorage.removeItem('userRole');
+      localStorage.removeItem('userId');
+
+      window.location.replace('/login');
+    }
+  };
+
   return (
     <>
       <Head>
@@ -430,6 +473,37 @@ export default function Users() {
           .user-row:hover {
             background-color: ${currentTheme.tableRowHover} !important;
           }
+
+          /* Estilos para animaciones del menú hamburguesa */
+          @keyframes slideIn {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+          }
+          @keyframes slideOut {
+            from { transform: translateX(0); }
+            to { transform: translateX(100%); }
+          }
+          .hamburger-menu {
+            animation: slideIn 0.3s ease forwards;
+          }
+          .hamburger-menu.closing {
+            animation: slideOut 0.3s ease forwards;
+          }
+          .nav-button {
+            background: none;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            color: ${currentTheme.text};
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+          }
+          .nav-button:hover {
+            background-color: ${currentTheme.buttonHover};
+          }
         `}</style>
       </Head>
 
@@ -446,52 +520,332 @@ export default function Users() {
         <div style={{
           backgroundColor: `${currentTheme.navbar}99`,
           backdropFilter: 'blur(10px)',
-          padding: '1rem 1.5rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          borderBottom: `1px solid ${currentTheme.border}`,
+          padding: '0.5rem 1.5rem',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
           position: 'sticky',
           top: 0,
-          zIndex: 10
+          zIndex: 1000,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
         }}>
-          <h1 style={{
-            margin: 0,
-            fontSize: '1.75rem',
-            color: currentTheme.text,
-            fontWeight: 600,
-            letterSpacing: '-0.5px'
-          }}>
-            User Management
-          </h1>
-          <button
-            onClick={() => router.push('/dashboard')}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+            <Logo theme={{ primary: currentTheme.primary }} size="small" />
+          </div>
+
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="nav-button"
+            >
+              <span className="material-icons" style={{ fontSize: '20px', marginRight: '6px' }}>
+                dashboard
+              </span>
+              <span style={{ fontSize: '0.9rem' }}>Dashboard</span>
+            </button>
+
+            <button
+              onClick={() => setIsHamburgerOpen(!isHamburgerOpen)}
+              className="nav-button"
+              style={{
+                padding: '8px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <span className="material-icons" style={{
+                fontSize: '22px',
+                transform: isHamburgerOpen ? 'rotate(180deg)' : 'none',
+                transition: 'transform 0.3s ease'
+              }}>
+                menu
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Hamburger Menu Overlay */}
+        {isHamburgerOpen && (
+          <div
+            onClick={() => setIsHamburgerOpen(false)}
             style={{
-              background: 'none',
-              border: 'none',
-              color: currentTheme.text,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.75rem 1rem',
-              borderRadius: '8px',
-              fontSize: '0.9rem',
-              transition: 'all 0.2s ease'
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              backdropFilter: 'blur(2px)',
+              zIndex: 998,
+              opacity: isHamburgerOpen ? 1 : 0,
+              transition: 'opacity 0.3s ease'
+            }}
+          />
+        )}
+
+        {/* Hamburger Menu */}
+        <div
+          className={`hamburger-menu ${!isHamburgerOpen ? 'closing' : ''}`}
+          style={{
+            position: 'fixed',
+            top: '60px',
+            right: 0,
+            width: '320px',
+            maxHeight: 'calc(100vh - 60px)',
+            backgroundColor: `${currentTheme.background}`,
+            backdropFilter: 'blur(10px)',
+            borderLeft: `1px solid ${currentTheme.border}`,
+            padding: '1.5rem',
+            zIndex: 999,
+            display: isHamburgerOpen ? 'flex' : 'none',
+            flexDirection: 'column',
+            gap: '1rem',
+            boxShadow: '-2px 0 8px rgba(0,0,0,0.2)',
+            transform: isHamburgerOpen ? 'translateX(0)' : 'translateX(100%)',
+            transition: 'transform 0.3s ease',
+            overflowY: 'auto',
+            overflowX: 'hidden'
+          }}
+        >
+          <div style={{
+            position: 'sticky',
+            top: 0,
+            backgroundColor: `${currentTheme.background}`,
+            backdropFilter: 'blur(10px)',
+            paddingBottom: '1.5rem',
+            marginBottom: '0.5rem',
+            borderBottom: `1px solid ${currentTheme.border}`,
+            zIndex: 2
+          }}>
+            <div
+              onClick={() => setIsHamburgerOpen(false)}
+              style={{
+                margin: 0,
+                fontSize: '1.1rem',
+                color: currentTheme.text,
+                fontWeight: '500',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                cursor: 'pointer',
+                padding: '0.5rem 0',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.opacity = '0.8';
+                e.currentTarget.style.transform = 'translateX(-4px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = '1';
+                e.currentTarget.style.transform = 'translateX(0)';
+              }}
+            >
+              <span className="material-icons" style={{
+                fontSize: '20px',
+                color: currentTheme.primary,
+                transition: 'transform 0.3s ease'
+              }}>
+                menu
+              </span>
+              Menu
+            </div>
+          </div>
+
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1rem',
+            flex: 1,
+            minHeight: 'min-content'
+          }}>
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="nav-button"
+              style={{
+                width: '100%',
+                justifyContent: 'flex-start',
+                padding: '1rem 1.25rem',
+                borderRadius: '12px',
+                transition: 'all 0.2s ease',
+                fontSize: '1rem',
+                backgroundColor: `${currentTheme.primary}15`,
+                border: `1px solid ${currentTheme.primary}30`,
+                color: currentTheme.primary
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = `${currentTheme.primary}25`;
+                e.currentTarget.style.transform = 'translateX(4px)';
+                e.currentTarget.style.boxShadow = `0 4px 12px ${currentTheme.primary}20`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = `${currentTheme.primary}15`;
+                e.currentTarget.style.transform = 'translateX(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <span className="material-icons" style={{
+                transition: 'transform 0.3s ease',
+                fontSize: '24px',
+                marginRight: '12px'
+              }}>
+                dashboard
+              </span>
+              Dashboard
+            </button>
+
+            <button
+              onClick={() => router.push('/users')}
+              className="nav-button"
+              style={{
+                width: '100%',
+                justifyContent: 'flex-start',
+                padding: '1rem 1.25rem',
+                borderRadius: '12px',
+                transition: 'all 0.2s ease',
+                fontSize: '1rem',
+                backgroundColor: `${currentTheme.secondary}15`,
+                border: `1px solid ${currentTheme.secondary}30`,
+                color: currentTheme.secondary
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = `${currentTheme.secondary}25`;
+                e.currentTarget.style.transform = 'translateX(4px)';
+                e.currentTarget.style.boxShadow = `0 4px 12px ${currentTheme.secondary}20`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = `${currentTheme.secondary}15`;
+                e.currentTarget.style.transform = 'translateX(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <span className="material-icons" style={{
+                transition: 'transform 0.3s ease',
+                fontSize: '24px',
+                marginRight: '12px'
+              }}>
+                people
+              </span>
+              Users
+            </button>
+
+            {isCurrentUserAdmin() && (
+              <button
+                onClick={() => router.push('/server')}
+                className="nav-button"
+                style={{
+                  width: '100%',
+                  justifyContent: 'flex-start',
+                  padding: '1rem 1.25rem',
+                  borderRadius: '12px',
+                  transition: 'all 0.2s ease',
+                  fontSize: '1rem',
+                  backgroundColor: `${currentTheme.secondary}15`,
+                  border: `1px solid ${currentTheme.secondary}30`,
+                  color: currentTheme.secondary
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = `${currentTheme.secondary}25`;
+                  e.currentTarget.style.transform = 'translateX(4px)';
+                  e.currentTarget.style.boxShadow = `0 4px 12px ${currentTheme.secondary}20`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = `${currentTheme.secondary}15`;
+                  e.currentTarget.style.transform = 'translateX(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <span className="material-icons" style={{
+                  transition: 'transform 0.3s ease',
+                  fontSize: '24px',
+                  marginRight: '12px'
+                }}>
+                  vpn_lock
+                </span>
+                Edit Server
+              </button>
+            )}
+
+            <button
+              onClick={() => {
+                const newTheme = theme === 'light' ? 'dark' : 'light';
+                // Save theme preference to localStorage
+                localStorage.setItem('appTheme', newTheme);
+                // Update state
+                setTheme(newTheme);
+                // Update document attribute for CSS
+                document.documentElement.setAttribute('data-theme', newTheme);
+              }}
+              className="nav-button"
+              style={{
+                width: '100%',
+                justifyContent: 'flex-start',
+                padding: '1rem 1.25rem',
+                borderRadius: '12px',
+                transition: 'all 0.2s ease',
+                fontSize: '1rem',
+                backgroundColor: `${currentTheme.primary}15`,
+                border: `1px solid ${currentTheme.primary}30`,
+                color: currentTheme.primary
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = `${currentTheme.primary}25`;
+                e.currentTarget.style.transform = 'translateX(4px)';
+                e.currentTarget.style.boxShadow = `0 4px 12px ${currentTheme.primary}20`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = `${currentTheme.primary}15`;
+                e.currentTarget.style.transform = 'translateX(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <span className="material-icons" style={{
+                transition: 'transform 0.4s ease, opacity 0.3s ease',
+                transform: theme === 'light' ? 'translateY(0)' : 'translateY(-2px) rotate(180deg)',
+                marginRight: '12px',
+                fontSize: '24px'
+              }}>
+                {theme === 'light' ? 'light_mode' : 'dark_mode'}
+              </span>
+              {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+            </button>
+          </div>
+
+          <button
+            onClick={handleLogout}
+            className="nav-button"
+            style={{
+              width: '100%',
+              justifyContent: 'flex-start',
+              padding: '1rem 1.25rem',
+              borderRadius: '12px',
+              transition: 'all 0.2s ease',
+              fontSize: '1rem',
+              backgroundColor: `${currentTheme.errorBackground}30`,
+              border: `1px solid ${currentTheme.errorBackground}50`,
+              color: '#F44336',
+              marginTop: '1rem'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = `${currentTheme.buttonHover}50`;
-              e.currentTarget.style.transform = 'translateX(-4px)';
+              e.currentTarget.style.backgroundColor = `${currentTheme.errorBackground}50`;
+              e.currentTarget.style.transform = 'translateX(4px)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(244,67,54,0.2)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.backgroundColor = `${currentTheme.errorBackground}30`;
               e.currentTarget.style.transform = 'translateX(0)';
+              e.currentTarget.style.boxShadow = 'none';
             }}
           >
-            <span className="material-icons" style={{ fontSize: '20px' }}>
-              arrow_back
+            <span className="material-icons" style={{
+              transition: 'transform 0.3s ease',
+              fontSize: '24px',
+              marginRight: '12px'
+            }}>
+              logout
             </span>
-            Back to Dashboard
+            Logout
           </button>
         </div>
 
@@ -503,6 +857,48 @@ export default function Users() {
           position: 'relative',
           zIndex: 1
         }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '2rem',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <h1 style={{
+              margin: 0,
+              display: 'flex',
+              alignItems: 'flex-end',
+              fontSize: '1.75rem'
+            }}>
+              <span className="material-icons" style={{
+                marginRight: '12px',
+                fontSize: '28px',
+                color: currentTheme.primary,
+                // marginBottom: '2px'
+              }}>
+                people
+              </span>
+              <span style={{ lineHeight: 1 }}>User Management</span>
+            </h1>
+          </div>
+
+          {successMessage && (
+            <div style={{
+              padding: '1rem',
+              backgroundColor: '#4CAF5020',
+              color: '#4CAF50',
+              borderRadius: '4px',
+              marginBottom: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <span className="material-icons" style={{ fontSize: '20px' }}>check_circle</span>
+              {successMessage}
+            </div>
+          )}
+
           {loading ? (
             <div style={{ textAlign: 'center', padding: '2rem' }}>
               Loading users...
@@ -519,34 +915,53 @@ export default function Users() {
             </div>
           ) : (
             <>
-              <button
-                onClick={() => setIsCreatingUser(true)}
-                style={{
-                  background: currentTheme.primary,
-                  border: 'none',
-                  color: '#fff',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '6px',
-                  fontSize: '0.85rem',
-                  marginBottom: '1rem',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              >
-                <span className="material-icons" style={{ fontSize: '18px' }}>add</span>
-                New User
-              </button>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                gap: '1.5rem',
+                marginBottom: '2rem'
+              }}>
+                <button
+                  onClick={() => setIsCreatingUser(true)}
+                  className="user-action-button"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '1.5rem',
+                    borderRadius: '12px',
+                    border: `1px solid #FF980060`,
+                    backgroundColor: `#FF980010`,
+                    color: currentTheme.text,
+                    transition: 'all 0.3s ease',
+                    cursor: 'pointer',
+                    gap: '12px',
+                    height: '120px',
+                    width: '100%'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-4px)';
+                    e.currentTarget.style.boxShadow = '0 6px 12px rgba(0,0,0,0.15)';
+                    e.currentTarget.style.backgroundColor = '#FF980020';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.backgroundColor = '#FF980010';
+                  }}
+                >
+                  <span className="material-icons" style={{ fontSize: '36px', color: '#FF9800' }}>
+                    person_add
+                  </span>
+                  <div style={{ fontWeight: '500', fontSize: '1.1rem' }}>
+                    Create New User
+                  </div>
+                  <div style={{ fontSize: '0.85rem', opacity: 0.8, textAlign: 'center' }}>
+                    Add a new user to the system
+                  </div>
+                </button>
+              </div>
 
               <div style={{
                 backgroundColor: `${currentTheme.cardBackground}99`,
@@ -555,294 +970,279 @@ export default function Users() {
                 border: `1px solid ${currentTheme.border}`,
                 overflow: 'hidden'
               }}>
-                <table style={{
-                  width: '100%',
-                  borderCollapse: 'collapse',
-                  textAlign: 'left'
+                <div style={{
+                  padding: '1rem',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  borderBottom: `1px solid ${currentTheme.border}`,
+                  backgroundColor: `${currentTheme.cardBackground}`
                 }}>
-                  <thead>
-                    <tr style={{
-                      backgroundColor: `${currentTheme.tableHeader}99`
-                    }}>
-                      <th
-                        onClick={() => requestSort('id')}
-                        style={{
-                          padding: '1rem',
-                          cursor: 'pointer',
-                          userSelect: 'none',
-                          backgroundColor: sortConfig?.key === 'id' ? `${currentTheme.primary}15` : 'transparent',
-                          transition: 'all 0.2s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = `${currentTheme.primary}25`;
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = sortConfig?.key === 'id' ? `${currentTheme.primary}15` : 'transparent';
-                        }}
-                      >
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}>
-                          ID
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                          }}>
+                  <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span className="material-icons" style={{ color: currentTheme.primary, fontSize: '20px' }}>
+                      format_list_bulleted
+                    </span>
+                    User List
+                  </h3>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ fontSize: '0.85rem', opacity: 0.8 }}>Total:</span>
+                      <span style={{ fontWeight: '500' }}>{users.length}</span>
+                    </div>
+                  </div>
+                </div>
+                {users.length === 0 ? (
+                  <div style={{
+                    padding: '2rem',
+                    textAlign: 'center',
+                    color: `${currentTheme.secondary}`
+                  }}>
+                    No users found
+                  </div>
+                ) : (
+                <div className="user-table-container" style={{ overflowX: 'auto' }}>
+                  <table className="user-table" style={{
+                    width: '100%',
+                    borderCollapse: 'collapse',
+                    color: currentTheme.text
+                  }}>
+                    <thead>
+                      <tr style={{
+                        borderBottom: `1px solid ${currentTheme.border}`,
+                        backgroundColor: `${currentTheme.cardBackground}`
+                      }}>
+                        <th
+                          onClick={() => requestSort('username')}
+                          style={{
+                            textAlign: 'left',
+                            padding: '0.75rem 1rem',
+                            fontSize: '0.9rem',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = `${currentTheme.primary}15`;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = sortConfig?.key === 'username' ? `${currentTheme.primary}15` : 'transparent';
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            Username
                             <span className="material-icons" style={{
                               fontSize: '16px',
-                              opacity: sortConfig?.key === 'id' ? 1 : 0.5,
+                              opacity: sortConfig?.key === 'username' ? 1 : 0.5,
                               color: currentTheme.primary
                             }}>
-                              {sortConfig?.key === 'id'
+                              {sortConfig?.key === 'username'
                                 ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
-                                : 'tag'
+                                : 'person'
                               }
                             </span>
                           </div>
-                        </div>
-                      </th>
-                      <th
-                        onClick={() => requestSort('username')}
-                        style={{
-                          padding: '1rem',
-                          cursor: 'pointer',
-                          userSelect: 'none',
-                          backgroundColor: sortConfig?.key === 'username' ? `${currentTheme.primary}15` : 'transparent',
-                          transition: 'all 0.2s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = `${currentTheme.primary}25`;
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = sortConfig?.key === 'username' ? `${currentTheme.primary}15` : 'transparent';
-                        }}
-                      >
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}>
-                          Username
-                          <span className="material-icons" style={{
-                            fontSize: '16px',
-                            opacity: sortConfig?.key === 'username' ? 1 : 0.5,
-                            color: currentTheme.primary
-                          }}>
-                            {sortConfig?.key === 'username'
-                              ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
-                              : 'person'
-                            }
-                          </span>
-                        </div>
-                      </th>
-                      <th
-                        onClick={() => requestSort('role')}
-                        style={{
-                          padding: '1rem',
-                          cursor: 'pointer',
-                          userSelect: 'none',
-                          backgroundColor: sortConfig?.key === 'role' ? `${currentTheme.primary}15` : 'transparent',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}>
-                          Role
-                          <span className="material-icons" style={{
-                            fontSize: '16px',
-                            opacity: sortConfig?.key === 'role' ? 1 : 0.5,
-                            color: currentTheme.primary
-                          }}>
-                            {sortConfig?.key === 'role'
-                              ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
-                              : 'admin_panel_settings'
-                            }
-                          </span>
-                        </div>
-                      </th>
-                      <th
-                        onClick={() => requestSort('createdAt')}
-                        style={{
-                          padding: '1rem',
-                          cursor: 'pointer',
-                          userSelect: 'none',
-                          backgroundColor: sortConfig?.key === 'createdAt' ? `${currentTheme.primary}15` : 'transparent',
-                          transition: 'all 0.2s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = `${currentTheme.primary}25`;
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = sortConfig?.key === 'createdAt' ? `${currentTheme.primary}15` : 'transparent';
-                        }}
-                      >
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}>
-                          Created At
-                          <span className="material-icons" style={{
-                            fontSize: '16px',
-                            opacity: sortConfig?.key === 'createdAt' ? 1 : 0.5,
-                            color: currentTheme.primary
-                          }}>
-                            {sortConfig?.key === 'createdAt'
-                              ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
-                              : 'calendar_today'
-                            }
-                          </span>
-                        </div>
-                      </th>
-                      <th
-                        onClick={() => requestSort('updatedAt')}
-                        style={{
-                          padding: '1rem',
-                          cursor: 'pointer',
-                          userSelect: 'none',
-                          backgroundColor: sortConfig?.key === 'updatedAt' ? `${currentTheme.primary}15` : 'transparent',
-                          transition: 'all 0.2s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = `${currentTheme.primary}25`;
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = sortConfig?.key === 'updatedAt' ? `${currentTheme.primary}15` : 'transparent';
-                        }}
-                      >
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}>
-                          Last Updated
-                          <span className="material-icons" style={{
-                            fontSize: '16px',
-                            opacity: sortConfig?.key === 'updatedAt' ? 1 : 0.5,
-                            color: currentTheme.primary
-                          }}>
-                            {sortConfig?.key === 'updatedAt'
-                              ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
-                              : 'update'
-                            }
-                          </span>
-                        </div>
-                      </th>
-                      <th style={{ padding: '1rem' }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedUsers.map(user => (
-                      <tr
-                        key={user.id}
-                        className="user-row"
-                        style={{
-                          borderTop: `1px solid ${currentTheme.border}`
-                        }}
-                      >
-                        <td style={{ padding: '1rem' }}>{user.id}</td>
-                        <td style={{ padding: '1rem' }}>{user.username}</td>
-                        <td style={{ padding: '1rem' }}>
-                          <div style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            padding: '4px 8px',
-                            borderRadius: '4px',
-                            backgroundColor: (user.role === 'admin') ? `${currentTheme.primary}20` : `${currentTheme.secondary}20`,
-                            color: (user.role === 'admin') ? currentTheme.primary : currentTheme.secondary,
-                            fontSize: '0.85rem',
-                            fontWeight: '500',
-                            gap: '4px'
-                          }}>
-                            <span className="material-icons" style={{ fontSize: '16px' }}>
-                              {(user.role === 'admin') ? 'admin_panel_settings' : 'visibility'}
+                        </th>
+                        <th
+                          onClick={() => requestSort('role')}
+                          style={{
+                            textAlign: 'left',
+                            padding: '0.75rem 1rem',
+                            fontSize: '0.9rem',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = `${currentTheme.primary}15`;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = sortConfig?.key === 'role' ? `${currentTheme.primary}15` : 'transparent';
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            Role
+                            <span className="material-icons" style={{
+                              fontSize: '16px',
+                              opacity: sortConfig?.key === 'role' ? 1 : 0.5,
+                              color: currentTheme.primary
+                            }}>
+                              {sortConfig?.key === 'role'
+                                ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
+                                : 'admin_panel_settings'
+                              }
                             </span>
-                            {((user.role || 'viewer').charAt(0).toUpperCase() + (user.role || 'viewer').slice(1))}
                           </div>
-                        </td>
-                        <td style={{ padding: '1rem' }}>
-                          {new Date(user.createdAt).toLocaleDateString()}
-                        </td>
-                        <td style={{ padding: '1rem' }}>
-                          {new Date(user.updatedAt).toLocaleDateString()}
-                        </td>
-                        <td style={{ padding: '1rem' }}>
-                          <div style={{
-                            display: 'flex',
-                            gap: '0.5rem'
-                          }}>
-                            <button
-                              onClick={() => setEditingUser(user)}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                color: currentTheme.primary,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.25rem',
-                                padding: '0.5rem',
-                                borderRadius: '4px',
-                                transition: 'all 0.2s ease'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = `${currentTheme.buttonHover}50`;
-                                e.currentTarget.style.transform = 'translateX(4px)';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = 'transparent';
-                                e.currentTarget.style.transform = 'translateX(0)';
-                              }}
-                            >
-                              <span className="material-icons" style={{ fontSize: '20px' }}>edit</span>
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => setDeleteConfirmUser(user)}
-                              disabled={users.length === 1 || user.role === 'admin'}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                color: users.length === 1 || user.role === 'admin' ? '#ff6b6b40' : '#F44336',
-                                cursor: users.length === 1 || user.role === 'admin' ? 'not-allowed' : 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.25rem',
-                                padding: '0.5rem',
-                                borderRadius: '4px',
-                                transition: 'all 0.2s ease',
-                                opacity: users.length === 1 || user.role === 'admin' ? 0.8 : 1,
-                                backgroundColor: users.length === 1 || user.role === 'admin' ? `${currentTheme.buttonHover}40` : 'transparent'
-                              }}
-                              onMouseEnter={(e) => {
-                                if (users.length > 1 && user.role !== 'admin') {
-                                  e.currentTarget.style.backgroundColor = `${currentTheme.buttonHover}50`;
-                                  e.currentTarget.style.transform = 'translateX(4px)';
-                                }
-                              }}
-                              onMouseLeave={(e) => {
-                                if (users.length > 1 && user.role !== 'admin') {
-                                  e.currentTarget.style.backgroundColor = 'transparent';
-                                  e.currentTarget.style.transform = 'translateX(0)';
-                                }
-                              }}
-                              title={user.role === 'admin' ? "Cannot delete admin user" : users.length === 1 ? "Cannot delete the last user" : "Delete user"}
-                            >
-                              <span className="material-icons" style={{ fontSize: '20px' }}>delete</span>
-                              Delete
-                            </button>
+                        </th>
+                        <th
+                          onClick={() => requestSort('createdAt')}
+                          style={{
+                            textAlign: 'left',
+                            padding: '0.75rem 1rem',
+                            fontSize: '0.9rem',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = `${currentTheme.primary}15`;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = sortConfig?.key === 'createdAt' ? `${currentTheme.primary}15` : 'transparent';
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            Created At
+                            <span className="material-icons" style={{
+                              fontSize: '16px',
+                              opacity: sortConfig?.key === 'createdAt' ? 1 : 0.5,
+                              color: currentTheme.primary
+                            }}>
+                              {sortConfig?.key === 'createdAt'
+                                ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
+                                : 'event'
+                              }
+                            </span>
                           </div>
-                        </td>
+                        </th>
+                        <th
+                          onClick={() => requestSort('updatedAt')}
+                          style={{
+                            textAlign: 'left',
+                            padding: '0.75rem 1rem',
+                            fontSize: '0.9rem',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = `${currentTheme.primary}15`;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = sortConfig?.key === 'updatedAt' ? `${currentTheme.primary}15` : 'transparent';
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            Last Updated
+                            <span className="material-icons" style={{
+                              fontSize: '16px',
+                              opacity: sortConfig?.key === 'updatedAt' ? 1 : 0.5,
+                              color: currentTheme.primary
+                            }}>
+                              {sortConfig?.key === 'updatedAt'
+                                ? (sortConfig.direction === 'ascending' ? 'arrow_upward' : 'arrow_downward')
+                                : 'update'
+                              }
+                            </span>
+                          </div>
+                        </th>
+                        <th style={{
+                          textAlign: 'center',
+                          padding: '0.75rem 1rem',
+                          fontSize: '0.9rem',
+                          fontWeight: 500
+                        }}>Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {sortedUsers.map((user) => (
+                        <tr key={user.username} style={{
+                          borderBottom: `1px solid ${currentTheme.border}`,
+                          backgroundColor: `${currentTheme.cardBackground}80`,
+                          transition: 'background-color 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = `${currentTheme.tableRowHover}`;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = `${currentTheme.cardBackground}80`;
+                        }}>
+                          <td style={{ padding: '0.75rem 1rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span className="material-icons" style={{
+                                color: user.role === 'admin' ? currentTheme.secondary : currentTheme.primary,
+                                fontSize: '20px'
+                              }}>
+                                {user.role === 'admin' ? 'admin_panel_settings' : 'person'}
+                              </span>
+                              {user.username}
+                            </div>
+                          </td>
+                          <td style={{ padding: '0.75rem 1rem' }}>
+                            <span style={{
+                              display: 'inline-block',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              fontSize: '0.75rem',
+                              backgroundColor: user.role === 'admin' ? `${currentTheme.secondary}20` : `${currentTheme.primary}20`,
+                              color: user.role === 'admin' ? currentTheme.secondary : currentTheme.primary,
+                              fontWeight: 500
+                            }}>
+                              {user.role === 'admin' ? 'Admin' : 'User'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.75rem 1rem', fontSize: '0.9rem' }}>
+                            {new Date(user.createdAt).toLocaleDateString()}
+                          </td>
+                          <td style={{ padding: '0.75rem 1rem', fontSize: '0.9rem' }}>
+                            {new Date(user.updatedAt).toLocaleDateString()}
+                          </td>
+                          <td style={{
+                            padding: '0.75rem 1rem',
+                            textAlign: 'center'
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                              <button
+                                onClick={() => setEditingUser(user)}
+                                style={{
+                                  backgroundColor: 'transparent',
+                                  border: 'none',
+                                  padding: '6px',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  color: currentTheme.primary,
+                                  transition: 'all 0.2s ease'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = `${currentTheme.primary}20`;
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                <span className="material-icons" style={{ fontSize: '20px' }}>edit</span>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteConfirmation(user)}
+                                disabled={users.length === 1 || user.role === 'admin'}
+                                style={{
+                                  backgroundColor: 'transparent',
+                                  border: 'none',
+                                  padding: '6px',
+                                  borderRadius: '4px',
+                                  cursor: users.length === 1 || user.role === 'admin' ? 'not-allowed' : 'pointer',
+                                  color: users.length === 1 || user.role === 'admin' ? '#F4433640' : '#F44336',
+                                  opacity: users.length === 1 || user.role === 'admin' ? 0.5 : 1,
+                                  transition: 'all 0.2s ease'
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (users.length > 1 && user.role !== 'admin') {
+                                    e.currentTarget.style.backgroundColor = `${currentTheme.errorBackground}40`;
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                                title={user.role === 'admin' ? "Cannot delete admin user" : users.length === 1 ? "Cannot delete the last user" : "Delete user"}
+                              >
+                                <span className="material-icons" style={{ fontSize: '20px' }}>delete</span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                )}
               </div>
             </>
           )}
@@ -1418,7 +1818,7 @@ export default function Users() {
                   Cancel
                 </button>
                 <button
-                  onClick={() => handleDelete(deleteConfirmUser.id)}
+                  onClick={() => handleDeleteUser()}
                   style={{
                     padding: '0.75rem 1.5rem',
                     borderRadius: '4px',

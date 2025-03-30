@@ -7,6 +7,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useEffect, useRef, useState } from 'react';
 import BackgroundEffect from '../components/BackgroundEffect'; // Import BackgroundEffect component
+import Footer from '../components/Footer'; // Import Footer component
 import Logo from '../components/Logo';
 
 // Define the Target interface to type our data
@@ -179,10 +180,18 @@ export default function Dashboard() {
   } | null>(null);
   const [filterText, setFilterText] = useState('');
 
-  // Ensure theme is set to dark on initial render
+  // Ensure theme is set based on localStorage or default to dark
   useEffect(() => {
-    // Force dark theme on initial load
-    setTheme('dark');
+    // Check if theme preference exists in localStorage
+    const savedTheme = localStorage.getItem('appTheme');
+    if (savedTheme === 'light' || savedTheme === 'dark') {
+      setTheme(savedTheme);
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    } else {
+      // Default to dark theme if no preference is saved
+      setTheme('dark');
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
   }, []);
 
   // Function to fetch targets from the API
@@ -395,7 +404,13 @@ export default function Dashboard() {
 
   // Function to toggle theme
   const toggleTheme = () => {
-    setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    // Save theme preference to localStorage
+    localStorage.setItem('appTheme', newTheme);
+    // Update state
+    setTheme(newTheme);
+    // Update document attribute for CSS
+    document.documentElement.setAttribute('data-theme', newTheme);
   };
 
   // Clean up interval on component unmount
@@ -547,31 +562,10 @@ export default function Dashboard() {
   };
 
   // Function to handle logout - redirects to login page first for better UX
-  const handleLogout = () => {
+  const handleLogout = async () => {
     try {
-      // Primero redirigir al usuario para evitar cambios en la UI
-      // Las limpiezas se harán en segundo plano
-      window.location.replace('/login');
-
-      // Luego hacer la llamada al API de logout para invalidar la sesión
-      fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      }).catch(() => {}); // Ignorar errores, ya estamos redirigiendo
-
-      // Reset server monitoring state
-      fetch('/api/system/monitoring', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ isMonitoring: false }),
-      }).catch(() => {}); // ignorar errores
-
-      // Also reset any target data in session
-      fetch('/api/system/reset', {
-        method: 'POST',
-      }).catch(() => {}); // ignorar errores
+      // Restaurar el tema oscuro por defecto antes de cerrar sesión
+      localStorage.setItem('appTheme', 'dark');
 
       // Detener el intervalo si está activo
       if (intervalRef.current) {
@@ -579,8 +573,7 @@ export default function Dashboard() {
         intervalRef.current = null;
       }
 
-      // Estas operaciones ocurrirán, pero el usuario ya estará en la página de login
-      // así que no verá ningún cambio en la UI
+      // Limpiar localStorage primero
       localStorage.removeItem('isAuthenticated');
       localStorage.removeItem('dashboardMonitoring');
       localStorage.removeItem('userRole');
@@ -589,8 +582,36 @@ export default function Dashboard() {
       localStorage.removeItem('dashboardStatuses');
       localStorage.removeItem('loginTimestamp');
 
+      // PRIMERO hacer la llamada al API de logout para invalidar la sesión
+      // y esperar a que termine antes de redirigir
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      // Reset server monitoring state
+      fetch('/api/system/monitoring', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isMonitoring: false }),
+      }).catch(() => {});
+
+      // Also reset any target data in session
+      fetch('/api/system/reset', {
+        method: 'POST',
+      }).catch(() => {});
+
+      // Finalmente redirigir al usuario después de limpiar todo
+      window.location.replace('/login');
     } catch (error) {
       // Si hay un error, asegurar que el usuario sea redirigido de todas formas
+      // Intentar limpiar las cookies localmente primero
+      localStorage.removeItem('isAuthenticated');
+      localStorage.removeItem('userRole');
+      localStorage.removeItem('userId');
+
       window.location.replace('/login');
     }
   };
@@ -941,40 +962,77 @@ export default function Dashboard() {
 
             {/* Only show Users button for admin users */}
             {isCurrentUserAdmin() && (
-              <button
-                onClick={() => router.push('/users')}
-                className="nav-button"
-                style={{
-                  width: '100%',
-                  justifyContent: 'flex-start',
-                  padding: '1rem 1.25rem',
-                  borderRadius: '12px',
-                  transition: 'all 0.2s ease',
-                  fontSize: '1rem',
-                  backgroundColor: `${currentTheme.primary}15`,
-                  border: `1px solid ${currentTheme.primary}30`,
-                  color: currentTheme.primary
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = `${currentTheme.primary}25`;
-                  e.currentTarget.style.transform = 'translateX(4px)';
-                  e.currentTarget.style.boxShadow = `0 4px 12px ${currentTheme.primary}20`;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = `${currentTheme.primary}15`;
-                  e.currentTarget.style.transform = 'translateX(0)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              >
-                <span className="material-icons" style={{
-                  transition: 'transform 0.3s ease',
-                  fontSize: '24px',
-                  marginRight: '12px'
-                }}>
-                  people
-                </span>
-                Users
-              </button>
+              <>
+                <button
+                  onClick={() => router.push('/users')}
+                  className="nav-button"
+                  style={{
+                    width: '100%',
+                    justifyContent: 'flex-start',
+                    padding: '1rem 1.25rem',
+                    borderRadius: '12px',
+                    transition: 'all 0.2s ease',
+                    fontSize: '1rem',
+                    backgroundColor: `${currentTheme.secondary}15`,
+                    border: `1px solid ${currentTheme.secondary}30`,
+                    color: currentTheme.secondary
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = `${currentTheme.secondary}25`;
+                    e.currentTarget.style.transform = 'translateX(4px)';
+                    e.currentTarget.style.boxShadow = `0 4px 12px ${currentTheme.secondary}20`;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = `${currentTheme.secondary}15`;
+                    e.currentTarget.style.transform = 'translateX(0)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                >
+                  <span className="material-icons" style={{
+                    transition: 'transform 0.3s ease',
+                    fontSize: '24px',
+                    marginRight: '12px'
+                  }}>
+                    people
+                  </span>
+                  Users
+                </button>
+
+                <button
+                  onClick={() => router.push('/server')}
+                  className="nav-button"
+                  style={{
+                    width: '100%',
+                    justifyContent: 'flex-start',
+                    padding: '1rem 1.25rem',
+                    borderRadius: '12px',
+                    transition: 'all 0.2s ease',
+                    fontSize: '1rem',
+                    backgroundColor: `${currentTheme.secondary}15`,
+                    border: `1px solid ${currentTheme.secondary}30`,
+                    color: currentTheme.secondary
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = `${currentTheme.secondary}25`;
+                    e.currentTarget.style.transform = 'translateX(4px)';
+                    e.currentTarget.style.boxShadow = `0 4px 12px ${currentTheme.secondary}20`;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = `${currentTheme.secondary}15`;
+                    e.currentTarget.style.transform = 'translateX(0)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                >
+                  <span className="material-icons" style={{
+                    transition: 'transform 0.3s ease',
+                    fontSize: '24px',
+                    marginRight: '12px'
+                  }}>
+                    vpn_lock
+                  </span>
+                  Edit Server
+                </button>
+              </>
             )}
 
             <div style={{
@@ -2159,80 +2217,7 @@ export default function Dashboard() {
           )}
         </main>
 
-        <footer style={{
-          backgroundColor: `${currentTheme.cardBackground}99`, // Added some transparency
-          backdropFilter: 'blur(10px)',
-          padding: '0.6rem',
-          borderTop: `1px solid ${currentTheme.border}`,
-          width: '100%',
-          boxSizing: 'border-box',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '0.5rem',
-          flexShrink: 0,
-          position: 'relative',
-          zIndex: 1
-        }}>
-          <div style={{
-            fontSize: '0.85rem',
-            color: currentTheme.text,
-            opacity: 0.8
-          }}>
-            © {new Date().getFullYear()} SubNetx. Released under the MIT License.
-          </div>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1.5rem'
-          }}>
-            <a
-              href="mailto:tacoronteriverocristian@gmail.com"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                color: currentTheme.text,
-                textDecoration: 'none',
-                transition: 'color 0.2s',
-                fontSize: '0.85rem'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = currentTheme.primary;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = currentTheme.text;
-              }}
-            >
-              <span className="material-icons" style={{ fontSize: '16px' }}>email</span>
-              Contact
-            </a>
-            <a
-              href="https://github.com/TacoronteRiveroCristian/SubNetx"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                color: currentTheme.text,
-                textDecoration: 'none',
-                transition: 'color 0.2s',
-                fontSize: '0.85rem'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = currentTheme.primary;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = currentTheme.text;
-              }}
-            >
-              <span className="material-icons" style={{ fontSize: '16px' }}>code</span>
-              GitHub
-            </a>
-          </div>
-        </footer>
+        <Footer theme={currentTheme} />
       </div>
     </>
   );
