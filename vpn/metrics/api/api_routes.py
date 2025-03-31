@@ -1,59 +1,55 @@
 """
 SubNetx VPN Metrics API.
 
-This FastAPI application provides a RESTful API interface for accessing VPN metrics data.
-It exposes endpoints to retrieve ping monitoring data, connection quality statistics,
-and historical metrics from the SQLite database.
+Este módulo principal de la API define las rutas y endpoints para el acceso a datos
+de monitoreo y gestión de VPN, integrando tanto los endpoints de métricas como los
+de gestión de la VPN.
 
-Key Features:
-- Real-time access to ping monitoring data
-- Historical data retrieval with pagination
-- Connection quality analysis and statistics
-- TLS certificate information tracking
-- Detailed ICMP packet analysis
+Características principales:
+- Acceso en tiempo real a datos de monitoreo de ping
+- Recuperación de datos históricos con paginación
+- Análisis de calidad de conexión y estadísticas
+- Seguimiento de información de certificados TLS
+- Gestión completa del servidor OpenVPN y sus clientes
+- Análisis detallado de paquetes ICMP
 
-The API is designed to be:
-- Asynchronous: Uses FastAPI's async capabilities for better performance
-- RESTful: Follows REST principles with clear endpoint naming
-- Self-documenting: Includes OpenAPI/Swagger documentation
-- Type-safe: Uses Pydantic models for request/response validation
+La API está diseñada para ser:
+- Asíncrona: Utiliza las capacidades async de FastAPI para mejor rendimiento
+- RESTful: Sigue los principios REST con nomenclatura clara de endpoints
+- Auto-documentada: Incluye documentación OpenAPI/Swagger
+- Segura en tipos: Usa modelos Pydantic para validación de request/response
 
-Dependencies:
-- FastAPI: Modern web framework for building APIs
-- Pydantic: Data validation using Python type annotations
-- SQLite: Local database for metrics storage
-
-:module: vpn.metrics.api.main
+:module: vpn.metrics.api.api_routes
 :author: SubNetx Team
-:version: 1.0.0
+:version: 1.0.1
 """
 
 import logging
 from typing import List, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from vpn.metrics.api.db_adapter import MetricsDBAdapter
 from vpn.metrics.collector.classes.databases.database_ping import PingDatabase
 from vpn.metrics.conf import PING_DB_PATH
 
-# Configure logging
+# Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI app with metadata
-app = FastAPI(
-    title="SubNetx VPN Metrics API",
-    description="API for accessing VPN metrics and monitoring data",
-    version="1.0.0",
-    docs_url="/docs",  # Swagger UI endpoint
-    redoc_url="/redoc",  # ReDoc endpoint
+# Crear router específico para métricas
+metrics_router = APIRouter(
+    prefix="/api/metrics",
+    tags=["metrics-monitoring"],
+    responses={404: {"description": "Not found"}},
 )
 
 # Initialize database connection
 # Note: We use a single database instance for the entire application
 # This is safe because FastAPI handles concurrent requests properly
 db = PingDatabase(PING_DB_PATH)
+db_adapter = MetricsDBAdapter(db)
 
 # Pydantic Models for Request/Response Validation
 # These models ensure type safety and automatic validation of API data
@@ -237,194 +233,195 @@ class ConnectionQualitySummary(BaseModel):
     uptime_percent: float = Field(
         ..., description="Percentage of time the target was online"
     )
-    status_counts: dict = Field(
-        ..., description="Count of different status types"
-    )
+    status_counts: dict = Field(..., description="Count of different status types")
     total_pings: int = Field(..., description="Total number of ping attempts")
 
 
-# API Endpoints
+class PaginatedResponse(BaseModel):
+    """Model for paginated responses.
 
+    Provides a standardized structure for paginated API responses,
+    including metadata about the pagination state.
 
-@app.get("/", response_model=dict)
-async def root() -> dict:
-    """Root endpoint providing basic API information.
-
-    This endpoint serves as a health check and provides basic information
-    about the API version and available endpoints.
-
-    :return: Basic API information including version and endpoints
-    :rtype: dict
+    :ivar items: The actual items being returned
+    :ivar total: Total number of items
+    :ivar page: Current page number
+    :ivar size: Size of each page
+    :ivar pages: Total number of pages
     """
-    return {
-        "message": "Welcome to SubNetx VPN Metrics API",
-        "version": "1.0.0",
-        "endpoints": {
-            "targets": "/targets",
-            "target_latest": "/targets/{target}/latest",
-            "target_history": "/targets/{target}/history",
-            "target_summary": "/targets/{target}/summary",
-            "all_latest": "/targets/latest",
-            "all_summaries": "/targets/summaries",
-        },
-    }
+
+    items: List[PingMetric] = Field(..., description="The actual items being returned")
+    total: int = Field(..., description="Total number of items")
+    page: int = Field(..., description="Current page number")
+    size: int = Field(..., description="Size of each page")
+    pages: int = Field(..., description="Total number of pages")
 
 
-@app.get("/targets", response_model=List[Target])
-async def get_targets() -> List[Target]:
-    """Get a list of all ping targets.
+# Endpoints de métricas
 
-    Returns a list of all targets currently being monitored,
-    including their IDs, descriptions, and when they were added.
+@metrics_router.get("/targets", response_model=List[Target], summary="List monitoring targets")
+async def get_targets():
+    """
+    List all monitoring targets in the system.
 
-    :return: List of all ping targets
-    :rtype: List[Target]
-    :raises HTTPException: If database error occurs
+    Returns a list of targets that are currently being monitored,
+    including their IDs, addresses, and descriptions.
+
+    Returns:
+        List[Target]: List of monitoring targets
     """
     try:
-        targets = db.get_all_targets()
-        return [Target(**target) for target in targets]
+        return db_adapter.get_targets()
     except Exception as e:
-        logger.error(f"Error getting targets: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.error(f"Error fetching targets: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Database error: {str(e)}"
+        )
 
 
-@app.get("/targets/{target}/latest", response_model=PingMetric)
-async def get_target_latest(target: str) -> PingMetric:
-    """Get the latest ping metrics for a specific target.
+@metrics_router.get(
+    "/targets/{target_id}/latest",
+    response_model=PingMetric,
+    summary="Get latest metric for a target"
+)
+async def get_latest_metric(target_id: int):
+    """
+    Get the most recent ping metric for a target.
 
-    Retrieves the most recent ping measurement data for the specified target,
-    including detailed ICMP and TLS information if available.
+    Retrieves the latest monitoring data for the specified target,
+    including connection status, RTT statistics, and quality rating.
 
-    :param target: Target hostname or IP address
-    :type target: str
-    :return: Latest ping metrics for the target
-    :rtype: PingMetric
-    :raises HTTPException: If target is not found or database error occurs
+    Args:
+        target_id: ID of the target to retrieve data for
+
+    Returns:
+        PingMetric: Latest ping metric data
     """
     try:
-        latest = db.get_latest_ping(target)
-        if not latest:
+        metric = db_adapter.get_latest_metric(target_id)
+        if not metric:
             raise HTTPException(
-                status_code=404, detail=f"Target {target} not found"
+                status_code=404,
+                detail=f"No metrics found for target ID {target_id}"
             )
-        return PingMetric(**latest)
+        return metric
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting latest ping for {target}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.error(f"Error fetching latest metric: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Database error: {str(e)}"
+        )
 
 
-@app.get("/targets/{target}/history", response_model=List[PingMetric])
-async def get_target_history(
-    target: str, limit: int = 60, offset: int = 0
-) -> List[PingMetric]:
-    """Get historical ping data for a target.
+@metrics_router.get(
+    "/targets/{target_id}/metrics",
+    response_model=PaginatedResponse,
+    summary="Get paginated metrics for a target"
+)
+async def get_metrics_for_target(
+    target_id: int, page: int = 1, size: int = 20, hours: Optional[int] = None
+):
+    """
+    Get paginated ping metrics for a target.
 
-    Retrieves a paginated list of historical ping measurements for the specified target.
-    Results are ordered by timestamp in descending order (newest first).
+    Retrieves a paginated list of ping measurements for the specified target.
+    Can be filtered to include only data from the past X hours.
 
-    :param target: Target hostname or IP address
-    :type target: str
-    :param limit: Maximum number of records to return
-    :type limit: int
-    :param offset: Number of records to skip
-    :type offset: int
-    :return: List of historical ping metrics
-    :rtype: List[PingMetric]
-    :raises HTTPException: If target is not found or database error occurs
+    Args:
+        target_id: ID of the target to retrieve data for
+        page: Page number to retrieve (starting from 1)
+        size: Number of items per page
+        hours: Optional filter to include only data from past X hours
+
+    Returns:
+        PaginatedResponse: Paginated metrics with metadata
     """
     try:
-        history = db.get_ping_history(target, limit, offset)
-        if not history:
+        # Validate target exists
+        target = db_adapter.get_target(target_id)
+        if not target:
             raise HTTPException(
-                status_code=404, detail=f"Target {target} not found"
+                status_code=404, detail=f"Target ID {target_id} not found"
             )
-        return [PingMetric(**metric) for metric in history]
+
+        # Validate pagination parameters
+        if page < 1:
+            raise HTTPException(
+                status_code=400, detail="Page must be >= 1"
+            )
+        if size < 1 or size > 100:
+            raise HTTPException(
+                status_code=400, detail="Size must be between 1 and 100"
+            )
+
+        # Get paginated metrics
+        metrics, total = db_adapter.get_metrics_paginated(
+            target_id, page, size, hours
+        )
+
+        # Calculate total pages
+        total_pages = (total + size - 1) // size if total > 0 else 1
+
+        # Return paginated response
+        return {
+            "items": metrics,
+            "total": total,
+            "page": page,
+            "size": size,
+            "pages": total_pages,
+        }
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting history for {target}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.error(f"Error fetching metrics: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Database error: {str(e)}"
+        )
 
 
-@app.get("/targets/{target}/summary", response_model=ConnectionQualitySummary)
-async def get_target_summary(
-    target: str, hours: int = 24
-) -> ConnectionQualitySummary:
-    """Get connection quality summary for a target.
+@metrics_router.get(
+    "/targets/{target_id}/quality",
+    response_model=ConnectionQualitySummary,
+    summary="Get connection quality analysis"
+)
+async def get_connection_quality(target_id: int, hours: int = 24):
+    """
+    Get connection quality analysis for a target.
 
-    Provides a comprehensive summary of connection quality over a specified time period,
-    including statistics, status distribution, and uptime percentage.
+    Analyzes ping data over the specified time period to provide
+    a summary of connection quality and reliability statistics.
 
-    :param target: Target hostname or IP address
-    :type target: str
-    :param hours: Number of hours to analyze
-    :type hours: int
-    :return: Summary of connection quality metrics
-    :rtype: ConnectionQualitySummary
-    :raises HTTPException: If target is not found or database error occurs
+    Args:
+        target_id: ID of the target to analyze
+        hours: Time period for analysis in hours
+
+    Returns:
+        ConnectionQualitySummary: Summary of connection quality
     """
     try:
-        summary = db.get_connection_quality_summary(target, hours)
-        if not summary:
+        # Validate target exists
+        target = db_adapter.get_target(target_id)
+        if not target:
             raise HTTPException(
-                status_code=404, detail=f"Target {target} not found"
+                status_code=404, detail=f"Target ID {target_id} not found"
             )
-        return ConnectionQualitySummary(**summary)
+
+        # Validate hours parameter
+        if hours < 1 or hours > 720:  # Max 30 days
+            raise HTTPException(
+                status_code=400,
+                detail="Hours must be between 1 and 720 (30 days)"
+            )
+
+        # Get connection quality summary
+        summary = db_adapter.get_connection_quality(target_id, hours)
+
+        return summary
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting summary for {target}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-
-@app.get("/targets/latest", response_model=List[PingMetric])
-async def get_all_latest() -> List[PingMetric]:
-    """Get the latest ping metrics for all targets.
-
-    Retrieves the most recent ping measurement for each target in the system.
-    Useful for getting a quick overview of all monitored targets.
-
-    :return: List of latest ping metrics for all targets
-    :rtype: List[PingMetric]
-    :raises HTTPException: If database error occurs
-    """
-    try:
-        targets = db.get_all_targets()
-        latest_metrics = []
-        for target in targets:
-            latest = db.get_latest_ping(target["target"])
-            if latest:
-                latest_metrics.append(PingMetric(**latest))
-        return latest_metrics
-    except Exception as e:
-        logger.error(f"Error getting all latest pings: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-
-@app.get("/targets/summaries", response_model=List[ConnectionQualitySummary])
-async def get_all_summaries(hours: int = 24) -> List[ConnectionQualitySummary]:
-    """Get connection quality summaries for all targets.
-
-    Provides connection quality summaries for all monitored targets over a specified time period.
-    Useful for comparing performance across different targets.
-
-    :param hours: Number of hours to analyze
-    :type hours: int
-    :return: List of connection quality summaries for all targets
-    :rtype: List[ConnectionQualitySummary]
-    :raises HTTPException: If database error occurs
-    """
-    try:
-        targets = db.get_all_targets()
-        summaries = []
-        for target in targets:
-            summary = db.get_connection_quality_summary(target["target"], hours)
-            if summary:
-                summaries.append(ConnectionQualitySummary(**summary))
-        return summaries
-    except Exception as e:
-        logger.error(f"Error getting all summaries: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.error(f"Error analyzing connection quality: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Analysis error: {str(e)}"
+        )

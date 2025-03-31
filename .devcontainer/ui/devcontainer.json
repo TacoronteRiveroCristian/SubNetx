@@ -32,7 +32,27 @@
                 },
                 "npm.packageManager": "npm",
                 "npm.runSilent": true,
-                "js/ts.implicitProjectConfig.checkJs": true
+                "js/ts.implicitProjectConfig.checkJs": true,
+                "editor.theme": "Solarized Dark",
+                "workbench.colorTheme": "Solarized Dark",
+                "editor.fontFamily": "Fira Code",
+                "editor.fontLigatures": false,
+                "editor.fontWeight": "normal",
+                "editor.fontWeightBold": "bold",
+                "editor.fontWeightLight": "normal",
+                "editor.fontWeightMedium": "normal",
+                "editor.fontSize": 14,
+                "editor.lineHeight": 20,
+                "editor.tabSize": 2,
+                "editor.insertSpaces": true,
+                "editor.detectIndentation": false,
+                "terminal.integrated.fontSize": 14,
+                "terminal.integrated.fontWeight": "normal",
+                "terminal.integrated.fontWeightBold": "bold",
+                "terminal.integrated.fontWeightLight": "normal",
+                "terminal.integrated.fontWeightMedium": "normal",
+                "terminal.integrated.fontFamily": "Fira Code"
+
             },
             "extensions": [
                 "esbenp.prettier-vscode",
