@@ -60,14 +60,14 @@ def start_api_server():
 
     # Determinar host y puerto, permitiendo configuración por variables de entorno
     host = os.environ.get("API_HOST", "0.0.0.0")
-    port = int(os.environ.get("API_PORT", "8001"))
+    port = int(os.environ.get("API_PORT", "8000"))
 
     # Iniciar servidor
     uvicorn.run(
         "vpn.metrics.api.api_server:app",
         host=host,
         port=port,
-        reload=False  # Deshabilitar recarga en producción
+        reload=True  # Deshabilitar recarga en producción
     )
 
 if __name__ == "__main__":

@@ -14,15 +14,9 @@ services:
       - ./docker/volumes/logs:/var/log/openvpn
       - ./databases:/app/databases:cached
     ports:
-      - "${OPENVPN_PORT}:${OPENVPN_PORT}/udp"
+      - 1194:1194/udp
       - "8000:8000"
     environment:
-      - VPN_NETWORK=${VPN_NETWORK}
-      - VPN_NETMASK=${VPN_NETMASK}
-      - OPENVPN_PORT=${OPENVPN_PORT}
-      - OPENVPN_PROTO=${OPENVPN_PROTO}
-      - TUN_DEVICE=${TUN_DEVICE}
-      - PUBLIC_IP=${PUBLIC_IP}
       - LOG_LEVEL=INFO
     logging:
       driver: "json-file"

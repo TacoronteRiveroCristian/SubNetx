@@ -2,6 +2,29 @@
 # Descripcion: Inicia OpenVPN en segundo plano, guarda su PID y verifica la conexion.
 # Usa las variables de entorno definidas en el Dockerfile para mantener coherencia.
 
+# Función para leer el archivo de configuración JSON
+read_config() {
+    local config_file="$OPENVPN_DIR/vpn_config.json"
+
+    if [ ! -f "$config_file" ]; then
+        echo "⚠️ No se encontró el archivo de configuración JSON. Usando variables de entorno..."
+        return 1
+    fi
+
+    # Leer variables del JSON
+    export VPN_NETWORK=$(jq -r '.vpn_network' "$config_file")
+    export VPN_NETMASK=$(jq -r '.vpn_netmask' "$config_file")
+    export OPENVPN_PORT=$(jq -r '.openvpn_port' "$config_file")
+    export OPENVPN_PROTO=$(jq -r '.openvpn_proto' "$config_file")
+    export TUN_DEVICE=$(jq -r '.tun_device' "$config_file")
+    export PUBLIC_IP=$(jq -r '.public_ip' "$config_file")
+
+    echo "✅ Configuración leída del archivo JSON"
+}
+
+# Leer configuración del JSON
+read_config
+
 echo "🛠️ Iniciando OpenVPN en segundo plano..."
 
 # Asegurar que el directorio de logs existe y tiene los permisos correctos

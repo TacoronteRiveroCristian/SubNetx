@@ -1,14 +1,6 @@
 #!/bin/bash
 # Descripcion: Configura OpenVPN, genera certificados, habilita el reenvio de paquetes y configura NAT.
-# Acepta parametros mediante flags para mayor flexibilidad en su uso.
-
-# Variables para almacenar los parametros
-VPN_NETWORK="" # Direccion de red para la VPN
-VPN_NETMASK="" # Mascara de red para la VPN
-OPENVPN_PORT="" # Puerto para el servicio OpenVPN
-OPENVPN_PROTO="" # Protocolo (udp/tcp)
-TUN_DEVICE="" # Dispositivo TUN a utilizar
-PUBLIC_IP="" # IP publica o nombre de dominio
+# Las rutas estan definidas como variables de entorno en el Dockerfile para mayor coherencia.
 
 # Funcion para manejar errores
 handle_error() {
@@ -17,95 +9,67 @@ handle_error() {
     exit 1 # Termina con codigo de error
 }
 
-# Funcion para mostrar ayuda
+# Función para mostrar ayuda
 show_help() {
-    echo "Uso: openvpn-setup.sh [opciones]"
-    echo ""
+    echo "Uso: $0 [opciones]"
     echo "Opciones:"
-    echo "  --red DIRECCION     Direccion de red VPN (ej. 10.8.0.0)"
-    echo "  --mask MASCARA     Mascara de red VPN (ej. 255.255.255.0)"
-    echo "  --port PUERTO      Puerto para OpenVPN (1-65535)"
-    echo "  --proto PROTOCOLO  Protocolo (udp/tcp)"
-    echo "  --tun DISPOSITIVO  Dispositivo TUN (ej. tun0)"
-    echo "  --ip IP            IP publica o nombre de dominio"
-    echo "  --help             Muestra esta ayuda"
-    echo ""
-    echo "Ejemplo:"
-    echo "  openvpn-setup.sh --red 10.8.0.0 --mask 255.255.255.0 --port 1194 --proto udp --tun tun0 --ip miservidor.duckdns.org"
+    echo "  --red <ip>        Red VPN (ej: 10.10.10.0)"
+    echo "  --mask <mask>     Máscara de red (ej: 255.255.255.0)"
+    echo "  --port <port>     Puerto OpenVPN (ej: 1194)"
+    echo "  --proto <proto>   Protocolo (udp/tcp)"
+    echo "  --tun <device>    Dispositivo TUN (ej: tun0)"
+    echo "  --ip <ip>         IP pública o dominio"
+    echo "  --help           Mostrar esta ayuda"
     exit 0
 }
 
-# Parsear argumentos
-while [[ "$#" -gt 0 ]]; do # Para cada argumento en la linea de comandos
-    case "$1" in
-        --red) # Si el argumento es --red
-            VPN_NETWORK="$2" # Asigna el siguiente argumento como direccion de red
-            shift 2 # Avanza dos posiciones
+# Parsear argumentos de línea de comandos
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --red)
+            VPN_NETWORK="$2"
+            shift 2
             ;;
-        --mask) # Si el argumento es --mask
-            VPN_NETMASK="$2" # Asigna el siguiente argumento como mascara de red
-            shift 2 # Avanza dos posiciones
+        --mask)
+            VPN_NETMASK="$2"
+            shift 2
             ;;
-        --port) # Si el argumento es --port
-            OPENVPN_PORT="$2" # Asigna el siguiente argumento como puerto
-            shift 2 # Avanza dos posiciones
+        --port)
+            OPENVPN_PORT="$2"
+            shift 2
             ;;
-        --proto) # Si el argumento es --proto
-            OPENVPN_PROTO="$2" # Asigna el siguiente argumento como protocolo
-            shift 2 # Avanza dos posiciones
+        --proto)
+            OPENVPN_PROTO="$2"
+            shift 2
             ;;
-        --tun) # Si el argumento es --tun
-            TUN_DEVICE="$2" # Asigna el siguiente argumento como dispositivo TUN
-            shift 2 # Avanza dos posiciones
+        --tun)
+            TUN_DEVICE="$2"
+            shift 2
             ;;
-        --ip) # Si el argumento es --ip
-            PUBLIC_IP="$2" # Asigna el siguiente argumento como IP publica
-            shift 2 # Avanza dos posiciones
+        --ip)
+            PUBLIC_IP="$2"
+            shift 2
             ;;
-        --help) # Si el argumento es --help
-            show_help # Muestra la ayuda
+        --help)
+            show_help
             ;;
-        *) # Si es cualquier otro argumento
-            echo "❌ Error: Opcion desconocida $1" # Muestra error
-            echo "Por favor, consulte la ayuda con --help para mas informacion."
-            /app/scripts/utils/openvpn-help.sh # Muestra ayuda
-            exit 1 # Termina con error
+        *)
+            echo "❌ Opción desconocida: $1"
+            show_help
             ;;
     esac
 done
 
-# Validar parametros
-missing_params=() # Inicializa array para parametros faltantes
-
-if [ -z "$VPN_NETWORK" ]; then # Si falta la direccion de red
-    missing_params+=("--red") # Añade a la lista de faltantes
-fi
-if [ -z "$VPN_NETMASK" ]; then # Si falta la mascara de red
-    missing_params+=("--mask") # Añade a la lista de faltantes
-fi
-if [ -z "$OPENVPN_PORT" ]; then # Si falta el puerto
-    missing_params+=("--port") # Añade a la lista de faltantes
-fi
-if [ -z "$OPENVPN_PROTO" ]; then # Si falta el protocolo
-    missing_params+=("--proto") # Añade a la lista de faltantes
-fi
-if [ -z "$TUN_DEVICE" ]; then # Si falta el dispositivo TUN
-    missing_params+=("--tun") # Añade a la lista de faltantes
-fi
-if [ -z "$PUBLIC_IP" ]; then # Si falta la IP publica
-    missing_params+=("--ip") # Añade a la lista de faltantes
-fi
-
-if [ ${#missing_params[@]} -ne 0 ]; then # Si hay parametros faltantes
-    echo "❌ Faltan los siguientes parametros:"
-    printf '  %s\n' "${missing_params[@]}" # Imprime cada parametro faltante
-    echo "Por favor, consulte la ayuda con --help para mas informacion."
-    /app/scripts/utils/openvpn-help.sh # Muestra ayuda
-    exit 1 # Termina con error
-fi
-
-# Validar que las rutas necesarias esten definidas como variables de entorno
-required_path_vars=(
+# ---------------------------
+# Validar variables de entorno requeridas
+# ---------------------------
+required_vars=(
+    "VPN_NETWORK"
+    "VPN_NETMASK"
+    "OPENVPN_PORT"
+    "OPENVPN_PROTO"
+    "TUN_DEVICE"
+    "PUBLIC_IP"
     "OPENVPN_DIR"
     "CERTS_DIR"
     "SERVER_CONF_DIR"
@@ -113,19 +77,46 @@ required_path_vars=(
     "LOGS_DIR"
 )
 
-missing_path_vars=() # Inicializa array para variables de ruta faltantes
+missing_vars=() # Inicializa array para variables faltantes
 
-for var in "${required_path_vars[@]}"; do
+for var in "${required_vars[@]}"; do
     if [ -z "${!var}" ]; then # Verifica si la variable esta vacia
-        missing_path_vars+=("$var") # Anade variable faltante al array
+        missing_vars+=("$var") # Anade variable faltante al array
     fi
 done
 
-if [ ${#missing_path_vars[@]} -ne 0 ]; then # Si hay variables de ruta faltantes
-    echo "❌ Faltan las siguientes variables de entorno para rutas:"
-    printf '%s\n' "${missing_path_vars[@]}" # Imprime cada variable faltante
-    handle_error "Estas variables de ruta deben estar definidas en el Dockerfile o en el entorno"
+if [ ${#missing_vars[@]} -ne 0 ]; then # Si hay variables faltantes
+    echo "❌ Faltan las siguientes variables de entorno:"
+    printf '%s\n' "${missing_vars[@]}" # Imprime cada variable faltante
+    echo "Por favor, consulte la ayuda con --help para mas informacion."
+    /app/scripts/utils/openvpn-help.sh # Muestra ayuda
+    exit 1 # Termina con error
 fi
+
+# Crear directorio OpenVPN si no existe
+mkdir -p "$OPENVPN_DIR"
+
+# Crear archivo de configuración JSON
+echo "📄 Creando archivo de configuración..."
+cat > "$OPENVPN_DIR/vpn_config.json" << EOF
+{
+    "vpn_network": "$VPN_NETWORK",
+    "vpn_netmask": "$VPN_NETMASK",
+    "openvpn_port": $OPENVPN_PORT,
+    "openvpn_proto": "$OPENVPN_PROTO",
+    "tun_device": "$TUN_DEVICE",
+    "public_ip": "$PUBLIC_IP"
+}
+EOF
+
+# Verificar que el archivo se creó correctamente
+if [ ! -f "$OPENVPN_DIR/vpn_config.json" ]; then
+    handle_error "No se pudo crear el archivo de configuración JSON"
+fi
+
+# Establecer permisos de lectura para todos
+chmod 644 "$OPENVPN_DIR/vpn_config.json"
+echo "✅ Archivo de configuración creado en $OPENVPN_DIR/vpn_config.json"
 
 # ---------------------------
 # Preparar directorio de logs
@@ -151,7 +142,7 @@ fi
 # Crear directorio para la configuracion del servidor si no existe
 mkdir -p "$SERVER_CONF_DIR" # Crea el directorio para la configuracion
 
-# Utilizar sed para reemplazar los placeholders con los parametros proporcionados
+# Utilizar sed para reemplazar los placeholders con las variables de entorno
 if ! sed -e "s/{{PORT}}/${OPENVPN_PORT}/g" \
     -e "s/{{PROTO}}/${OPENVPN_PROTO}/g" \
     -e "s/{{TUN}}/${TUN_DEVICE}/g" \
