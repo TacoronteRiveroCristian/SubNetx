@@ -279,6 +279,39 @@ async def get_targets():
         )
 
 
+@metrics_router.get("/status", response_model=List[PingMetric], summary="Get latest status for all targets")
+async def get_all_latest_status():
+    """
+    Get the most recent ping metrics for all targets.
+
+    Returns a list of the latest monitoring data for all targets,
+    including connection status, RTT statistics, and quality ratings.
+
+    Returns:
+        List[PingMetric]: List of latest ping metric data for all targets
+    """
+    try:
+        targets = db_adapter.get_targets()
+        result = []
+
+        for target in targets:
+            try:
+                metric = db_adapter.get_latest_metric(target['id'])
+                if metric:
+                    result.append(metric)
+            except Exception as e:
+                logger.warning(f"Error fetching metric for target {target['id']}: {str(e)}")
+                # Continue with next target if one fails
+                continue
+
+        return result
+    except Exception as e:
+        logger.error(f"Error fetching all latest metrics: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Database error: {str(e)}"
+        )
+
+
 @metrics_router.get(
     "/targets/{target_id}/latest",
     response_model=PingMetric,

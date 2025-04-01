@@ -4,7 +4,7 @@
  */
 
 import { NextApiRequest, NextApiResponse } from 'next'
-import { verifyAdminCredentials } from '../../../lib/auth.ts'
+import { verifyAdminCredentials } from '../../../lib/auth'
 import prisma from '../../../lib/db'
 import { generateToken } from '../../../lib/jwt'
 
