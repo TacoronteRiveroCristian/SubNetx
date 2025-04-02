@@ -187,7 +187,7 @@ class MetricsDBAdapter:
         tls_data = metric.get('tls_info')
         if tls_data:
             tls_info = {
-                'cert_expiry': tls_data.get('expiry'),
+                'cert_expiry': tls_data.get('cert_expiry'),
                 'issuer': tls_data.get('issuer'),
                 'subject': tls_data.get('subject'),
                 'version': tls_data.get('version'),
@@ -201,12 +201,12 @@ class MetricsDBAdapter:
             'status': metric.get('status', 'unknown'),
             'connection_quality': metric.get('connection_quality', 'unknown'),
             'packet_loss_percent': metric.get('packet_loss_percent', 0.0),
-            'min_rtt': metric.get('rtt_stats', {}).get('min_ms', 0.0),
-            'avg_rtt': metric.get('rtt_stats', {}).get('avg_ms', 0.0),
-            'max_rtt': metric.get('rtt_stats', {}).get('max_ms', 0.0),
-            'mdev_rtt': metric.get('rtt_stats', {}).get('mdev_ms', 0.0),
-            'packets_transmitted': metric.get('packets', {}).get('transmitted', 0),
-            'packets_received': metric.get('packets', {}).get('received', 0),
+            'min_rtt': metric.get('min_rtt', metric.get('rtt_stats', {}).get('min_ms', 0.0)),
+            'avg_rtt': metric.get('avg_rtt', metric.get('rtt_stats', {}).get('avg_ms', 0.0)),
+            'max_rtt': metric.get('max_rtt', metric.get('rtt_stats', {}).get('max_ms', 0.0)),
+            'mdev_rtt': metric.get('mdev_rtt', metric.get('rtt_stats', {}).get('mdev_ms', 0.0)),
+            'packets_transmitted': metric.get('packets_transmitted', metric.get('packets', {}).get('transmitted', 0)),
+            'packets_received': metric.get('packets_received', metric.get('packets', {}).get('received', 0)),
             'icmp_details': icmp_details,
             'tls_info': tls_info
         }

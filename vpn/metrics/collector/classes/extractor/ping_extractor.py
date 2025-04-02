@@ -35,7 +35,10 @@ JSON Response Format:
         "tls_info": {
             "certificate": "SSL/TLS certificate information (if applicable)",
             "expiry": "Certificate expiration date",
-            "issuer": "Certificate issuer details"
+            "issuer": "Certificate issuer details",
+            "subject": "Certificate subject details",
+            "version": "SSL/TLS version",
+            "cipher": "SSL/TLS cipher"
         }
     }
 }
@@ -84,6 +87,9 @@ class TlsInfo(TypedDict):
     certificate: str | None
     expiry: str | None
     issuer: str | None
+    subject: str | None
+    version: str | None
+    cipher: str | None
 
 
 class PingResult(TypedDict):
@@ -158,7 +164,7 @@ class PingExtractor(BaseMonitor):
             with subprocess.Popen(
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
             ) as process:
-                stdout, _ = process.communicate()
+                stdout, stderr = process.communicate()
 
             # Store the raw output
             result["raw_output"] = stdout
@@ -167,9 +173,9 @@ class PingExtractor(BaseMonitor):
             if process.returncode == 0:
                 result["status"] = "online"
 
-                # Parse packet statistics
+                # Parse packet statistics - improved regex to be more robust
                 packet_stats = re.search(
-                    r"(\d+) packets transmitted, (\d+) received", stdout
+                    r"(\d+)\s+packets\s+transmitted,\s+(\d+)\s+received", stdout
                 )
                 if packet_stats:
                     transmitted = int(packet_stats.group(1))
@@ -181,10 +187,13 @@ class PingExtractor(BaseMonitor):
                     if transmitted > 0:
                         packet_loss = 100 - (received / transmitted * 100)
                         result["packet_loss_percent"] = round(packet_loss, 2)
+                    else:
+                        # Default to 100% loss if no packets transmitted
+                        result["packet_loss_percent"] = 100.0
 
-                # Parse RTT statistics
+                # Parse RTT statistics - improved regex with optional whitespace
                 rtt_stats = re.search(
-                    r"min/avg/max/mdev = (\d+\.\d+)/(\d+\.\d+)/(\d+\.\d+)/(\d+\.\d+)",
+                    r"min/avg/max/mdev\s*=\s*(\d+\.?\d*)/(\d+\.?\d*)/(\d+\.?\d*)/(\d+\.?\d*)",
                     stdout,
                 )
                 if rtt_stats:
@@ -192,10 +201,21 @@ class PingExtractor(BaseMonitor):
                     result["rtt_stats"]["avg_ms"] = float(rtt_stats.group(2))
                     result["rtt_stats"]["max_ms"] = float(rtt_stats.group(3))
                     result["rtt_stats"]["mdev_ms"] = float(rtt_stats.group(4))
+                else:
+                    # Try alternative format that might be used in some systems
+                    alt_rtt = re.search(
+                        r"min\s*=\s*(\d+\.?\d*)ms,\s*avg\s*=\s*(\d+\.?\d*)ms,\s*max\s*=\s*(\d+\.?\d*)ms,\s*mdev\s*=\s*(\d+\.?\d*)ms",
+                        stdout
+                    )
+                    if alt_rtt:
+                        result["rtt_stats"]["min_ms"] = float(alt_rtt.group(1))
+                        result["rtt_stats"]["avg_ms"] = float(alt_rtt.group(2))
+                        result["rtt_stats"]["max_ms"] = float(alt_rtt.group(3))
+                        result["rtt_stats"]["mdev_ms"] = float(alt_rtt.group(4))
 
-                # Parse individual ICMP responses
+                # Parse individual ICMP responses - improved regex handling
                 icmp_responses = re.finditer(
-                    r"icmp_seq=(\d+) ttl=\d+ time=(\d+\.\d+) ms", stdout
+                    r"icmp_seq=(\d+).*time=(\d+\.?\d*)\s*ms", stdout
                 )
                 for match in icmp_responses:
                     seq = int(match.group(1))
@@ -216,12 +236,15 @@ class PingExtractor(BaseMonitor):
             else:
                 # If ping command failed, set to timeout
                 result["status"] = "timeout"
+                # Include stderr for troubleshooting
+                result["error"] = stderr if stderr else "Ping command failed with no error output"
 
         except Exception as e:
-            # Log the error and return the default offline result
-            print(f"Error executing ping to {self.target}: {str(e)}")
+            # Log the error and return the default offline result with error information
+            error_message = f"Error executing ping to {self.target}: {str(e)}"
+            print(error_message)
             result["status"] = "error"
-            result["error"] = str(e)
+            result["error"] = error_message
 
         return result
 
@@ -244,8 +267,8 @@ class PingExtractor(BaseMonitor):
 
             # Add TLS information for hostnames
             if self.is_hostname(self.target):
-                tls_info = self.get_tls_info()
-                ping_result["tls_info"] = tls_info
+                # Use base class implementation for TLS info
+                ping_result["tls_info"] = self.get_tls_info()
 
             self.results[self.target] = ping_result
             result["primary_target"] = ping_result
@@ -254,14 +277,6 @@ class PingExtractor(BaseMonitor):
         except Exception as e:
             print(f"Error in ping collection: {e}")
             raise
-
-    def get_tls_info(self) -> TlsInfo:
-        """Get TLS certificate information for the target.
-
-        :return: TLS certificate information
-        :rtype: TlsInfo
-        """
-        return {"certificate": None, "expiry": None, "issuer": None}
 
 
 # Standalone testing when script is run directly

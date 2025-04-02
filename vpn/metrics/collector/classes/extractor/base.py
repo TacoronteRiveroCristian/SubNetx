@@ -19,6 +19,9 @@ class TlsInfo(TypedDict):
     certificate: str | None
     expiry: str | None
     issuer: str | None
+    subject: str | None
+    version: str | None
+    cipher: str | None
 
 
 class BaseMonitor:
@@ -71,25 +74,82 @@ class BaseMonitor:
                 # Get the certificate details
                 cert = ssock.getpeercert()
 
+                # Get information about the TLS connection
+                cipher = ssock.cipher()
+                version = ssock.version()
+
                 # Check if certificate exists
                 if not cert:
                     raise ValueError("No certificate found")
 
-                # Return TLS information with safe processing of fields
+                # Process certificate data
+                expiry = None
+                issuer = None
+                subject = None
+
+                try:
+                    # Format expiry date
+                    expiry_str = cert.get("notAfter", "")
+                    if expiry_str and isinstance(expiry_str, str):
+                        expiry = datetime.strptime(
+                            expiry_str, "%b %d %H:%M:%S %Y %Z"
+                        ).isoformat()
+                except (ValueError, TypeError) as e:
+                    print(f"Error parsing certificate expiry date: {e}")
+
+                # Process certificate issuer
+                try:
+                    if "issuer" in cert:
+                        issuer = json.dumps(cert.get("issuer", []))
+                except Exception as e:
+                    print(f"Error processing certificate issuer: {e}")
+
+                # Process certificate subject
+                try:
+                    if "subject" in cert:
+                        subject = json.dumps(cert.get("subject", []))
+                except Exception as e:
+                    print(f"Error processing certificate subject: {e}")
+
+                # Return complete TLS information
                 return {
-                    "certificate": json.dumps(cert),
-                    "expiry": datetime.strptime(
-                        str(cert.get("notAfter", "")), "%b %d %H:%M:%S %Y %Z"
-                    ).isoformat(),
-                    "issuer": json.dumps(cert.get("issuer", [])),
+                    "certificate": json.dumps(cert) if cert else None,
+                    "expiry": expiry,
+                    "issuer": issuer,
+                    "subject": subject,
+                    "version": version,
+                    "cipher": json.dumps(cipher) if cipher else None,
                 }
+        except socket.gaierror:
+            print(f"DNS resolution failed for {hostname}")
+            return self._get_default_tls_info()
+        except socket.timeout:
+            print(f"Connection timed out for {hostname}")
+            return self._get_default_tls_info()
+        except ssl.SSLError as e:
+            print(f"SSL error when connecting to {hostname}: {e}")
+            return self._get_default_tls_info()
+        except ConnectionRefusedError:
+            print(f"Connection refused for {hostname}:{port}")
+            return self._get_default_tls_info()
         except Exception as e:
             print(f"TLS check failed for {hostname}: {e}")
-            return {
-                "certificate": None,
-                "expiry": None,
-                "issuer": None,
-            }
+            return self._get_default_tls_info()
+
+    def _get_default_tls_info(self) -> TlsInfo:
+        """Return default TLS information structure with null values.
+
+        :return: Default TLS information dictionary
+        :rtype: TlsInfo
+        """
+        return {
+            "certificate": None,
+            "expiry": None,
+            "issuer": None,
+            "subject": None,
+            "version": None,
+            "cipher": None,
+        }
 
     def is_hostname(self, target: str) -> bool:
         """Check if target is a hostname or IP address.
@@ -109,8 +169,21 @@ class BaseMonitor:
         :rtype: TlsInfo
         """
         if self.is_hostname(self.target):
-            return self.check_tls(self.target)
-        return {"certificate": None, "expiry": None, "issuer": None}
+            # Try standard HTTPS port first
+            tls_info = self.check_tls(self.target)
+
+            # If certificate is still None, try common alternative ports
+            if tls_info.get("certificate") is None:
+                for alt_port in [8443, 4443]:
+                    try:
+                        tls_info = self.check_tls(self.target, alt_port)
+                        if tls_info.get("certificate") is not None:
+                            break
+                    except Exception:
+                        pass
+
+            return tls_info
+        return self._get_default_tls_info()
 
     def _format_bytes(self, bytes_value: float) -> str:
         """Format bytes to human-readable format (KB, MB, GB).

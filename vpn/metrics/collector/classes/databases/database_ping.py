@@ -331,16 +331,13 @@ class PingDatabase:
         :type tls_info: Dict[str, Any]
         """
         # Extract TLS information and ensure all values are strings or None
-        cert_expiry = tls_info.get("cert_expiry")
+        cert_expiry = tls_info.get("expiry")
         issuer = tls_info.get("issuer")
         subject = tls_info.get("subject")
-        version = tls_info.get("tls_version")
-        cipher = (
-            json.dumps(tls_info.get("cipher"))
-            if tls_info.get("cipher")
-            else None
-        )
+        version = tls_info.get("version")
+        cipher = tls_info.get("cipher")
 
+        # Store TLS information in database
         conn.execute(
             """
             INSERT INTO tls_info (ping_metric_id, cert_expiry, issuer, subject, version, cipher)
