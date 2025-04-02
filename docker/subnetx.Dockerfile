@@ -39,7 +39,8 @@ RUN apt-get update && \
     wget \
     bash-completion \
     lsb-release \
-    supervisor && \
+    supervisor \
+    jq && \
     rm -rf /var/lib/apt/lists/*
 
 # Instalar dependencias de Python para metrics
@@ -56,11 +57,11 @@ RUN mkdir -p ${CERTS_DIR} ${CCD_DIR} ${CLIENTS_DIR} ${LOGS_DIR} ${SERVER_CONF_DI
 RUN mkdir -p /app/scripts/{core,client,utils}
 
 # Copiar estructura de archivos
-COPY vpn/openvpn/src/subnetx /usr/local/bin/subnetx
+COPY scripts/subnetx /usr/local/bin/subnetx
 COPY vpn/openvpn/config /app/config/
-COPY vpn/openvpn/src/core/*.sh /app/scripts/core/
-COPY vpn/openvpn/src/client/*.sh /app/scripts/client/
-COPY vpn/openvpn/src/utils/*.sh /app/scripts/utils/
+COPY scripts/core/*.sh /app/scripts/core/
+COPY scripts/client/*.sh /app/scripts/client/
+COPY scripts/utils/*.sh /app/scripts/utils/
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Copiar módulos Python
