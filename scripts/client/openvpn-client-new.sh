@@ -2,6 +2,29 @@
 # Descripcion: Genera un certificado y configuracion para un nuevo cliente OpenVPN con IP fija.
 # Usa las variables de entorno definidas en el Dockerfile para mantener coherencia.
 
+# Verificar si existe el archivo de configuración
+if [ ! -f "$OPENVPN_DIR/vpn_config.json" ]; then
+    echo "❌ Error: No se encontró el archivo de configuración en $OPENVPN_DIR/vpn_config.json"
+    echo "Ejecute primero openvpn-setup.sh para generar la configuración."
+    exit 1
+fi
+
+# Cargar configuración desde el archivo JSON
+echo "📄 Cargando configuración desde $OPENVPN_DIR/vpn_config.json"
+VPN_NETWORK=$(jq -r '.vpn_network' "$OPENVPN_DIR/vpn_config.json")
+VPN_NETMASK=$(jq -r '.vpn_netmask' "$OPENVPN_DIR/vpn_config.json")
+OPENVPN_PORT=$(jq -r '.openvpn_port' "$OPENVPN_DIR/vpn_config.json")
+OPENVPN_PROTO=$(jq -r '.openvpn_proto' "$OPENVPN_DIR/vpn_config.json")
+TUN_DEVICE=$(jq -r '.tun_device' "$OPENVPN_DIR/vpn_config.json")
+PUBLIC_IP=$(jq -r '.public_ip' "$OPENVPN_DIR/vpn_config.json")
+
+# Verificar que se cargaron todas las variables necesarias
+if [ -z "$VPN_NETWORK" ] || [ -z "$VPN_NETMASK" ] || [ -z "$OPENVPN_PORT" ] || \
+   [ -z "$OPENVPN_PROTO" ] || [ -z "$TUN_DEVICE" ] || [ -z "$PUBLIC_IP" ]; then
+    echo "❌ Error: El archivo de configuración no contiene todas las variables necesarias"
+    exit 1
+fi
+
 CLIENT_NAME="" # Nombre del cliente
 CLIENT_IP="" # IP fija asignada al cliente
 
@@ -18,7 +41,6 @@ while [[ "$#" -gt 0 ]]; do # Para cada argumento en la linea de comandos
             ;;
         *) # Si es cualquier otro argumento
             echo "❌ Error: Opcion desconocida $1" # Muestra error
-            echo "Por favor, consulte la ayuda con --help para mas informacion."
             /app/scripts/utils/openvpn-help.sh # Muestra ayuda
             exit 1 # Termina con error
             ;;
@@ -27,8 +49,7 @@ done
 
 # Validar parametros
 if [[ -z "$CLIENT_NAME" || -z "$CLIENT_IP" ]]; then # Si falta nombre o IP
-    echo "❌ Faltan los siguientes parametros:"
-    echo "Por favor, consulte la ayuda con --help para mas informacion."
+    echo "❌ Error: Debes especificar un nombre y una IP para el cliente."
     /app/scripts/utils/openvpn-help.sh # Muestra ayuda
     exit 1 # Termina con error
 fi
@@ -80,7 +101,7 @@ echo "📄 Creando archivo de configuracion del cliente: $CLIENT_CONFIG"
 
 cat > "$CLIENT_CONFIG" <<EOF
 client
-dev tun
+dev $TUN_DEVICE
 proto $OPENVPN_PROTO
 remote $PUBLIC_IP $OPENVPN_PORT
 resolv-retry infinite
@@ -117,6 +138,10 @@ EOF
 
 # Crear una copia del archivo de configuracion en el directorio centralizado
 cp "$CLIENT_CONFIG" "$CLIENT_CONFIG_COPY" # Copia el archivo de configuracion
+
+# Establecer permisos correctos
+chmod 600 "$CERTS_DIR/clients/$CLIENT_NAME/$CLIENT_NAME.key" "$CERTS_DIR/ta.key"
+chmod 644 "$CERTS_DIR/clients/$CLIENT_NAME/$CLIENT_NAME.crt" "$CERTS_DIR/ca.crt" "$CLIENT_CONFIG" "$CLIENT_CONFIG_COPY"
 
 echo "✅ Cliente creado correctamente con IP fija: $CLIENT_IP"
 echo "📄 Archivo .ovpn (todo embebido): $CLIENT_CONFIG"
