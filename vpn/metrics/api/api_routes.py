@@ -25,12 +25,13 @@ La API está diseñada para ser:
 """
 
 import logging
-from typing import List, Optional
+import re
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, HTTPException, Response
 from pydantic import BaseModel, Field
 
-from vpn.metrics.api.db_adapter import MetricsDBAdapter
+from vpn.metrics.api.db_adapter import DBAdapter as MetricsDBAdapter
 from vpn.metrics.collector.classes.databases.database_ping import PingDatabase
 from vpn.metrics.conf import PING_DB_PATH
 
@@ -257,6 +258,120 @@ class PaginatedResponse(BaseModel):
     pages: int = Field(..., description="Total number of pages")
 
 
+# Función para formatear valores TLS en un formato más legible
+def format_tls_value(value: Any) -> Any:
+    """
+    Formatear un valor TLS para mejor legibilidad.
+
+    :param value: Valor TLS a formatear
+    :type value: Any
+    :return: Valor formateado
+    :rtype: Any
+    """
+    if value is None:
+        return None
+
+    if not isinstance(value, str):
+        return value
+
+    # Primero intentamos parsear como representación de tuplas anidadas
+    try:
+        # Extraer todos los pares clave-valor usando regex
+        pairs = []
+        matches = re.finditer(r"'([^']+)', '([^']+)'", value)
+
+        for match in matches:
+            key, val = match.groups()
+            # Mapear abreviaturas a nombres legibles
+            key_map = {
+                "C": "Country",
+                "ST": "State",
+                "L": "Locality",
+                "O": "Organization",
+                "OU": "Organizational Unit",
+                "CN": "Common Name",
+                "countryName": "Country",
+                "stateOrProvinceName": "State",
+                "localityName": "Locality",
+                "organizationName": "Organization",
+                "organizationalUnitName": "Organizational Unit",
+                "commonName": "Common Name",
+                "emailAddress": "Email",
+            }
+            readable_key = key_map.get(key, key)
+            pairs.append(f"{readable_key}={val}")
+
+        if pairs:
+            return ", ".join(pairs)
+    except Exception as e:
+        logger.warning(f"Error formateando DN con regex: {e}")
+
+    # Si es una cadena JSON, intentar parsearla
+    if isinstance(value, str) and (value.startswith('[') or value.startswith('{')):
+        try:
+            # Intentar parsear como JSON
+            import json
+            parsed = json.loads(value)
+
+            # Formatear arrays anidados de DN (Distinguished Name)
+            if isinstance(parsed, list) and len(parsed) > 0:
+                # Caso típico de issuer/subject: [[[key, value], ...], ...]
+                parts = []
+
+                # Intentar extraer partes de manera recursiva
+                def extract_parts(data):
+                    if isinstance(data, list):
+                        for item in data:
+                            if isinstance(item, list):
+                                extract_parts(item)
+                            elif isinstance(item, list) and len(item) == 2:
+                                key, val = item
+                                readable_key = key_map.get(key, key)
+                                parts.append(f"{readable_key}={val}")
+
+                extract_parts(parsed)
+                if parts:
+                    return ", ".join(parts)
+
+            # Formatear arrays de tipo cipher
+            if isinstance(parsed, list) and len(parsed) >= 3:
+                # Caso típico de cipher: ["CIPHER_NAME", "VERSION", bits]
+                return f"{parsed[0]} ({parsed[1]}, {parsed[2]} bits)"
+
+            # En otros casos, simplificar la representación JSON
+            return json.dumps(parsed, ensure_ascii=False)
+
+        except json.JSONDecodeError:
+            # Si no es JSON válido, devolver el valor original
+            return value
+
+    # Para valores ya formateados o no son JSON, devolver como están
+    return value
+
+
+# Formatear los datos de TLS en la respuesta
+def format_tls_info_response(metric: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Formatear la información TLS en la respuesta para que sea más legible.
+
+    :param metric: Métrica con información TLS
+    :type metric: Dict[str, Any]
+    :return: Métrica con información TLS formateada
+    :rtype: Dict[str, Any]
+    """
+    # Crear una copia para no modificar el original
+    result = dict(metric)
+
+    # Formatear campos TLS si están presentes
+    if "tls_info" in result and result["tls_info"]:
+        tls_info = result["tls_info"]
+        for field in ["issuer", "subject"]:
+            if field in tls_info and tls_info[field]:
+                tls_info[field] = format_tls_value(tls_info[field])
+
+    return result
+
+
 # Endpoints de métricas
 
 @metrics_router.get("/targets", response_model=List[Target], summary="List monitoring targets")
@@ -298,6 +413,8 @@ async def get_all_latest_status():
             try:
                 metric = db_adapter.get_latest_metric(target['id'])
                 if metric:
+                    # Formatear campos TLS
+                    metric = format_tls_info_response(metric)
                     result.append(metric)
             except Exception as e:
                 logger.warning(f"Error fetching metric for target {target['id']}: {str(e)}")
@@ -337,6 +454,10 @@ async def get_latest_metric(target_id: int):
                 status_code=404,
                 detail=f"No metrics found for target ID {target_id}"
             )
+
+        # Formatear campos TLS para mejor legibilidad
+        metric = format_tls_info_response(metric)
+
         return metric
     except HTTPException:
         raise
@@ -393,12 +514,15 @@ async def get_metrics_for_target(
             target_id, page, size, hours
         )
 
+        # Formatear TLS info en cada métrica
+        formatted_metrics = [format_tls_info_response(m) for m in metrics]
+
         # Calculate total pages
         total_pages = (total + size - 1) // size if total > 0 else 1
 
         # Return paginated response
         return {
-            "items": metrics,
+            "items": formatted_metrics,
             "total": total,
             "page": page,
             "size": size,
