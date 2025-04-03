@@ -26,7 +26,7 @@ La API está diseñada para ser:
 
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from fastapi import APIRouter, FastAPI, HTTPException, Response
 from pydantic import BaseModel, Field
@@ -136,20 +136,26 @@ class TlsInfo(BaseModel):
     Contains details about SSL/TLS certificates for secure connections.
     Used for monitoring certificate validity and security status.
 
-    :ivar cert_expiry: Certificate expiration date
-    :ivar issuer: Certificate issuer
-    :ivar subject: Certificate subject
+    :ivar cert_expiry: Certificate expiration date information
+    :ivar issuer: Certificate issuer details
+    :ivar subject: Certificate subject details
     :ivar version: TLS version used
-    :ivar cipher: Cipher suite used
+    :ivar cipher: Cipher suite information
     """
 
-    cert_expiry: Optional[str] = Field(
-        None, description="Certificate expiration date"
+    cert_expiry: Optional[Union[str, Dict[str, Any]]] = Field(
+        None, description="Certificate expiration date information"
     )
-    issuer: Optional[str] = Field(None, description="Certificate issuer")
-    subject: Optional[str] = Field(None, description="Certificate subject")
+    issuer: Optional[Union[str, Dict[str, str]]] = Field(
+        None, description="Certificate issuer details"
+    )
+    subject: Optional[Union[str, Dict[str, str]]] = Field(
+        None, description="Certificate subject details"
+    )
     version: Optional[str] = Field(None, description="TLS version used")
-    cipher: Optional[str] = Field(None, description="Cipher suite used")
+    cipher: Optional[Union[str, Dict[str, Any]]] = Field(
+        None, description="Cipher suite information"
+    )
 
 
 class PingMetric(BaseModel):
@@ -365,9 +371,61 @@ def format_tls_info_response(metric: Dict[str, Any]) -> Dict[str, Any]:
     # Formatear campos TLS si están presentes
     if "tls_info" in result and result["tls_info"]:
         tls_info = result["tls_info"]
-        for field in ["issuer", "subject"]:
-            if field in tls_info and tls_info[field]:
-                tls_info[field] = format_tls_value(tls_info[field])
+
+        # Formatear el campo issuer como un diccionario
+        if "issuer" in tls_info and tls_info["issuer"]:
+            issuer_str = format_tls_value(tls_info["issuer"])
+            # Convertir el string formateado a diccionario
+            issuer_dict = {}
+            for pair in issuer_str.split(", "):
+                if "=" in pair:
+                    key, value = pair.split("=", 1)
+                    issuer_dict[key] = value
+            tls_info["issuer"] = issuer_dict
+
+        # Formatear el campo subject como un diccionario
+        if "subject" in tls_info and tls_info["subject"]:
+            subject_str = format_tls_value(tls_info["subject"])
+            # Convertir el string formateado a diccionario
+            subject_dict = {}
+            for pair in subject_str.split(", "):
+                if "=" in pair:
+                    key, value = pair.split("=", 1)
+                    subject_dict[key] = value
+            tls_info["subject"] = subject_dict
+
+        # Formatear cert_expiry como un diccionario con información de expiración
+        if "cert_expiry" in tls_info and tls_info["cert_expiry"]:
+            try:
+                import datetime
+                expiry_str = tls_info["cert_expiry"]
+                expiry_date = datetime.datetime.fromisoformat(expiry_str)
+                now = datetime.datetime.now()
+                days_remaining = (expiry_date - now).days
+
+                tls_info["cert_expiry"] = {
+                    "date": expiry_str,
+                    "days_remaining": days_remaining,
+                    "expired": days_remaining < 0,
+                    "status": "valid" if days_remaining > 30 else "expiring_soon" if days_remaining >= 0 else "expired"
+                }
+            except Exception as e:
+                logger.warning(f"Error formateando fecha de expiración: {e}")
+                # Mantener el formato original si hay error
+                pass
+
+        # Formatear cipher como un diccionario si contiene información estructurada
+        if "cipher" in tls_info and tls_info["cipher"] and isinstance(tls_info["cipher"], str):
+            cipher_str = tls_info["cipher"]
+            # Detectar patrón "CIPHER (PROTOCOL, BITS bits)"
+            import re
+            cipher_match = re.match(r"([A-Z0-9_]+) \(([^,]+), (\d+) bits\)", cipher_str)
+            if cipher_match:
+                tls_info["cipher"] = {
+                    "name": cipher_match.group(1),
+                    "protocol": cipher_match.group(2),
+                    "bits": int(cipher_match.group(3))
+                }
 
     return result
 
