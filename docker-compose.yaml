@@ -10,6 +10,7 @@ services:
       - SYS_ADMIN
     privileged: true
     volumes:
+      - .:/app
       - ./docker/volumes/certs:/etc/openvpn/certs
       - ./docker/volumes/logs:/var/log/openvpn
       - ./databases:/app/databases:cached

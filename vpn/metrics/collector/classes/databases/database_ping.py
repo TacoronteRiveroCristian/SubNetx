@@ -337,6 +337,13 @@ class PingDatabase:
         version = tls_info.get("version")
         cipher = tls_info.get("cipher")
 
+        print(f"Storing TLS info for ping_metric_id {ping_metric_id}:")
+        print(f"  expiry: {cert_expiry}")
+        print(f"  issuer: {issuer}")
+        print(f"  subject: {subject}")
+        print(f"  version: {version}")
+        print(f"  cipher: {cipher}")
+
         # Store TLS information in database
         conn.execute(
             """
