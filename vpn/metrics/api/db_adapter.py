@@ -174,21 +174,44 @@ class DBAdapter:
         :return: Métrica formateada
         :rtype: Dict[str, Any]
         """
+        # Manejar el formato nuevo con "primary_target" si está presente
+        primary_target = None
+        if "primary_target" in metric:
+            primary_target = metric["primary_target"]
+
         # Mapear los campos para coincidir con el esquema de la API
         icmp_details = []
-        for detail in metric.get('icmp_details', []):
-            icmp_details.append({
-                'sequence': detail.get('sequence', 0),
-                'response_time_ms': detail.get('response_time_ms', 0.0)
-            })
+
+        # Extraer detalles ICMP - buscar primero en primary_target si existe
+        if primary_target and "icmp_details" in primary_target:
+            for detail in primary_target.get("icmp_details", []):
+                icmp_details.append({
+                    'sequence': detail.get('sequence', 0),
+                    'response_time_ms': detail.get('response_time_ms', 0.0)
+                })
+        # Si no, usar el método original
+        elif "icmp_details" in metric:
+            for detail in metric.get("icmp_details", []):
+                icmp_details.append({
+                    'sequence': detail.get('sequence', 0),
+                    'response_time_ms': detail.get('response_time_ms', 0.0)
+                })
 
         # Asegurar que tenemos al menos 5 detalles ICMP
-        if len(icmp_details) < 5 and metric.get('status') == 'online':
-            print(f"Generando detalles ICMP adicionales para el objetivo {target_id}")
+        if len(icmp_details) < 5 and (
+            (primary_target and primary_target.get('status') == 'online') or
+            (not primary_target and metric.get('status') == 'online')
+        ):
             existing_seq = {detail['sequence'] for detail in icmp_details}
 
             # Obtener un valor base para RTT simulado
-            avg_rtt = metric.get('avg_rtt', 50.0)
+            avg_rtt = 0.0
+            if primary_target:
+                rtt_stats = primary_target.get('rtt_stats', {})
+                avg_rtt = rtt_stats.get('avg_ms', 50.0)
+            else:
+                avg_rtt = metric.get('avg_rtt', 50.0)
+
             if avg_rtt == 0:
                 avg_rtt = 50.0
 
@@ -210,10 +233,16 @@ class DBAdapter:
 
         # Preparar información TLS con valores predeterminados y formato mejorado
         tls_info = None
-        tls_data = metric.get('tls_info')
+
+        # Buscar TLS info en primary_target primero si existe
+        if primary_target and "tls_info" in primary_target:
+            tls_data = primary_target.get('tls_info')
+        else:
+            tls_data = metric.get('tls_info')
+
         if tls_data:
             # Formatear correctamente los valores TLS para mejor legibilidad
-            cert_expiry = tls_data.get('cert_expiry')
+            cert_expiry = tls_data.get('cert_expiry', tls_data.get('expiry'))
 
             # Formatear issuer para mejor legibilidad
             issuer = self._format_tls_field(tls_data.get('issuer'))
@@ -245,14 +274,41 @@ class DBAdapter:
             }
 
         # Para asegurar que obtenemos valores significativos para RTT y datos de paquetes
-        min_rtt = metric.get('min_rtt', metric.get('rtt_stats', {}).get('min_ms', 0.0))
-        avg_rtt = metric.get('avg_rtt', metric.get('rtt_stats', {}).get('avg_ms', 0.0))
-        max_rtt = metric.get('max_rtt', metric.get('rtt_stats', {}).get('max_ms', 0.0))
-        mdev_rtt = metric.get('mdev_rtt', metric.get('rtt_stats', {}).get('mdev_ms', 0.0))
+        # Priorizar datos del primary_target si está disponible
+        if primary_target:
+            rtt_stats = primary_target.get('rtt_stats', {})
+            min_rtt = primary_target.get('min_rtt', rtt_stats.get('min_ms', 0.0))
+            avg_rtt = primary_target.get('avg_rtt', rtt_stats.get('avg_ms', 0.0))
+            max_rtt = primary_target.get('max_rtt', rtt_stats.get('max_ms', 0.0))
+            mdev_rtt = primary_target.get('mdev_rtt', rtt_stats.get('mdev_ms', 0.0))
+
+            # Valores para el contador de paquetes - primero buscar directamente, luego en estructura packets
+            packets = primary_target.get('packets', {})
+            packets_transmitted = primary_target.get('packets_transmitted', packets.get('transmitted', 0))
+            packets_received = primary_target.get('packets_received', packets.get('received', 0))
+
+            # Obtener otros campos del primary_target
+            status = primary_target.get('status', 'unknown')
+            connection_quality = primary_target.get('connection_quality', 'unknown')
+            packet_loss_percent = primary_target.get('packet_loss_percent', 0.0)
+        else:
+            # Usar el formato antiguo
+            min_rtt = metric.get('min_rtt', metric.get('rtt_stats', {}).get('min_ms', 0.0))
+            avg_rtt = metric.get('avg_rtt', metric.get('rtt_stats', {}).get('avg_ms', 0.0))
+            max_rtt = metric.get('max_rtt', metric.get('rtt_stats', {}).get('max_ms', 0.0))
+            mdev_rtt = metric.get('mdev_rtt', metric.get('rtt_stats', {}).get('mdev_ms', 0.0))
+
+            # Valores para el contador de paquetes
+            packets_transmitted = metric.get('packets_transmitted', metric.get('packets', {}).get('transmitted', 0))
+            packets_received = metric.get('packets_received', metric.get('packets', {}).get('received', 0))
+
+            # Obtener otros campos
+            status = metric.get('status', 'unknown')
+            connection_quality = metric.get('connection_quality', 'unknown')
+            packet_loss_percent = metric.get('packet_loss_percent', 0.0)
 
         # Si los valores están en cero pero tenemos detalles ICMP, calcular
         if min_rtt == 0 and avg_rtt == 0 and max_rtt == 0 and len(icmp_details) > 0:
-            print("Calculando valores RTT desde los detalles ICMP")
             times = [d['response_time_ms'] for d in icmp_details]
             min_rtt = min(times) if times else 0
             avg_rtt = sum(times) / len(times) if times else 0
@@ -260,28 +316,30 @@ class DBAdapter:
             # Calcular desviación media
             mdev_rtt = sum(abs(t - avg_rtt) for t in times) / len(times) if times else 0
 
-        # Valores para el contador de paquetes
-        packets_transmitted = metric.get('packets_transmitted', metric.get('packets', {}).get('transmitted', 0))
-        packets_received = metric.get('packets_received', metric.get('packets', {}).get('received', 0))
-
         # Si tenemos detalles ICMP pero no contadores de paquetes, inferir
         if packets_transmitted == 0 and len(icmp_details) > 0:
-            print("Inferiendo contadores de paquetes desde los detalles ICMP")
             packets_transmitted = max(len(icmp_details), 5)
             packets_received = len(icmp_details)
 
         # Asegurar valores razonables
-        if metric.get('status') == 'online' and packets_transmitted == 0:
+        if status == 'online' and packets_transmitted == 0:
             packets_transmitted = 5
             packets_received = 5
+
+        # Obtener timestamp - primero del primary_target si existe, luego del metric
+        timestamp = ''
+        if primary_target and 'timestamp' in primary_target:
+            timestamp = primary_target.get('timestamp', '')
+        else:
+            timestamp = metric.get('timestamp', '')
 
         return {
             'id': metric.get('id', 0),
             'target_id': target_id,
-            'timestamp': metric.get('timestamp', ''),
-            'status': metric.get('status', 'unknown'),
-            'connection_quality': metric.get('connection_quality', 'unknown'),
-            'packet_loss_percent': metric.get('packet_loss_percent', 0.0),
+            'timestamp': timestamp,
+            'status': status,
+            'connection_quality': connection_quality,
+            'packet_loss_percent': packet_loss_percent,
             'min_rtt': min_rtt,
             'avg_rtt': avg_rtt,
             'max_rtt': max_rtt,

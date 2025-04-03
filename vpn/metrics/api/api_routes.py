@@ -358,84 +358,70 @@ def format_tls_value(value: Any) -> Any:
 # Formatear los datos de TLS en la respuesta
 def format_tls_info_response(metric: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Formatear la información TLS en la respuesta para que sea más legible.
+    Format TLS info in the metric response for better client-side processing.
 
-    :param metric: Métrica con información TLS
-    :type metric: Dict[str, Any]
-    :return: Métrica con información TLS formateada
-    :rtype: Dict[str, Any]
+    This function formats TLS certificate data to more human-readable formats,
+    handling different representations of DN (Distinguished Name) fields.
+
+    Args:
+        metric: Metric data to format
+
+    Returns:
+        Dict[str, Any]: Formatted metric data
     """
-    # Crear una copia para no modificar el original
-    result = dict(metric)
+    # Make a copy to avoid modifying the original
+    formatted = metric.copy()
 
-    # Formatear campos TLS si están presentes
-    if "tls_info" in result and result["tls_info"]:
-        tls_info = result["tls_info"]
+    # Check if we have the new format with primary_target
+    primary_target = None
+    tls_info = None
 
-        # Formatear el campo issuer como un diccionario
-        if "issuer" in tls_info and tls_info["issuer"]:
-            issuer_str = format_tls_value(tls_info["issuer"])
-            # Convertir el string formateado a diccionario
-            issuer_dict = {}
-            for pair in issuer_str.split(", "):
-                if "=" in pair:
-                    key, value = pair.split("=", 1)
-                    issuer_dict[key] = value
-            tls_info["issuer"] = issuer_dict
+    if "primary_target" in formatted:
+        primary_target = formatted["primary_target"]
+        if primary_target and "tls_info" in primary_target:
+            tls_info = primary_target["tls_info"]
+    elif "tls_info" in formatted:
+        tls_info = formatted["tls_info"]
 
-        # Formatear el campo subject como un diccionario
-        if "subject" in tls_info and tls_info["subject"]:
-            subject_str = format_tls_value(tls_info["subject"])
-            # Convertir el string formateado a diccionario
-            subject_dict = {}
-            for pair in subject_str.split(", "):
-                if "=" in pair:
-                    key, value = pair.split("=", 1)
-                    subject_dict[key] = value
-            tls_info["subject"] = subject_dict
+    # Skip if no TLS info
+    if not tls_info:
+        return formatted
 
-        # Formatear cert_expiry como un diccionario con información de expiración
-        if "cert_expiry" in tls_info and tls_info["cert_expiry"]:
-            try:
-                import datetime
-                expiry_str = tls_info["cert_expiry"]
-                expiry_date = datetime.datetime.fromisoformat(expiry_str)
-                now = datetime.datetime.now()
-                days_remaining = (expiry_date - now).days
+    # Format TLS fields for better display
+    formatted_tls = {}
 
-                tls_info["cert_expiry"] = {
-                    "date": expiry_str,
-                    "days_remaining": days_remaining,
-                    "expired": days_remaining < 0,
-                    "status": "valid" if days_remaining > 30 else "expiring_soon" if days_remaining >= 0 else "expired"
-                }
-            except Exception as e:
-                logger.warning(f"Error formateando fecha de expiración: {e}")
-                # Mantener el formato original si hay error
-                pass
+    # Process each field
+    for field in ["cert_expiry", "expiry", "issuer", "subject", "version", "cipher"]:
+        if field in tls_info and tls_info[field]:
+            value = tls_info[field]
+            formatted_value = format_tls_value(value)
 
-        # Formatear cipher como un diccionario si contiene información estructurada
-        if "cipher" in tls_info and tls_info["cipher"] and isinstance(tls_info["cipher"], str):
-            cipher_str = tls_info["cipher"]
-            # Detectar patrón "CIPHER (PROTOCOL, BITS bits)"
-            import re
-            cipher_match = re.match(r"([A-Z0-9_]+) \(([^,]+), (\d+) bits\)", cipher_str)
-            if cipher_match:
-                tls_info["cipher"] = {
-                    "name": cipher_match.group(1),
-                    "protocol": cipher_match.group(2),
-                    "bits": int(cipher_match.group(3))
-                }
+            # Use standard field names in response
+            if field == "expiry":  # Map expiry to cert_expiry
+                formatted_tls["cert_expiry"] = formatted_value
+            else:
+                formatted_tls[field] = formatted_value
 
-    return result
+    # Ensure all expected fields exist in the response
+    for field in ["cert_expiry", "issuer", "subject", "version", "cipher"]:
+        if field not in formatted_tls:
+            formatted_tls[field] = None
+
+    # Update the TLS info in the formatted response
+    if primary_target:
+        formatted["primary_target"]["tls_info"] = formatted_tls
+    else:
+        formatted["tls_info"] = formatted_tls
+
+    return formatted
 
 
 # Endpoints de métricas
 
-@metrics_router.get("/targets", response_model=List[Target], summary="List monitoring targets")
+@metrics_router.get("/targets", response_model=List[Target], summary="List all monitoring targets")
 async def get_targets():
     """
-    List all monitoring targets in the system.
+    Get all monitoring targets.
 
     Returns a list of targets that are currently being monitored,
     including their IDs, addresses, and descriptions.
@@ -444,7 +430,19 @@ async def get_targets():
         List[Target]: List of monitoring targets
     """
     try:
-        return db_adapter.get_targets()
+        # Get all targets from the database
+        all_targets = db_adapter.get_targets()
+
+        # Filter to only show the targets that are actively being monitored
+        active_target_hostnames = get_active_target_hostnames()
+
+        # Filter targets that are in the active list
+        active_targets = [
+            target for target in all_targets
+            if target['target'] in active_target_hostnames
+        ]
+
+        return active_targets
     except Exception as e:
         logger.error(f"Error fetching targets: {str(e)}")
         raise HTTPException(
@@ -464,16 +462,48 @@ async def get_all_latest_status():
         List[PingMetric]: List of latest ping metric data for all targets
     """
     try:
-        targets = db_adapter.get_targets()
+        # Get only the actively monitored targets
+        active_target_hostnames = get_active_target_hostnames()
+        all_targets = db_adapter.get_targets()
+        active_targets = [
+            target for target in all_targets
+            if target['target'] in active_target_hostnames
+        ]
+
         result = []
 
-        for target in targets:
+        for target in active_targets:
             try:
+                # Get the latest metric for the target
                 metric = db_adapter.get_latest_metric(target['id'])
+
                 if metric:
-                    # Formatear campos TLS
-                    metric = format_tls_info_response(metric)
-                    result.append(metric)
+                    # Format TLS fields for better readability
+                    formatted_metric = format_tls_info_response(metric)
+
+                    # The metric should already be formatted by the db_adapter._format_metric method,
+                    # but we need to extract it from the primary_target structure if present
+                    if "primary_target" in formatted_metric:
+                        # Keep only the metric fields needed by the API model
+                        result.append({
+                            'id': formatted_metric.get('id', 0),
+                            'target_id': target['id'],
+                            'timestamp': formatted_metric.get('primary_target', {}).get('timestamp', ''),
+                            'status': formatted_metric.get('primary_target', {}).get('status', 'unknown'),
+                            'connection_quality': formatted_metric.get('primary_target', {}).get('connection_quality', 'unknown'),
+                            'packet_loss_percent': formatted_metric.get('primary_target', {}).get('packet_loss_percent', 0.0),
+                            'min_rtt': formatted_metric.get('primary_target', {}).get('min_rtt', 0.0),
+                            'avg_rtt': formatted_metric.get('primary_target', {}).get('avg_rtt', 0.0),
+                            'max_rtt': formatted_metric.get('primary_target', {}).get('max_rtt', 0.0),
+                            'mdev_rtt': formatted_metric.get('primary_target', {}).get('mdev_rtt', 0.0),
+                            'packets_transmitted': formatted_metric.get('primary_target', {}).get('packets_transmitted', 0),
+                            'packets_received': formatted_metric.get('primary_target', {}).get('packets_received', 0),
+                            'icmp_details': formatted_metric.get('primary_target', {}).get('icmp_details', []),
+                            'tls_info': formatted_metric.get('primary_target', {}).get('tls_info', {})
+                        })
+                    else:
+                        # Use the metric directly as it's already in the right format
+                        result.append(formatted_metric)
             except Exception as e:
                 logger.warning(f"Error fetching metric for target {target['id']}: {str(e)}")
                 # Continue with next target if one fails
@@ -506,6 +536,23 @@ async def get_latest_metric(target_id: int):
         PingMetric: Latest ping metric data
     """
     try:
+        # Get target info first
+        target = db_adapter.get_target(target_id)
+        if not target:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Target ID {target_id} not found"
+            )
+
+        # Check if this target is actively being monitored
+        active_target_hostnames = get_active_target_hostnames()
+        if target['target'] not in active_target_hostnames:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Target '{target['target']}' is not actively being monitored"
+            )
+
+        # Get the latest metric for the target
         metric = db_adapter.get_latest_metric(target_id)
         if not metric:
             raise HTTPException(
@@ -513,10 +560,33 @@ async def get_latest_metric(target_id: int):
                 detail=f"No metrics found for target ID {target_id}"
             )
 
-        # Formatear campos TLS para mejor legibilidad
-        metric = format_tls_info_response(metric)
+        # Format TLS fields for better readability
+        formatted_metric = format_tls_info_response(metric)
 
-        return metric
+        # If the metric has a primary_target structure, extract the data from it
+        if "primary_target" in formatted_metric:
+            # Extract only the fields needed by the API model
+            primary_data = formatted_metric.get('primary_target', {})
+            return {
+                'id': formatted_metric.get('id', 0),
+                'target_id': target_id,
+                'timestamp': primary_data.get('timestamp', ''),
+                'status': primary_data.get('status', 'unknown'),
+                'connection_quality': primary_data.get('connection_quality', 'unknown'),
+                'packet_loss_percent': primary_data.get('packet_loss_percent', 0.0),
+                'min_rtt': primary_data.get('min_rtt', 0.0),
+                'avg_rtt': primary_data.get('avg_rtt', 0.0),
+                'max_rtt': primary_data.get('max_rtt', 0.0),
+                'mdev_rtt': primary_data.get('mdev_rtt', 0.0),
+                'packets_transmitted': primary_data.get('packets_transmitted', 0),
+                'packets_received': primary_data.get('packets_received', 0),
+                'icmp_details': primary_data.get('icmp_details', []),
+                'tls_info': primary_data.get('tls_info', {})
+            }
+
+        # Otherwise just return the formatted metric
+        return formatted_metric
+
     except HTTPException:
         raise
     except Exception as e:
@@ -555,6 +625,14 @@ async def get_metrics_for_target(
         if not target:
             raise HTTPException(
                 status_code=404, detail=f"Target ID {target_id} not found"
+            )
+
+        # Check if this target is actively being monitored
+        active_target_hostnames = get_active_target_hostnames()
+        if target['target'] not in active_target_hostnames:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Target '{target['target']}' is not actively being monitored"
             )
 
         # Validate pagination parameters
@@ -622,6 +700,14 @@ async def get_connection_quality(target_id: int, hours: int = 24):
                 status_code=404, detail=f"Target ID {target_id} not found"
             )
 
+        # Check if this target is actively being monitored
+        active_target_hostnames = get_active_target_hostnames()
+        if target['target'] not in active_target_hostnames:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Target '{target['target']}' is not actively being monitored"
+            )
+
         # Validate hours parameter
         if hours < 1 or hours > 720:  # Max 30 days
             raise HTTPException(
@@ -640,3 +726,17 @@ async def get_connection_quality(target_id: int, hours: int = 24):
         raise HTTPException(
             status_code=500, detail=f"Analysis error: {str(e)}"
         )
+
+
+def get_active_target_hostnames() -> List[str]:
+    """
+    Get the list of hostnames that are actively being monitored.
+
+    This centralizes the definition of which targets are considered "active"
+    to ensure consistency across API endpoints.
+
+    Returns:
+        List[str]: List of active target hostnames
+    """
+    # These targets are hardcoded in the extract_and_save_ping.py script
+    return ["google.com", "invalid.example.domain"]
