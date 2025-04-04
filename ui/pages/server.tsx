@@ -133,17 +133,35 @@ export default function ServerManagement() {
 
                 // If status is running, try to get configuration
                 if (data.status === 'running' && data.config) {
-                    setServerConfig({
+                    const config = {
                         vpn_network: data.config.vpn_network || "",
                         vpn_netmask: data.config.vpn_netmask || "",
                         openvpn_port: data.config.openvpn_port || 0,
                         openvpn_proto: data.config.openvpn_proto || "",
                         public_ip: data.config.public_ip || ""
-                    });
+                    };
+
+                    setServerConfig(config);
+
+                    // Guardar la configuración en localStorage para persistencia
+                    localStorage.setItem('serverConfig', JSON.stringify(config));
+                } else {
+                    // Si el servidor no está corriendo, intentamos cargar la configuración del localStorage
+                    const savedConfig = localStorage.getItem('serverConfig');
+                    if (savedConfig) {
+                        setServerConfig(JSON.parse(savedConfig));
+                    }
                 }
             } catch (error) {
                 console.error('Failed to fetch server status:', error);
                 setServerStatus('unknown');
+
+                // En caso de error, intentamos cargar la configuración del localStorage
+                const savedConfig = localStorage.getItem('serverConfig');
+                if (savedConfig) {
+                    setServerConfig(JSON.parse(savedConfig));
+                }
+
                 showNotification('Could not connect to server', 'error');
             }
         };
@@ -313,13 +331,18 @@ export default function ServerManagement() {
                 setServerStatus('stopped');
 
                 // Reset server configuration - usar strings vacíos para que se muestren guiones
-                setServerConfig({
+                const emptyConfig = {
                     vpn_network: "",
                     vpn_netmask: "",
                     openvpn_port: 0,
                     openvpn_proto: "",
                     public_ip: ""
-                });
+                };
+
+                setServerConfig(emptyConfig);
+
+                // Eliminar la configuración del localStorage
+                localStorage.removeItem('serverConfig');
 
                 showNotification('Server configuration deleted successfully', 'success');
 
@@ -409,14 +432,20 @@ export default function ServerManagement() {
             const data = await response.json();
 
             if (data.success) {
-                // Actualizar la configuración del servidor
-                setServerConfig({
+                // Crear objeto de configuración
+                const newConfig = {
                     vpn_network: setupVpnNetwork,
                     vpn_netmask: setupVpnNetmask,
                     openvpn_port: parseInt(setupOpenvpnPort),
                     openvpn_proto: setupOpenvpnProto,
                     public_ip: setupPublicIp
-                });
+                };
+
+                // Actualizar la configuración del servidor
+                setServerConfig(newConfig);
+
+                // Guardar la configuración en localStorage para persistencia
+                localStorage.setItem('serverConfig', JSON.stringify(newConfig));
 
                 // Cerrar el modal y mostrar notificación
                 setSetupModalOpen(false);
@@ -1275,55 +1304,88 @@ export default function ServerManagement() {
                             </button>
                         </div>
 
-                        {/* Start Button */}
-                        <button
-                            className="server-action-button start"
-                            onClick={() => handleServerOperation('start')}
-                            disabled={loading || serverStatus === 'running'}
-                            onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                                e.currentTarget.style.opacity = '0.8';
-                                e.currentTarget.style.transform = 'translateX(-4px)';
-                            }}
-                            onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-                                e.currentTarget.style.opacity = '1';
-                                e.currentTarget.style.transform = 'translateX(0)';
-                            }}
-                        >
-                            <span className="material-icons" style={{ fontSize: '36px', color: currentTheme.primary }}>
-                                play_circle
-                            </span>
-                            <div style={{ fontWeight: '500', fontSize: '1.1rem' }}>
-                                Start Server
-                            </div>
-                            <div style={{ fontSize: '0.85rem', opacity: 0.8, textAlign: 'center' }}>
-                                Start the OpenVPN service
-                            </div>
-                        </button>
+                        {/* Start/Stop Container */}
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.5rem'
+                        }}>
+                            {/* Start Button */}
+                            <button
+                                className="server-action-button start"
+                                onClick={() => handleServerOperation('start')}
+                                disabled={loading || serverStatus === 'running'}
+                                onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                    e.currentTarget.style.opacity = '0.8';
+                                    e.currentTarget.style.transform = 'translateX(-4px)';
+                                }}
+                                onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                    e.currentTarget.style.opacity = '1';
+                                    e.currentTarget.style.transform = 'translateX(0)';
+                                }}
+                                style={{
+                                    height: '65px',
+                                    padding: '0.75rem'
+                                }}
+                            >
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '12px'
+                                }}>
+                                    <span className="material-icons" style={{ fontSize: '28px', color: currentTheme.primary }}>
+                                        play_circle
+                                    </span>
+                                    <div>
+                                        <div style={{ fontWeight: '500', fontSize: '1rem', textAlign: 'left' }}>
+                                            Start Server
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', opacity: 0.8, textAlign: 'left' }}>
+                                            Start the OpenVPN service
+                                        </div>
+                                    </div>
+                                </div>
+                            </button>
 
-                        {/* Stop Button */}
-                        <button
-                            className="server-action-button stop"
-                            onClick={() => handleServerOperation('stop')}
-                            disabled={loading || serverStatus !== 'running'}
-                            onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                                e.currentTarget.style.opacity = '0.8';
-                                e.currentTarget.style.transform = 'translateX(-4px)';
-                            }}
-                            onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-                                e.currentTarget.style.opacity = '1';
-                                e.currentTarget.style.transform = 'translateX(0)';
-                            }}
-                        >
-                            <span className="material-icons" style={{ fontSize: '36px', color: '#F44336' }}>
-                                stop_circle
-                            </span>
-                            <div style={{ fontWeight: '500', fontSize: '1.1rem' }}>
-                                Stop Server
-                            </div>
-                            <div style={{ fontSize: '0.85rem', opacity: 0.8, textAlign: 'center' }}>
-                                Stop the OpenVPN service
-                            </div>
-                        </button>
+                            {/* Stop Button */}
+                            <button
+                                className="server-action-button stop"
+                                onClick={() => handleServerOperation('stop')}
+                                disabled={loading || serverStatus !== 'running'}
+                                onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                    e.currentTarget.style.opacity = '0.8';
+                                    e.currentTarget.style.transform = 'translateX(-4px)';
+                                }}
+                                onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                    e.currentTarget.style.opacity = '1';
+                                    e.currentTarget.style.transform = 'translateX(0)';
+                                }}
+                                style={{
+                                    height: '65px',
+                                    padding: '0.75rem',
+                                    borderColor: '#F4433660',
+                                    backgroundColor: '#F4433610',
+                                }}
+                            >
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '12px'
+                                }}>
+                                    <span className="material-icons" style={{ fontSize: '28px', color: '#F44336' }}>
+                                        stop_circle
+                                    </span>
+                                    <div>
+                                        <div style={{ fontWeight: '500', fontSize: '1rem', textAlign: 'left' }}>
+                                            Stop Server
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', opacity: 0.8, textAlign: 'left' }}>
+                                            Stop the OpenVPN service
+                                        </div>
+                                    </div>
+                                </div>
+                            </button>
+                        </div>
 
                         {/* Create Client Button */}
                         <button
@@ -1349,7 +1411,15 @@ export default function ServerManagement() {
                                 Generate client configuration
                             </div>
                         </button>
+                    </div>
 
+                    {/* Second row for Edit button */}
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+                        gap: '1.5rem',
+                        marginBottom: '2rem'
+                    }}>
                         {/* Edit Server Button */}
                         <div style={{
                             position: 'relative',
@@ -1514,17 +1584,6 @@ export default function ServerManagement() {
                             }}>
                                 <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>Encryption</div>
                                 <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>{serverConfig.vpn_network ? "AES-256-GCM" : "-"}</div>
-                            </div>
-
-                            <div style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '0.5rem'
-                            }}>
-                                <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>Connected Clients</div>
-                                <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>
-                                    {serverStatus === 'running' && serverConfig.vpn_network ? '0' : '-'}
-                                </div>
                             </div>
                         </div>
                     </div>
