@@ -309,6 +309,35 @@ async def stop_server():
             detail=f"Error deteniendo el servidor: {result['output']}"
         )
 
+@router.post("/reset", response_model=OperationResponse, summary="Eliminar toda la configuración del servidor OpenVPN")
+async def reset_server():
+    """
+    Elimina toda la configuración del servidor OpenVPN.
+
+    Borra todos los certificados del servidor, configuraciones y clientes.
+    Esta operación no se puede deshacer.
+
+    Returns:
+        OperationResponse: Resultado de la operación de eliminación
+    """
+    # Ejecutar script de reset que ya maneja la parada del servidor y la limpieza de archivos
+    logger.info("Iniciando proceso de reset del servidor OpenVPN")
+    result = run_command(["/app/scripts/core/openvpn-reset.sh"])
+
+    if result["success"]:
+        logger.info("Reset completado correctamente")
+        return {
+            "success": True,
+            "message": "Configuración del servidor eliminada correctamente",
+            "output": result["output"]
+        }
+    else:
+        logger.error(f"Error durante el reset: {result['output']}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error eliminando la configuración del servidor: {result['output']}"
+        )
+
 # Rutas para gestión de clientes
 @router.post("/client/create", response_model=ClientResponse, summary="Crear cliente OpenVPN")
 async def create_client(client: ClientRequest):
@@ -415,3 +444,29 @@ async def delete_client(client_name: str = Path(..., description="Nombre del cli
                 status_code=500,
                 detail=f"Error eliminando el cliente: {result['output']}"
             )
+
+@router.get("/has-certificates", summary="Verificar si existen certificados del servidor")
+async def has_certificates():
+    """
+    Comprueba si existen certificados y configuraciones para el servidor.
+
+    Este endpoint verifica la existencia de archivos críticos como el certificado
+    del servidor, la clave y la configuración.
+
+    Returns:
+        Dict: Indicando si existen certificados y configuración
+    """
+    # Comprobar existencia de archivos críticos
+    server_conf_exists = os.path.exists("/etc/openvpn/server/server.conf")
+    pki_exists = os.path.exists("/etc/openvpn/easy-rsa/pki")
+
+    # Consideramos que hay certificados si existe el directorio PKI o la configuración del servidor
+    has_certs = server_conf_exists or pki_exists
+
+    logger.info(f"Verificación de certificados: {has_certs} (server_conf: {server_conf_exists}, pki: {pki_exists})")
+
+    return {
+        "hasCertificates": has_certs,
+        "serverConfExists": server_conf_exists,
+        "pkiExists": pki_exists
+    }

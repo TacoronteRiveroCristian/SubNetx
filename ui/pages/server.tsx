@@ -52,18 +52,38 @@ export default function ServerManagement() {
     const [theme, setTheme] = useState<'light' | 'dark'>('dark');
     const [isHamburgerOpen, setIsHamburgerOpen] = useState(false);
     const [serverStatus, setServerStatus] = useState<'running' | 'stopped' | 'unknown'>('unknown');
+    const [serverHasCertificates, setServerHasCertificates] = useState(false);
     const [serverConfig, setServerConfig] = useState({
-        vpn_network: "10.8.0.0",
-        vpn_netmask: "255.255.255.0",
-        openvpn_port: 1194,
-        openvpn_proto: "udp",
-        public_ip: "labcrist.duckdns.org"
+        vpn_network: "",
+        vpn_netmask: "",
+        openvpn_port: 0,
+        openvpn_proto: "",
+        public_ip: ""
     });
+
+    // Cliente modal states
     const [createClientModalOpen, setCreateClientModalOpen] = useState(false);
     const [newClientName, setNewClientName] = useState('');
-    const [newClientIP, setNewClientIP] = useState('10.8.0.10');
+    const [newClientIP, setNewClientIP] = useState('');
     const [clientCreating, setClientCreating] = useState(false);
     const [clientError, setClientError] = useState<string | null>(null);
+
+    // Setup modal states
+    const [setupModalOpen, setSetupModalOpen] = useState(false);
+    const [setupConfirmModalOpen, setSetupConfirmModalOpen] = useState(false);
+    const [setupVpnNetwork, setSetupVpnNetwork] = useState('');
+    const [setupVpnNetmask, setSetupVpnNetmask] = useState('');
+    const [setupOpenvpnPort, setSetupOpenvpnPort] = useState('');
+    const [setupOpenvpnProto, setSetupOpenvpnProto] = useState('udp');
+    const [setupPublicIp, setSetupPublicIp] = useState('');
+    const [setupError, setSetupError] = useState<string | null>(null);
+    const [setupProcessing, setSetupProcessing] = useState(false);
+
+    // Delete configuration states
+    const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
+    const [deleteProcessing, setDeleteProcessing] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
+
     const [notification, setNotification] = useState<{
         message: string;
         type: 'success' | 'error';
@@ -102,14 +122,23 @@ export default function ServerManagement() {
 
                 setServerStatus(data.status as 'running' | 'stopped' | 'unknown');
 
+                // Si la API devuelve información sobre los certificados, actualizamos el estado
+                if (data.hasCertificates !== undefined) {
+                    setServerHasCertificates(data.hasCertificates);
+                } else {
+                    // Si la API no proporciona esta información, asumimos que no hay certificados
+                    // Este caso debería manejarse adecuadamente en el backend
+                    setServerHasCertificates(false);
+                }
+
                 // If status is running, try to get configuration
                 if (data.status === 'running' && data.config) {
                     setServerConfig({
-                        vpn_network: data.config.vpn_network || "10.8.0.0",
-                        vpn_netmask: data.config.vpn_netmask || "255.255.255.0",
-                        openvpn_port: data.config.openvpn_port || 1194,
-                        openvpn_proto: data.config.openvpn_proto || "udp",
-                        public_ip: data.config.public_ip || "labcrist.duckdns.org"
+                        vpn_network: data.config.vpn_network || "",
+                        vpn_netmask: data.config.vpn_netmask || "",
+                        openvpn_port: data.config.openvpn_port || 0,
+                        openvpn_proto: data.config.openvpn_proto || "",
+                        public_ip: data.config.public_ip || ""
                     });
                 }
             } catch (error) {
@@ -180,12 +209,24 @@ export default function ServerManagement() {
 
         // Ocultar automáticamente después de 5 segundos
         setTimeout(() => {
-            setNotification(prev => ({ ...prev, visible: false }));
+            setNotification((prev: { message: string; type: 'success' | 'error'; visible: boolean }) => ({ ...prev, visible: false }));
         }, 5000);
     };
 
     // Server operations function
     const handleServerOperation = async (operation: 'setup' | 'start' | 'stop' | 'edit') => {
+        // Para el caso de setup, verificamos si hay certificados existentes
+        if (operation === 'setup') {
+            // Si hay certificados existentes, mostramos primero el modal de confirmación
+            if (serverHasCertificates) {
+                setSetupConfirmModalOpen(true);
+            } else {
+                // Si no hay certificados, mostramos directamente el modal de configuración
+                setSetupModalOpen(true);
+            }
+            return;
+        }
+
         setLoading(true);
 
         try {
@@ -203,26 +244,6 @@ export default function ServerManagement() {
             let body = null;
 
             switch (operation) {
-                case 'setup':
-                    endpoint = '/api/vpn/setup';
-                    // Usar valores predeterminados para la configuración
-                    body = {
-                        vpn_network: "10.8.0.0",
-                        vpn_netmask: "255.255.255.0",
-                        openvpn_port: 1194,
-                        openvpn_proto: "udp",
-                        tun_device: "tun0",
-                        public_ip: "labcrist.duckdns.org"
-                    };
-                    // Update serverConfig state with these values
-                    setServerConfig({
-                        vpn_network: body.vpn_network,
-                        vpn_netmask: body.vpn_netmask,
-                        openvpn_port: body.openvpn_port,
-                        openvpn_proto: body.openvpn_proto,
-                        public_ip: body.public_ip
-                    });
-                    break;
                 case 'start': endpoint = '/api/vpn/start'; break;
                 case 'stop': endpoint = '/api/vpn/stop'; break;
             }
@@ -252,8 +273,6 @@ export default function ServerManagement() {
                 } else if (operation === 'stop') {
                     setServerStatus('stopped');
                     showNotification('Server stopped successfully', 'success');
-                } else if (operation === 'setup') {
-                    showNotification('Server configured successfully', 'success');
                 }
             } else {
                 // Manejar error
@@ -268,16 +287,207 @@ export default function ServerManagement() {
         }
     };
 
+    // Function to handle delete configuration
+    const handleDeleteConfiguration = async () => {
+        setDeleteProcessing(true);
+        setDeleteError(null);
+
+        try {
+            // Call the API endpoint to delete configuration
+            const response = await fetch('/api/vpn/reset', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Update server state
+                setServerHasCertificates(false);
+                setServerStatus('stopped');
+
+                // Reset server configuration - usar strings vacíos para que se muestren guiones
+                setServerConfig({
+                    vpn_network: "",
+                    vpn_netmask: "",
+                    openvpn_port: 0,
+                    openvpn_proto: "",
+                    public_ip: ""
+                });
+
+                showNotification('Server configuration deleted successfully', 'success');
+
+                // Close the modal
+                setDeleteConfirmModalOpen(false);
+            } else {
+                setDeleteError(data.message || 'Error deleting server configuration');
+                showNotification('Error deleting server configuration: ' + (data.message || 'Unknown error'), 'error');
+            }
+        } catch (error) {
+            console.error('Failed to delete configuration:', error);
+            setDeleteError('Failed to connect to server');
+            showNotification('Failed to connect to server', 'error');
+        } finally {
+            setDeleteProcessing(false);
+        }
+    };
+
+    // Function to handle setup confirmation
+    const handleConfirmSetup = () => {
+        // Cerramos el modal de confirmación
+        setSetupConfirmModalOpen(false);
+        // Abrimos el modal de configuración
+        setSetupModalOpen(true);
+    };
+
+    // Function to handle setup form submission
+    const handleSetupSubmit = async () => {
+        // Validar los campos del formulario
+        if (!setupVpnNetwork) {
+            setSetupError('VPN Network is required');
+            return;
+        }
+        if (!setupVpnNetmask) {
+            setSetupError('VPN Netmask is required');
+            return;
+        }
+        if (!setupOpenvpnPort) {
+            setSetupError('OpenVPN Port is required');
+            return;
+        }
+        // Validar que el puerto sea un número entre 1-65535
+        const port = parseInt(setupOpenvpnPort);
+        if (isNaN(port) || port < 1 || port > 65535) {
+            setSetupError('Port must be a number between 1-65535');
+            return;
+        }
+        if (!setupOpenvpnProto) {
+            setSetupError('OpenVPN Protocol is required');
+            return;
+        }
+        if (!setupPublicIp) {
+            setSetupError('Public IP/Domain is required');
+            return;
+        }
+
+        setSetupProcessing(true);
+        setSetupError(null);
+
+        try {
+            const endpoint = '/api/vpn/setup';
+            const body = {
+                vpn_network: setupVpnNetwork,
+                vpn_netmask: setupVpnNetmask,
+                openvpn_port: parseInt(setupOpenvpnPort),
+                openvpn_proto: setupOpenvpnProto,
+                tun_device: "tun0", // Valor por defecto para tun_device
+                public_ip: setupPublicIp,
+                force_reset: serverHasCertificates // Si había certificados, indicamos que debe forzar reset
+            };
+
+            console.log(`Calling VPN setup endpoint with body:`, body);
+
+            // Realizar la llamada a la API
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(body)
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Actualizar la configuración del servidor
+                setServerConfig({
+                    vpn_network: setupVpnNetwork,
+                    vpn_netmask: setupVpnNetmask,
+                    openvpn_port: parseInt(setupOpenvpnPort),
+                    openvpn_proto: setupOpenvpnProto,
+                    public_ip: setupPublicIp
+                });
+
+                // Cerrar el modal y mostrar notificación
+                setSetupModalOpen(false);
+
+                // Si se ha forzado el reset, mostramos un mensaje específico
+                if (serverHasCertificates) {
+                    showNotification('Server reconfigured and all clients reset successfully', 'success');
+                } else {
+                    showNotification('Server configured successfully', 'success');
+                }
+
+                // Actualizamos el estado de certificados
+                setServerHasCertificates(true);
+
+                // Resetear el estado del formulario
+                resetSetupForm();
+            } else {
+                // Mostrar mensaje de error
+                setSetupError(data.message || 'Error configuring server');
+            }
+        } catch (error) {
+            console.error('Failed to configure server:', error);
+            setSetupError('Failed to connect to server');
+        } finally {
+            setSetupProcessing(false);
+        }
+    };
+
+    // Function to reset setup form
+    const resetSetupForm = () => {
+        setSetupVpnNetwork('');
+        setSetupVpnNetmask('');
+        setSetupOpenvpnPort('');
+        setSetupOpenvpnProto('udp');
+        setSetupPublicIp('');
+        setSetupError(null);
+    };
+
     // Function to create a new client
     const handleCreateClient = async () => {
+        // Validar nombre del cliente
         if (!newClientName.trim()) {
             setClientError('Client name is required');
             return;
         }
 
-        // Validate IP address format
-        if (!newClientIP.trim() || !/^(\d{1,3}\.){3}\d{1,3}$/.test(newClientIP)) {
-            setClientError('Valid IP address is required');
+        // Validar que el nombre solo contenga caracteres alfanuméricos y guiones
+        if (!/^[a-zA-Z0-9-_]+$/.test(newClientName.trim())) {
+            setClientError('Client name can only contain letters, numbers, hyphens and underscores');
+            return;
+        }
+
+        // Validar dirección IP del cliente
+        if (!newClientIP.trim()) {
+            setClientError('Client IP address is required');
+            return;
+        }
+
+        // Validar formato de dirección IP (simple)
+        if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(newClientIP.trim())) {
+            setClientError('Invalid IP address format (e.g. 10.8.0.10)');
+            return;
+        }
+
+        // Validación adicional para comprobar que cada octeto está entre 0-255
+        const octets = newClientIP.trim().split('.');
+        if (octets.some(octet => {
+            const num = parseInt(octet, 10);
+            return isNaN(num) || num < 0 || num > 255;
+        })) {
+            setClientError('IP address octets must be between 0-255');
             return;
         }
 
@@ -308,7 +518,7 @@ export default function ServerManagement() {
                 setClientCreating(false);
                 setCreateClientModalOpen(false);
                 setNewClientName('');
-                setNewClientIP('10.8.0.10'); // Reset to default
+                setNewClientIP(''); // Reset to empty
                 // Mostrar notificación de éxito
                 showNotification(`Client "${newClientName}" created successfully`, 'success');
             } else {
@@ -395,6 +605,10 @@ export default function ServerManagement() {
           @keyframes slideOut {
             from { transform: translateX(0); }
             to { transform: translateX(100%); }
+          }
+          @keyframes fadeIn {
+            from { opacity: 0; transform: translate(-50%, -10px); }
+            to { opacity: 1; transform: translate(-50%, 0); }
           }
           .hamburger-menu {
             animation: slideIn 0.3s ease forwards;
@@ -567,6 +781,52 @@ export default function ServerManagement() {
                         </button>
                     </div>
                 </div>
+
+                {/* Notificación en línea */}
+                {notification.visible && (
+                    <div style={{
+                        backgroundColor: notification.type === 'success' ? 'rgba(67, 160, 71, 0.5)' : 'rgba(229, 57, 53, 0.5)',
+                        color: 'white',
+                        padding: '8px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        width: '70%',
+                        maxWidth: '700px',
+                        boxSizing: 'border-box',
+                        boxShadow: '0 1px 8px rgba(0,0,0,0.15)',
+                        zIndex: 999,
+                        position: 'absolute',
+                        top: '75px',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        borderRadius: '6px',
+                        backdropFilter: 'blur(5px)',
+                        animation: 'fadeIn 0.3s ease',
+                        fontSize: '0.95rem'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span className="material-icons" style={{ fontSize: '18px' }}>
+                                {notification.type === 'success' ? 'check_circle' : 'error'}
+                            </span>
+                            {notification.message}
+                        </div>
+                        <button
+                            onClick={() => setNotification((prev: { message: string; type: 'success' | 'error'; visible: boolean }) => ({ ...prev, visible: false }))}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                color: 'white',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: '2px'
+                            }}
+                        >
+                            <span className="material-icons" style={{ fontSize: '16px' }}>close</span>
+                        </button>
+                    </div>
+                )}
 
                 {/* Hamburger Menu Overlay */}
                 {isHamburgerOpen && (
@@ -840,7 +1100,55 @@ export default function ServerManagement() {
                     </div>
                 </div>
 
-                <main style={{ flex: 1, padding: '2rem 1.5rem', position: 'relative' }}>
+                <main style={{
+                    padding: '2rem',
+                    paddingTop: '3.5rem',
+                    maxWidth: '1200px',
+                    margin: '0 auto',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    flex: 1
+                }}>
+                    {/* Server Header */}
+                    <div style={{
+                        marginBottom: '2.5rem',
+                        paddingTop: '1rem'
+                    }}>
+                        <h1 style={{
+                            fontSize: '1.75rem',
+                            margin: '0 0 1.5rem 0',
+                            display: 'flex',
+                            alignItems: 'center'
+                        }}>
+                            <span className="material-icons" style={{
+                                fontSize: '28px',
+                                marginRight: '12px',
+                                color: currentTheme.primary
+                            }}>
+                                vpn_lock
+                            </span>
+                            OpenVPN Server Management
+                            {serverStatus !== 'unknown' && (
+                                <div className={`status-indicator ${serverStatus}`}>
+                                    <span className="material-icons" style={{ fontSize: '14px', marginRight: '4px' }}>
+                                        {serverStatus === 'running' ? 'radio_button_checked' : 'radio_button_unchecked'}
+                                    </span>
+                                    {serverStatus === 'running' ? 'Running' : 'Stopped'}
+                                </div>
+                            )}
+                        </h1>
+
+                        <p style={{
+                            margin: '0 0 1rem 0',
+                            fontSize: '1rem',
+                            opacity: 0.8,
+                            maxWidth: '800px',
+                            lineHeight: '1.5'
+                        }}>
+                            Configure and manage your OpenVPN server settings, monitor connections, and create client configurations.
+                        </p>
+                    </div>
+
                     {/* Loading Overlay */}
                     {loading && (
                         <div style={{
@@ -877,77 +1185,6 @@ export default function ServerManagement() {
                         </div>
                     )}
 
-                    {/* Notification */}
-                    {notification.visible && (
-                        <div style={{
-                            position: 'fixed',
-                            top: '1.5rem',
-                            right: '1.5rem',
-                            padding: '1rem 1.5rem',
-                            backgroundColor: notification.type === 'success' ? `${currentTheme.primary}20` : `${currentTheme.errorBackground}30`,
-                            border: `1px solid ${notification.type === 'success' ? currentTheme.primary : '#F44336'}30`,
-                            borderLeft: `5px solid ${notification.type === 'success' ? currentTheme.primary : '#F44336'}`,
-                            borderRadius: '4px',
-                            color: notification.type === 'success' ? currentTheme.primary : '#F44336',
-                            maxWidth: '320px',
-                            zIndex: 9999,
-                            animation: 'fadeIn 0.3s ease',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-                        }}>
-                            <div style={{
-                                display: 'flex',
-                                alignItems: 'flex-start',
-                                gap: '0.5rem'
-                            }}>
-                                <span className="material-icons" style={{ fontSize: '20px' }}>
-                                    {notification.type === 'success' ? 'check_circle' : 'error'}
-                                </span>
-                                <div style={{ fontSize: '0.95rem' }}>
-                                    {notification.message}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    <div style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginBottom: '2rem',
-                        flexWrap: 'wrap',
-                        gap: '1rem'
-                    }}>
-                        <h1 style={{
-                            margin: 0,
-                            display: 'flex',
-                            alignItems: 'flex-end',
-                            fontSize: '1.75rem'
-                        }}>
-                            <span className="material-icons" style={{
-                                marginRight: '12px',
-                                fontSize: '28px',
-                                color: currentTheme.secondary,
-                                marginBottom: '4px'
-                            }}>
-                                vpn_lock
-                            </span>
-                            <span style={{ lineHeight: 1 }}>OpenVPN Server Management</span>
-                            <div className={`status-indicator ${serverStatus}`} style={{
-                                marginBottom: '10px',
-                                marginLeft: '12px',
-                                transform: 'translateY(10px)'
-                            }}>
-                                <span className="material-icons" style={{
-                                    fontSize: '16px',
-                                    marginRight: '8px'
-                                }}>
-                                    {serverStatus === 'running' ? 'check_circle' : serverStatus === 'stopped' ? 'cancel' : 'help'}
-                                </span>
-                                {serverStatus === 'running' ? 'Running' : serverStatus === 'stopped' ? 'Stopped' : 'Unknown'}
-                            </div>
-                        </h1>
-                    </div>
-
                     {/* Server Actions Grid */}
                     <div style={{
                         display: 'grid',
@@ -955,30 +1192,88 @@ export default function ServerManagement() {
                         gap: '1.5rem',
                         marginBottom: '2rem'
                     }}>
-                        {/* Setup Button */}
-                        <button
-                            className="server-action-button setup"
-                            onClick={() => handleServerOperation('setup')}
-                            disabled={loading}
-                            onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                                e.currentTarget.style.opacity = '0.8';
-                                e.currentTarget.style.transform = 'translateX(-4px)';
-                            }}
-                            onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-                                e.currentTarget.style.opacity = '1';
-                                e.currentTarget.style.transform = 'translateX(0)';
-                            }}
-                        >
-                            <span className="material-icons" style={{ fontSize: '36px', color: currentTheme.secondary }}>
-                                settings
-                            </span>
-                            <div style={{ fontWeight: '500', fontSize: '1.1rem' }}>
-                                Server Setup
-                            </div>
-                            <div style={{ fontSize: '0.85rem', opacity: 0.8, textAlign: 'center' }}>
-                                Configure OpenVPN server settings
-                            </div>
-                        </button>
+                        {/* Setup and Reset Container */}
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.5rem'
+                        }}>
+                            {/* Setup Button */}
+                            <button
+                                className="server-action-button setup"
+                                onClick={() => handleServerOperation('setup')}
+                                disabled={loading}
+                                onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                    e.currentTarget.style.opacity = '0.8';
+                                    e.currentTarget.style.transform = 'translateX(-4px)';
+                                }}
+                                onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                    e.currentTarget.style.opacity = '1';
+                                    e.currentTarget.style.transform = 'translateX(0)';
+                                }}
+                                style={{
+                                    height: '65px',
+                                    padding: '0.75rem'
+                                }}
+                            >
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '12px'
+                                }}>
+                                    <span className="material-icons" style={{ fontSize: '28px', color: currentTheme.secondary }}>
+                                        settings
+                                    </span>
+                                    <div>
+                                        <div style={{ fontWeight: '500', fontSize: '1rem', textAlign: 'left' }}>
+                                            Server Setup
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', opacity: 0.8, textAlign: 'left' }}>
+                                            Configure OpenVPN settings
+                                        </div>
+                                    </div>
+                                </div>
+                            </button>
+
+                            {/* Delete Server Button */}
+                            <button
+                                className="server-action-button"
+                                onClick={() => setDeleteConfirmModalOpen(true)}
+                                disabled={loading}
+                                onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                    e.currentTarget.style.opacity = '0.8';
+                                    e.currentTarget.style.transform = 'translateX(-4px)';
+                                }}
+                                onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                    e.currentTarget.style.opacity = '1';
+                                    e.currentTarget.style.transform = 'translateX(0)';
+                                }}
+                                style={{
+                                    height: '65px',
+                                    padding: '0.75rem',
+                                    borderColor: '#F4433660',
+                                    backgroundColor: '#F4433610',
+                                }}
+                            >
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '12px'
+                                }}>
+                                    <span className="material-icons" style={{ fontSize: '28px', color: '#F44336' }}>
+                                        delete_forever
+                                    </span>
+                                    <div>
+                                        <div style={{ fontWeight: '500', fontSize: '1rem', textAlign: 'left' }}>
+                                            Delete Configuration
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', opacity: 0.8, textAlign: 'left' }}>
+                                            Reset server certificates
+                                        </div>
+                                    </div>
+                                </div>
+                            </button>
+                        </div>
 
                         {/* Start Button */}
                         <button
@@ -1056,29 +1351,89 @@ export default function ServerManagement() {
                         </button>
 
                         {/* Edit Server Button */}
-                        <button
-                            className="server-action-button edit"
-                            onClick={() => handleServerOperation('edit')}
-                            disabled={loading}
-                            onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                                e.currentTarget.style.opacity = '0.8';
-                                e.currentTarget.style.transform = 'translateX(-4px)';
-                            }}
-                            onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-                                e.currentTarget.style.opacity = '1';
-                                e.currentTarget.style.transform = 'translateX(0)';
-                            }}
-                        >
-                            <span className="material-icons" style={{ fontSize: '36px', color: '#9C27B0' }}>
-                                edit
-                            </span>
-                            <div style={{ fontWeight: '500', fontSize: '1.1rem' }}>
-                                Edit Configuration
+                        <div style={{
+                            position: 'relative',
+                            width: '100%',
+                            height: '100%'
+                        }}>
+                            <div
+                                style={{
+                                    position: 'absolute',
+                                    top: '-40px',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    backgroundColor: 'rgba(0,0,0,0.8)',
+                                    color: 'white',
+                                    padding: '8px 12px',
+                                    borderRadius: '6px',
+                                    fontSize: '0.8rem',
+                                    zIndex: '100',
+                                    whiteSpace: 'nowrap',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                                    visibility: 'hidden',
+                                    opacity: 0,
+                                    transition: 'opacity 0.3s ease, visibility 0.3s ease',
+                                    pointerEvents: 'none'
+                                }}
+                                className="tooltip-text"
+                            >
+                                Próximamente disponible
+                                <div style={{
+                                    position: 'absolute',
+                                    bottom: '-6px',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    width: '0',
+                                    height: '0',
+                                    borderLeft: '6px solid transparent',
+                                    borderRight: '6px solid transparent',
+                                    borderTop: '6px solid rgba(0,0,0,0.8)'
+                                }}></div>
                             </div>
-                            <div style={{ fontSize: '0.85rem', opacity: 0.8, textAlign: 'center' }}>
-                                Modify server configuration
-                            </div>
-                        </button>
+
+                            <button
+                                className="server-action-button edit"
+                                disabled={true}
+                                style={{
+                                    position: 'relative',
+                                    opacity: '0.6',
+                                    cursor: 'not-allowed',
+                                    width: '100%'
+                                }}
+                                onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                    // Mostrar tooltip usando CSS
+                                    const parent = e.currentTarget.parentElement;
+                                    if (parent) {
+                                        const tooltip = parent.querySelector('.tooltip-text') as HTMLElement;
+                                        if (tooltip) {
+                                            tooltip.style.visibility = 'visible';
+                                            tooltip.style.opacity = '1';
+                                        }
+                                    }
+                                }}
+                                onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                    // Ocultar tooltip
+                                    const parent = e.currentTarget.parentElement;
+                                    if (parent) {
+                                        const tooltip = parent.querySelector('.tooltip-text') as HTMLElement;
+                                        if (tooltip) {
+                                            tooltip.style.visibility = 'hidden';
+                                            tooltip.style.opacity = '0';
+                                        }
+                                    }
+                                }}
+                            >
+                                <span className="material-icons" style={{ fontSize: '36px', color: '#9C27B0', opacity: '0.5' }}>
+                                    edit
+                                </span>
+                                <div style={{ fontWeight: '500', fontSize: '1.1rem', color: '#666' }}>
+                                    Edit Configuration
+                                </div>
+                                <div style={{ fontSize: '0.85rem', opacity: 0.8, textAlign: 'center', color: '#888' }}>
+                                    Modify server configuration
+                                </div>
+                            </button>
+                        </div>
                     </div>
 
                     {/* Server Status and Info Card */}
@@ -1113,7 +1468,7 @@ export default function ServerManagement() {
                                 gap: '0.5rem'
                             }}>
                                 <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>IP Address</div>
-                                <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>{serverConfig.public_ip}</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>{serverConfig.public_ip || "-"}</div>
                             </div>
 
                             <div style={{
@@ -1122,7 +1477,7 @@ export default function ServerManagement() {
                                 gap: '0.5rem'
                             }}>
                                 <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>Port</div>
-                                <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>{serverConfig.openvpn_port} ({serverConfig.openvpn_proto.toUpperCase()})</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>{serverConfig.openvpn_port ? `${serverConfig.openvpn_port} (${serverConfig.openvpn_proto.toUpperCase()})` : "-"}</div>
                             </div>
 
                             <div style={{
@@ -1131,7 +1486,7 @@ export default function ServerManagement() {
                                 gap: '0.5rem'
                             }}>
                                 <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>Protocol</div>
-                                <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>{serverConfig.openvpn_proto.toUpperCase()}</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>{serverConfig.openvpn_proto ? serverConfig.openvpn_proto.toUpperCase() : "-"}</div>
                             </div>
 
                             <div style={{
@@ -1140,7 +1495,7 @@ export default function ServerManagement() {
                                 gap: '0.5rem'
                             }}>
                                 <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>VPN Network</div>
-                                <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>{serverConfig.vpn_network}</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>{serverConfig.vpn_network || "-"}</div>
                             </div>
 
                             <div style={{
@@ -1149,7 +1504,7 @@ export default function ServerManagement() {
                                 gap: '0.5rem'
                             }}>
                                 <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>Netmask</div>
-                                <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>{serverConfig.vpn_netmask}</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>{serverConfig.vpn_netmask || "-"}</div>
                             </div>
 
                             <div style={{
@@ -1158,7 +1513,7 @@ export default function ServerManagement() {
                                 gap: '0.5rem'
                             }}>
                                 <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>Encryption</div>
-                                <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>AES-256-GCM</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>{serverConfig.vpn_network ? "AES-256-GCM" : "-"}</div>
                             </div>
 
                             <div style={{
@@ -1168,7 +1523,7 @@ export default function ServerManagement() {
                             }}>
                                 <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>Connected Clients</div>
                                 <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>
-                                    {serverStatus === 'running' ? 3 : 0}
+                                    {serverStatus === 'running' && serverConfig.vpn_network ? '0' : '-'}
                                 </div>
                             </div>
                         </div>
@@ -1208,7 +1563,7 @@ export default function ServerManagement() {
                                 type="text"
                                 value={newClientName}
                                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewClientName(e.target.value)}
-                                placeholder="Enter client name"
+                                placeholder="Enter client name (e.g. client1)"
                                 style={{
                                     width: '100%',
                                     padding: '0.75rem',
@@ -1244,7 +1599,7 @@ export default function ServerManagement() {
                                 type="text"
                                 value={newClientIP}
                                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewClientIP(e.target.value)}
-                                placeholder="Enter client IP"
+                                placeholder="Enter client IP (e.g. 10.8.0.10)"
                                 style={{
                                     width: '100%',
                                     padding: '0.75rem',
@@ -1311,6 +1666,473 @@ export default function ServerManagement() {
                                     }} />
                                 )}
                                 {clientCreating ? 'Creating...' : 'Create Client'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Setup Server Modal */}
+            {setupModalOpen && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <h2 style={{
+                            margin: '0 0 1.5rem 0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            fontSize: '1.3rem'
+                        }}>
+                            <span className="material-icons" style={{ color: currentTheme.secondary }}>
+                                settings
+                            </span>
+                            OpenVPN Server Setup
+                        </h2>
+
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{
+                                display: 'block',
+                                marginBottom: '0.5rem',
+                                fontSize: '0.9rem',
+                                opacity: 0.8
+                            }}>
+                                VPN Network
+                            </label>
+                            <input
+                                type="text"
+                                value={setupVpnNetwork}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSetupVpnNetwork(e.target.value)}
+                                placeholder="Enter VPN network (e.g. 10.8.0.0)"
+                                style={{
+                                    width: '100%',
+                                    padding: '0.75rem',
+                                    fontSize: '1rem',
+                                    borderRadius: '8px',
+                                    border: `1px solid ${currentTheme.border}`,
+                                    backgroundColor: currentTheme.background,
+                                    color: currentTheme.text,
+                                    boxSizing: 'border-box'
+                                }}
+                            />
+                        </div>
+
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{
+                                display: 'block',
+                                marginBottom: '0.5rem',
+                                fontSize: '0.9rem',
+                                opacity: 0.8
+                            }}>
+                                VPN Netmask
+                            </label>
+                            <input
+                                type="text"
+                                value={setupVpnNetmask}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSetupVpnNetmask(e.target.value)}
+                                placeholder="Enter VPN netmask (e.g. 255.255.255.0)"
+                                style={{
+                                    width: '100%',
+                                    padding: '0.75rem',
+                                    fontSize: '1rem',
+                                    borderRadius: '8px',
+                                    border: `1px solid ${currentTheme.border}`,
+                                    backgroundColor: currentTheme.background,
+                                    color: currentTheme.text,
+                                    boxSizing: 'border-box'
+                                }}
+                            />
+                        </div>
+
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{
+                                display: 'block',
+                                marginBottom: '0.5rem',
+                                fontSize: '0.9rem',
+                                opacity: 0.8
+                            }}>
+                                OpenVPN Port
+                            </label>
+                            <input
+                                type="text"
+                                value={setupOpenvpnPort}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSetupOpenvpnPort(e.target.value)}
+                                placeholder="Enter port (e.g. 1194)"
+                                style={{
+                                    width: '100%',
+                                    padding: '0.75rem',
+                                    fontSize: '1rem',
+                                    borderRadius: '8px',
+                                    border: `1px solid ${currentTheme.border}`,
+                                    backgroundColor: currentTheme.background,
+                                    color: currentTheme.text,
+                                    boxSizing: 'border-box'
+                                }}
+                            />
+                        </div>
+
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{
+                                display: 'block',
+                                marginBottom: '0.5rem',
+                                fontSize: '0.9rem',
+                                opacity: 0.8
+                            }}>
+                                OpenVPN Protocol
+                            </label>
+                            <select
+                                value={setupOpenvpnProto}
+                                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSetupOpenvpnProto(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '0.75rem',
+                                    fontSize: '1rem',
+                                    borderRadius: '8px',
+                                    border: `1px solid ${currentTheme.border}`,
+                                    backgroundColor: currentTheme.background,
+                                    color: currentTheme.text,
+                                    boxSizing: 'border-box'
+                                }}
+                            >
+                                <option value="udp">UDP</option>
+                                <option value="tcp">TCP</option>
+                            </select>
+                        </div>
+
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{
+                                display: 'block',
+                                marginBottom: '0.5rem',
+                                fontSize: '0.9rem',
+                                opacity: 0.8
+                            }}>
+                                Public IP / Domain
+                            </label>
+                            <input
+                                type="text"
+                                value={setupPublicIp}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSetupPublicIp(e.target.value)}
+                                placeholder="Enter public IP or domain (e.g. vpn.example.com)"
+                                style={{
+                                    width: '100%',
+                                    padding: '0.75rem',
+                                    fontSize: '1rem',
+                                    borderRadius: '8px',
+                                    border: `1px solid ${currentTheme.border}`,
+                                    backgroundColor: currentTheme.background,
+                                    color: currentTheme.text,
+                                    boxSizing: 'border-box'
+                                }}
+                            />
+                        </div>
+
+                        {setupError && (
+                            <div style={{
+                                color: '#F44336',
+                                fontSize: '0.85rem',
+                                marginTop: '0.5rem',
+                                marginBottom: '1rem',
+                                padding: '0.75rem',
+                                backgroundColor: `${currentTheme.errorBackground}50`,
+                                borderRadius: '4px',
+                                border: '1px solid rgba(244,67,54,0.3)'
+                            }}>
+                                {setupError}
+                            </div>
+                        )}
+
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'flex-end',
+                            gap: '1rem',
+                            marginTop: '1.5rem'
+                        }}>
+                            <button
+                                onClick={() => {
+                                    setSetupModalOpen(false);
+                                    resetSetupForm();
+                                }}
+                                style={{
+                                    padding: '0.75rem 1.25rem',
+                                    borderRadius: '8px',
+                                    border: `1px solid ${currentTheme.border}`,
+                                    backgroundColor: 'transparent',
+                                    color: currentTheme.text,
+                                    fontSize: '0.95rem',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease'
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleSetupSubmit}
+                                disabled={setupProcessing}
+                                style={{
+                                    padding: '0.75rem 1.25rem',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    backgroundColor: currentTheme.secondary,
+                                    color: 'white',
+                                    fontSize: '0.95rem',
+                                    cursor: setupProcessing ? 'not-allowed' : 'pointer',
+                                    transition: 'all 0.2s ease',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    opacity: setupProcessing ? 0.7 : 1
+                                }}
+                            >
+                                {setupProcessing && (
+                                    <div style={{
+                                        width: '18px',
+                                        height: '18px',
+                                        border: '2px solid rgba(255,255,255,0.3)',
+                                        borderTop: '2px solid white',
+                                        borderRadius: '50%',
+                                        animation: 'spin 1s linear infinite'
+                                    }} />
+                                )}
+                                {setupProcessing ? 'Setting up...' : 'Configure Server'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Setup Confirmation Modal */}
+            {setupConfirmModalOpen && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <h2 style={{
+                            margin: '0 0 1rem 0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            fontSize: '1.3rem',
+                            color: '#F44336'
+                        }}>
+                            <span className="material-icons" style={{ color: '#F44336' }}>
+                                warning
+                            </span>
+                            Warning: Existing Configuration
+                        </h2>
+
+                        <div style={{
+                            backgroundColor: `${currentTheme.errorBackground}50`,
+                            border: '1px solid rgba(244,67,54,0.3)',
+                            borderRadius: '8px',
+                            padding: '1rem',
+                            marginBottom: '1.5rem'
+                        }}>
+                            <p style={{
+                                margin: '0 0 1rem 0',
+                                fontSize: '1rem',
+                                lineHeight: '1.5'
+                            }}>
+                                <strong>The server already has an existing configuration with certificates.</strong>
+                            </p>
+                            <p style={{
+                                margin: '0 0 1rem 0',
+                                fontSize: '0.95rem',
+                                lineHeight: '1.5'
+                            }}>
+                                Proceeding will:
+                            </p>
+                            <ul style={{
+                                margin: '0 0 1rem 0',
+                                paddingLeft: '1.5rem',
+                                fontSize: '0.95rem',
+                                lineHeight: '1.5'
+                            }}>
+                                <li>Delete ALL existing certificates</li>
+                                <li>Remove ALL client configurations</li>
+                                <li>Create a new server configuration</li>
+                                <li>Require new client certificates to be generated</li>
+                            </ul>
+                            <p style={{
+                                margin: '0',
+                                fontSize: '0.95rem',
+                                fontWeight: 'bold',
+                                lineHeight: '1.5'
+                            }}>
+                                This action cannot be undone. All clients will lose connection to the VPN server.
+                            </p>
+                        </div>
+
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'flex-end',
+                            gap: '1rem',
+                            marginTop: '1.5rem'
+                        }}>
+                            <button
+                                onClick={() => {
+                                    setSetupConfirmModalOpen(false);
+                                }}
+                                style={{
+                                    padding: '0.75rem 1.25rem',
+                                    borderRadius: '8px',
+                                    border: `1px solid ${currentTheme.border}`,
+                                    backgroundColor: 'transparent',
+                                    color: currentTheme.text,
+                                    fontSize: '0.95rem',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease'
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleConfirmSetup}
+                                style={{
+                                    padding: '0.75rem 1.25rem',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    backgroundColor: '#F44336',
+                                    color: 'white',
+                                    fontSize: '0.95rem',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem'
+                                }}
+                            >
+                                Proceed & Reset Server
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Configuration Confirmation Modal */}
+            {deleteConfirmModalOpen && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <h2 style={{
+                            margin: '0 0 1rem 0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            fontSize: '1.3rem',
+                            color: '#F44336'
+                        }}>
+                            <span className="material-icons" style={{ color: '#F44336' }}>
+                                warning
+                            </span>
+                            Warning: Delete Server Configuration
+                        </h2>
+
+                        <div style={{
+                            backgroundColor: `${currentTheme.errorBackground}50`,
+                            border: '1px solid rgba(244,67,54,0.3)',
+                            borderRadius: '8px',
+                            padding: '1rem',
+                            marginBottom: '1.5rem'
+                        }}>
+                            <p style={{
+                                margin: '0 0 1rem 0',
+                                fontSize: '1rem',
+                                lineHeight: '1.5'
+                            }}>
+                                <strong>This action will permanently delete all server configuration.</strong>
+                            </p>
+                            <p style={{
+                                margin: '0 0 1rem 0',
+                                fontSize: '0.95rem',
+                                lineHeight: '1.5'
+                            }}>
+                                The following data will be deleted:
+                            </p>
+                            <ul style={{
+                                margin: '0 0 1rem 0',
+                                paddingLeft: '1.5rem',
+                                fontSize: '0.95rem',
+                                lineHeight: '1.5'
+                            }}>
+                                <li>All server certificates and keys</li>
+                                <li>All client configurations and certificates</li>
+                                <li>OpenVPN server configuration</li>
+                                <li>All connection profiles</li>
+                            </ul>
+                            <p style={{
+                                margin: '0',
+                                fontSize: '0.95rem',
+                                fontWeight: 'bold',
+                                lineHeight: '1.5'
+                            }}>
+                                This action cannot be undone. You will need to reconfigure the server and generate new client certificates.
+                            </p>
+                        </div>
+
+                        {deleteError && (
+                            <div style={{
+                                color: '#F44336',
+                                fontSize: '0.85rem',
+                                marginTop: '0.5rem',
+                                marginBottom: '1rem',
+                                padding: '0.75rem',
+                                backgroundColor: `${currentTheme.errorBackground}50`,
+                                borderRadius: '4px',
+                                border: '1px solid rgba(244,67,54,0.3)'
+                            }}>
+                                {deleteError}
+                            </div>
+                        )}
+
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'flex-end',
+                            gap: '1rem',
+                            marginTop: '1.5rem'
+                        }}>
+                            <button
+                                onClick={() => {
+                                    setDeleteConfirmModalOpen(false);
+                                    setDeleteError(null);
+                                }}
+                                style={{
+                                    padding: '0.75rem 1.25rem',
+                                    borderRadius: '8px',
+                                    border: `1px solid ${currentTheme.border}`,
+                                    backgroundColor: 'transparent',
+                                    color: currentTheme.text,
+                                    fontSize: '0.95rem',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease'
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleDeleteConfiguration}
+                                disabled={deleteProcessing}
+                                style={{
+                                    padding: '0.75rem 1.25rem',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    backgroundColor: '#F44336',
+                                    color: 'white',
+                                    fontSize: '0.95rem',
+                                    cursor: deleteProcessing ? 'not-allowed' : 'pointer',
+                                    transition: 'all 0.2s ease',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    opacity: deleteProcessing ? 0.7 : 1
+                                }}
+                            >
+                                {deleteProcessing && (
+                                    <div style={{
+                                        width: '18px',
+                                        height: '18px',
+                                        border: '2px solid rgba(255,255,255,0.3)',
+                                        borderTop: '2px solid white',
+                                        borderRadius: '50%',
+                                        animation: 'spin 1s linear infinite'
+                                    }} />
+                                )}
+                                {deleteProcessing ? 'Deleting...' : 'Delete All Server Data'}
                             </button>
                         </div>
                     </div>
