@@ -13,6 +13,10 @@
         "dev:setup": "npm run db:setup && npm run dev"
     },
     "dependencies": {
+        "@mui/material": "^5.15.11",
+        "@mui/styles": "^5.15.11",
+        "@emotion/react": "^11.11.3",
+        "@emotion/styled": "^11.11.0",
         "@prisma/client": "^6.5.0",
         "bcryptjs": "^3.0.2",
         "cookie": "^0.6.0",

@@ -4,6 +4,7 @@
  */
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import type { ChangeEvent, FormEvent, MouseEvent } from 'react';
 import React, { useEffect, useState } from 'react';
 import BackgroundEffect from '../components/BackgroundEffect';
 import Footer from '../components/Footer';
@@ -22,14 +23,14 @@ interface User {
 const themes = {
     light: {
         background: '#ffffff',
-        text: '#333333',
-        primary: '#4CAF50',
-        secondary: '#2196F3',
-        border: '#dddddd',
-        tableHeader: '#f2f2f2',
+        text: '#1a1a1a',           // Cambiado de #333333 a #1a1a1a para mejor contraste
+        primary: '#2E7D32',        // Verde más oscuro para mejor contraste
+        secondary: '#1565C0',      // Azul más oscuro para mejor contraste
+        border: '#e0e0e0',         // Borde más visible
+        tableHeader: '#f5f5f5',
         tableRow: '#ffffff',
         tableRowHover: '#f5f5f5',
-        cardBackground: '#f9f9f9',
+        cardBackground: '#ffffff',
         errorBackground: '#FFEBEE',
         statusIndicator: '#E3F2FD',
         navbar: '#ffffff',
@@ -60,12 +61,21 @@ export default function Users() {
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [successMessage, setSuccessMessage] = useState<string>('');
-    const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+    const [passwordError, setPasswordError] = useState<string | null>(null);
+    const [deleteConfirmUser, setDeleteConfirmUser] = useState<User | null>(null);
+    const [notification, setNotification] = useState<{
+        message: string;
+        type: 'success' | 'error';
+        visible: boolean;
+    }>({ message: '', type: 'success', visible: false });
+
+    // Replace Material UI theme with custom theme
+    const [themeMode, setThemeMode] = useState<'light' | 'dark'>('dark');
+    const currentTheme = themes[themeMode];
+
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-    const [passwordError, setPasswordError] = useState<string | null>(null);
 
     // Add sort configuration state
     const [sortConfig, setSortConfig] = useState<{
@@ -76,12 +86,8 @@ export default function Users() {
     // Add new state for create user modal
     const [isCreatingUser, setIsCreatingUser] = useState(false);
     const [newUser, setNewUser] = useState({ username: '', password: '', confirmPassword: '', role: 'viewer' });
-    const [deleteConfirmUser, setDeleteConfirmUser] = useState<User | null>(null);
     // Agregar estado para el menú hamburguesa
     const [isHamburgerOpen, setIsHamburgerOpen] = useState(false);
-
-    // Get current theme
-    const currentTheme = themes[theme as keyof typeof themes];
 
     // Check authentication on mount
     useEffect(() => {
@@ -95,7 +101,7 @@ export default function Users() {
         // Check if theme preference exists in localStorage
         const savedTheme = localStorage.getItem('appTheme');
         if (savedTheme === 'light' || savedTheme === 'dark') {
-            setTheme(savedTheme);
+            setThemeMode(savedTheme);
             document.documentElement.setAttribute('data-theme', savedTheme);
         }
     }, []);
@@ -259,17 +265,17 @@ export default function Users() {
             setUsers(users.filter((user: User) => user.id !== deleteConfirmUser.id));
             setDeleteConfirmUser(null);
 
-            // Show success message
-            setSuccessMessage('User deleted successfully');
-            setTimeout(() => setSuccessMessage(''), 3000);
+            // Show success notification
+            showNotification('User deleted successfully', 'success');
 
         } catch (err) {
             setError((err as Error).message);
+            showNotification((err as Error).message, 'error');
         }
     };
 
     // Modify the handleEdit function to handle role restrictions
-    const handleEdit = async (e: React.FormEvent) => {
+    const handleEdit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!editingUser) return;
 
@@ -278,6 +284,7 @@ export default function Users() {
             const originalUser = users.find((u: User) => u.id === editingUser.id);
             if (originalUser && originalUser.role !== editingUser.role) {
                 setError('Cannot change admin role');
+                showNotification('Cannot change admin role', 'error');
                 return;
             }
         }
@@ -285,10 +292,12 @@ export default function Users() {
         if (newPassword) {
             if (newPassword !== confirmPassword) {
                 setPasswordError('Passwords do not match');
+                showNotification('Passwords do not match', 'error');
                 return;
             }
             if (newPassword.length < 8) {
                 setPasswordError('Password must be at least 8 characters long');
+                showNotification('Password must be at least 8 characters long', 'error');
                 return;
             }
             setPasswordError(null);
@@ -324,38 +333,28 @@ export default function Users() {
             setNewPassword('');
             setConfirmPassword('');
             setPasswordError(null);
+            showNotification('User updated successfully', 'success');
         } catch (error) {
             console.error('Error updating user:', error);
             setError(error instanceof Error ? error.message : 'Failed to update user');
+            showNotification(error instanceof Error ? error.message : 'Failed to update user', 'error');
         }
     };
 
     // Function to handle user creation
-    const handleCreate = async (e: React.FormEvent) => {
+    const handleCreate = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        setPasswordError(null); // Reset password error
-
         if (newUser.password !== newUser.confirmPassword) {
             setPasswordError('Passwords do not match');
+            showNotification('Passwords do not match', 'error');
             return;
         }
         if (newUser.password.length < 8) {
             setPasswordError('Password must be at least 8 characters long');
+            showNotification('Password must be at least 8 characters long', 'error');
             return;
         }
-
-        // Check if username already exists
-        const existingUser = users.find((user: User) => user.username.toLowerCase() === newUser.username.toLowerCase());
-        if (existingUser) {
-            setPasswordError('Username already exists');
-            return;
-        }
-
-        // Log the user data being sent
-        console.log('Creating user with data:', {
-            username: newUser.username,
-            role: newUser.role
-        });
+        setPasswordError(null);
 
         try {
             const response = await fetch('/api/users', {
@@ -379,21 +378,18 @@ export default function Users() {
 
             if (!response.ok) {
                 const errorData = await response.json();
-                setPasswordError(errorData.message || 'Failed to create user');
-                return;
+                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
             }
-
-            // Log the response data
-            const responseData = await response.json();
-            console.log('User created successfully:', responseData);
 
             await fetchUsers();
             setIsCreatingUser(false);
             setNewUser({ username: '', password: '', confirmPassword: '', role: 'viewer' });
             setPasswordError(null);
+            showNotification('User created successfully', 'success');
         } catch (error) {
             console.error('Error creating user:', error);
-            setPasswordError(error instanceof Error ? error.message : 'Failed to create user');
+            setError(error instanceof Error ? error.message : 'Failed to create user');
+            showNotification(error instanceof Error ? error.message : 'Failed to create user', 'error');
         }
     };
 
@@ -426,6 +422,24 @@ export default function Users() {
 
             window.location.replace('/login');
         }
+    };
+
+    // Función para mostrar notificaciones
+    const showNotification = (message: string, type: 'success' | 'error') => {
+        setNotification({ message, type, visible: true });
+
+        // Ocultar automáticamente después de 5 segundos
+        setTimeout(() => {
+            setNotification((prev: { message: string; type: 'success' | 'error'; visible: boolean }) => ({ ...prev, visible: false }));
+        }, 5000);
+    };
+
+    // Function to toggle theme
+    const toggleTheme = () => {
+        const newTheme = themeMode === 'light' ? 'dark' : 'light';
+        setThemeMode(newTheme);
+        localStorage.setItem('appTheme', newTheme);
+        document.documentElement.setAttribute('data-theme', newTheme);
     };
 
     return (
@@ -504,6 +518,10 @@ export default function Users() {
           .nav-button:hover {
             background-color: ${currentTheme.buttonHover};
           }
+          @keyframes fadeIn {
+            from { opacity: 0; transform: translate(-50%, -10px); }
+            to { opacity: 1; transform: translate(-50%, 0); }
+          }
         `}</style>
             </Head>
 
@@ -565,6 +583,52 @@ export default function Users() {
                         </button>
                     </div>
                 </div>
+
+                {/* Notificación en línea */}
+                {notification.visible && (
+                    <div style={{
+                        backgroundColor: notification.type === 'success' ? 'rgba(67, 160, 71, 0.5)' : 'rgba(229, 57, 53, 0.5)',
+                        color: 'white',
+                        padding: '8px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        width: '70%',
+                        maxWidth: '700px',
+                        boxSizing: 'border-box',
+                        boxShadow: '0 1px 8px rgba(0,0,0,0.15)',
+                        zIndex: 999,
+                        position: 'absolute',
+                        top: '75px',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        borderRadius: '6px',
+                        backdropFilter: 'blur(5px)',
+                        animation: 'fadeIn 0.3s ease',
+                        fontSize: '0.95rem'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span className="material-icons" style={{ fontSize: '18px' }}>
+                                {notification.type === 'success' ? 'check_circle' : 'error'}
+                            </span>
+                            {notification.message}
+                        </div>
+                        <button
+                            onClick={() => setNotification((prev: { message: string; type: 'success' | 'error'; visible: boolean }) => ({ ...prev, visible: false }))}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                color: 'white',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: '2px'
+                            }}
+                        >
+                            <span className="material-icons" style={{ fontSize: '16px' }}>close</span>
+                        </button>
+                    </div>
+                )}
 
                 {/* Hamburger Menu Overlay */}
                 {isHamburgerOpen && (
@@ -633,11 +697,11 @@ export default function Users() {
                                 padding: '0.5rem 0',
                                 transition: 'all 0.2s ease'
                             }}
-                            onMouseEnter={(e: ReactMouseEvent) => {
+                            onMouseEnter={(e: MouseEvent<HTMLDivElement>) => {
                                 e.currentTarget.style.opacity = '0.8';
                                 e.currentTarget.style.transform = 'translateX(-4px)';
                             }}
-                            onMouseLeave={(e: ReactMouseEvent) => {
+                            onMouseLeave={(e: MouseEvent<HTMLDivElement>) => {
                                 e.currentTarget.style.opacity = '1';
                                 e.currentTarget.style.transform = 'translateX(0)';
                             }}
@@ -674,12 +738,12 @@ export default function Users() {
                                 border: `1px solid ${currentTheme.primary}30`,
                                 color: currentTheme.primary
                             }}
-                            onMouseEnter={(e: ReactMouseEvent) => {
+                            onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => {
                                 e.currentTarget.style.backgroundColor = `${currentTheme.primary}25`;
                                 e.currentTarget.style.transform = 'translateX(4px)';
                                 e.currentTarget.style.boxShadow = `0 4px 12px ${currentTheme.primary}20`;
                             }}
-                            onMouseLeave={(e: ReactMouseEvent) => {
+                            onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => {
                                 e.currentTarget.style.backgroundColor = `${currentTheme.primary}15`;
                                 e.currentTarget.style.transform = 'translateX(0)';
                                 e.currentTarget.style.boxShadow = 'none';
@@ -709,12 +773,12 @@ export default function Users() {
                                 border: `1px solid ${currentTheme.secondary}30`,
                                 color: currentTheme.secondary
                             }}
-                            onMouseEnter={(e: ReactMouseEvent) => {
+                            onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => {
                                 e.currentTarget.style.backgroundColor = `${currentTheme.secondary}25`;
                                 e.currentTarget.style.transform = 'translateX(4px)';
                                 e.currentTarget.style.boxShadow = `0 4px 12px ${currentTheme.secondary}20`;
                             }}
-                            onMouseLeave={(e: ReactMouseEvent) => {
+                            onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => {
                                 e.currentTarget.style.backgroundColor = `${currentTheme.secondary}15`;
                                 e.currentTarget.style.transform = 'translateX(0)';
                                 e.currentTarget.style.boxShadow = 'none';
@@ -745,12 +809,12 @@ export default function Users() {
                                     border: `1px solid ${currentTheme.secondary}30`,
                                     color: currentTheme.secondary
                                 }}
-                                onMouseEnter={(e: ReactMouseEvent) => {
+                                onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => {
                                     e.currentTarget.style.backgroundColor = `${currentTheme.secondary}25`;
                                     e.currentTarget.style.transform = 'translateX(4px)';
                                     e.currentTarget.style.boxShadow = `0 4px 12px ${currentTheme.secondary}20`;
                                 }}
-                                onMouseLeave={(e: ReactMouseEvent) => {
+                                onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => {
                                     e.currentTarget.style.backgroundColor = `${currentTheme.secondary}15`;
                                     e.currentTarget.style.transform = 'translateX(0)';
                                     e.currentTarget.style.boxShadow = 'none';
@@ -768,15 +832,7 @@ export default function Users() {
                         )}
 
                         <button
-                            onClick={() => {
-                                const newTheme = theme === 'light' ? 'dark' : 'light';
-                                // Save theme preference to localStorage
-                                localStorage.setItem('appTheme', newTheme);
-                                // Update state
-                                setTheme(newTheme);
-                                // Update document attribute for CSS
-                                document.documentElement.setAttribute('data-theme', newTheme);
-                            }}
+                            onClick={toggleTheme}
                             className="nav-button"
                             style={{
                                 width: '100%',
@@ -789,12 +845,12 @@ export default function Users() {
                                 border: `1px solid ${currentTheme.primary}30`,
                                 color: currentTheme.primary
                             }}
-                            onMouseEnter={(e: ReactMouseEvent) => {
+                            onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => {
                                 e.currentTarget.style.backgroundColor = `${currentTheme.primary}25`;
                                 e.currentTarget.style.transform = 'translateX(4px)';
                                 e.currentTarget.style.boxShadow = `0 4px 12px ${currentTheme.primary}20`;
                             }}
-                            onMouseLeave={(e: ReactMouseEvent) => {
+                            onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => {
                                 e.currentTarget.style.backgroundColor = `${currentTheme.primary}15`;
                                 e.currentTarget.style.transform = 'translateX(0)';
                                 e.currentTarget.style.boxShadow = 'none';
@@ -802,13 +858,13 @@ export default function Users() {
                         >
                             <span className="material-icons" style={{
                                 transition: 'transform 0.4s ease, opacity 0.3s ease',
-                                transform: theme === 'light' ? 'translateY(0)' : 'translateY(-2px) rotate(180deg)',
+                                transform: themeMode === 'light' ? 'translateY(0)' : 'translateY(-2px) rotate(180deg)',
                                 marginRight: '12px',
                                 fontSize: '24px'
                             }}>
-                                {theme === 'light' ? 'light_mode' : 'dark_mode'}
+                                {themeMode === 'light' ? 'light_mode' : 'dark_mode'}
                             </span>
-                            {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+                            {themeMode === 'light' ? 'Dark Mode' : 'Light Mode'}
                         </button>
                     </div>
 
@@ -827,12 +883,12 @@ export default function Users() {
                             color: '#F44336',
                             marginTop: '1rem'
                         }}
-                        onMouseEnter={(e: ReactMouseEvent) => {
+                        onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => {
                             e.currentTarget.style.backgroundColor = `${currentTheme.errorBackground}50`;
                             e.currentTarget.style.transform = 'translateX(4px)';
                             e.currentTarget.style.boxShadow = '0 4px 12px rgba(244,67,54,0.2)';
                         }}
-                        onMouseLeave={(e: ReactMouseEvent) => {
+                        onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => {
                             e.currentTarget.style.backgroundColor = `${currentTheme.errorBackground}30`;
                             e.currentTarget.style.transform = 'translateX(0)';
                             e.currentTarget.style.boxShadow = 'none';
@@ -883,22 +939,6 @@ export default function Users() {
                         </h1>
                     </div>
 
-                    {successMessage && (
-                        <div style={{
-                            padding: '1rem',
-                            backgroundColor: '#4CAF5020',
-                            color: '#4CAF50',
-                            borderRadius: '4px',
-                            marginBottom: '1rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}>
-                            <span className="material-icons" style={{ fontSize: '20px' }}>check_circle</span>
-                            {successMessage}
-                        </div>
-                    )}
-
                     {loading ? (
                         <div style={{ textAlign: 'center', padding: '2rem' }}>
                             Loading users...
@@ -940,12 +980,12 @@ export default function Users() {
                                         height: '120px',
                                         width: '100%'
                                     }}
-                                    onMouseEnter={(e: ReactMouseEvent) => {
+                                    onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => {
                                         e.currentTarget.style.transform = 'translateY(-4px)';
                                         e.currentTarget.style.boxShadow = '0 6px 12px rgba(0,0,0,0.15)';
                                         e.currentTarget.style.backgroundColor = '#FF980020';
                                     }}
-                                    onMouseLeave={(e: ReactMouseEvent) => {
+                                    onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => {
                                         e.currentTarget.style.transform = 'translateY(0)';
                                         e.currentTarget.style.boxShadow = 'none';
                                         e.currentTarget.style.backgroundColor = '#FF980010';
@@ -1020,10 +1060,10 @@ export default function Users() {
                                                             cursor: 'pointer',
                                                             transition: 'all 0.2s ease'
                                                         }}
-                                                        onMouseEnter={(e: ReactMouseEvent) => {
+                                                        onMouseEnter={(e: MouseEvent<HTMLTableCellElement>) => {
                                                             e.currentTarget.style.backgroundColor = `${currentTheme.primary}15`;
                                                         }}
-                                                        onMouseLeave={(e: ReactMouseEvent) => {
+                                                        onMouseLeave={(e: MouseEvent<HTMLTableCellElement>) => {
                                                             e.currentTarget.style.backgroundColor = sortConfig?.key === 'username' ? `${currentTheme.primary}15` : 'transparent';
                                                         }}
                                                     >
@@ -1051,10 +1091,10 @@ export default function Users() {
                                                             cursor: 'pointer',
                                                             transition: 'all 0.2s ease'
                                                         }}
-                                                        onMouseEnter={(e: ReactMouseEvent) => {
+                                                        onMouseEnter={(e: MouseEvent<HTMLTableCellElement>) => {
                                                             e.currentTarget.style.backgroundColor = `${currentTheme.primary}15`;
                                                         }}
-                                                        onMouseLeave={(e: ReactMouseEvent) => {
+                                                        onMouseLeave={(e: MouseEvent<HTMLTableCellElement>) => {
                                                             e.currentTarget.style.backgroundColor = sortConfig?.key === 'role' ? `${currentTheme.primary}15` : 'transparent';
                                                         }}
                                                     >
@@ -1082,10 +1122,10 @@ export default function Users() {
                                                             cursor: 'pointer',
                                                             transition: 'all 0.2s ease'
                                                         }}
-                                                        onMouseEnter={(e: ReactMouseEvent) => {
+                                                        onMouseEnter={(e: MouseEvent<HTMLTableCellElement>) => {
                                                             e.currentTarget.style.backgroundColor = `${currentTheme.primary}15`;
                                                         }}
-                                                        onMouseLeave={(e: ReactMouseEvent) => {
+                                                        onMouseLeave={(e: MouseEvent<HTMLTableCellElement>) => {
                                                             e.currentTarget.style.backgroundColor = sortConfig?.key === 'createdAt' ? `${currentTheme.primary}15` : 'transparent';
                                                         }}
                                                     >
@@ -1113,10 +1153,10 @@ export default function Users() {
                                                             cursor: 'pointer',
                                                             transition: 'all 0.2s ease'
                                                         }}
-                                                        onMouseEnter={(e: ReactMouseEvent) => {
+                                                        onMouseEnter={(e: MouseEvent<HTMLTableCellElement>) => {
                                                             e.currentTarget.style.backgroundColor = `${currentTheme.primary}15`;
                                                         }}
-                                                        onMouseLeave={(e: ReactMouseEvent) => {
+                                                        onMouseLeave={(e: MouseEvent<HTMLTableCellElement>) => {
                                                             e.currentTarget.style.backgroundColor = sortConfig?.key === 'updatedAt' ? `${currentTheme.primary}15` : 'transparent';
                                                         }}
                                                     >
@@ -1149,10 +1189,10 @@ export default function Users() {
                                                         backgroundColor: `${currentTheme.cardBackground}80`,
                                                         transition: 'background-color 0.2s ease'
                                                     }}
-                                                        onMouseEnter={(e: ReactMouseEvent) => {
+                                                        onMouseEnter={(e: MouseEvent<HTMLTableRowElement>) => {
                                                             e.currentTarget.style.backgroundColor = `${currentTheme.tableRowHover}`;
                                                         }}
-                                                        onMouseLeave={(e: ReactMouseEvent) => {
+                                                        onMouseLeave={(e: MouseEvent<HTMLTableRowElement>) => {
                                                             e.currentTarget.style.backgroundColor = `${currentTheme.cardBackground}80`;
                                                         }}>
                                                         <td style={{ padding: '0.75rem 1rem' }}>
@@ -1201,10 +1241,10 @@ export default function Users() {
                                                                         color: currentTheme.primary,
                                                                         transition: 'all 0.2s ease'
                                                                     }}
-                                                                    onMouseEnter={(e: ReactMouseEvent) => {
+                                                                    onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => {
                                                                         e.currentTarget.style.backgroundColor = `${currentTheme.primary}20`;
                                                                     }}
-                                                                    onMouseLeave={(e: ReactMouseEvent) => {
+                                                                    onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => {
                                                                         e.currentTarget.style.backgroundColor = 'transparent';
                                                                     }}
                                                                 >
@@ -1223,12 +1263,12 @@ export default function Users() {
                                                                         opacity: users.length === 1 || user.role === 'admin' ? 0.5 : 1,
                                                                         transition: 'all 0.2s ease'
                                                                     }}
-                                                                    onMouseEnter={(e: ReactMouseEvent) => {
+                                                                    onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => {
                                                                         if (users.length > 1 && user.role !== 'admin') {
                                                                             e.currentTarget.style.backgroundColor = `${currentTheme.errorBackground}40`;
                                                                         }
                                                                     }}
-                                                                    onMouseLeave={(e: ReactMouseEvent) => {
+                                                                    onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => {
                                                                         e.currentTarget.style.backgroundColor = 'transparent';
                                                                     }}
                                                                     title={user.role === 'admin' ? "Cannot delete admin user" : users.length === 1 ? "Cannot delete the last user" : "Delete user"}
@@ -1297,11 +1337,11 @@ export default function Users() {
                                         borderRadius: '4px',
                                         transition: 'all 0.2s ease'
                                     }}
-                                    onMouseEnter={(e: ReactMouseEvent) => {
+                                    onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => {
                                         e.currentTarget.style.backgroundColor = `${currentTheme.buttonHover}50`;
                                         e.currentTarget.style.transform = 'scale(1.1)';
                                     }}
-                                    onMouseLeave={(e: ReactMouseEvent) => {
+                                    onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => {
                                         e.currentTarget.style.backgroundColor = 'transparent';
                                         e.currentTarget.style.transform = 'scale(1)';
                                     }}
@@ -1322,7 +1362,7 @@ export default function Users() {
                                     <input
                                         type="text"
                                         value={editingUser.username}
-                                        onChange={(e: ReactChangeEvent) => setEditingUser({ ...editingUser, username: e.target.value })}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => setEditingUser({ ...editingUser, username: e.target.value })}
                                         style={{
                                             width: '100%',
                                             padding: '0.75rem',
@@ -1347,7 +1387,7 @@ export default function Users() {
                                     <input
                                         type="password"
                                         value={newPassword}
-                                        onChange={(e: ReactChangeEvent) => {
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => {
                                             setNewPassword(e.target.value);
                                             setPasswordError(null);
                                         }}
@@ -1376,7 +1416,7 @@ export default function Users() {
                                     <input
                                         type="password"
                                         value={confirmPassword}
-                                        onChange={(e: ReactChangeEvent) => {
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => {
                                             setConfirmPassword(e.target.value);
                                             setPasswordError(null);
                                         }}
@@ -1430,10 +1470,10 @@ export default function Users() {
                                             fontSize: '1rem',
                                             transition: 'all 0.2s ease'
                                         }}
-                                        onMouseEnter={(e: ReactMouseEvent) => {
+                                        onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => {
                                             e.currentTarget.style.backgroundColor = `${currentTheme.buttonHover}50`;
                                         }}
-                                        onMouseLeave={(e: ReactMouseEvent) => {
+                                        onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => {
                                             e.currentTarget.style.backgroundColor = 'transparent';
                                         }}
                                     >
@@ -1451,11 +1491,11 @@ export default function Users() {
                                             fontSize: '1rem',
                                             transition: 'all 0.2s ease'
                                         }}
-                                        onMouseEnter={(e: ReactMouseEvent) => {
+                                        onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => {
                                             e.currentTarget.style.transform = 'translateY(-2px)';
                                             e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
                                         }}
-                                        onMouseLeave={(e: ReactMouseEvent) => {
+                                        onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => {
                                             e.currentTarget.style.transform = 'translateY(0)';
                                             e.currentTarget.style.boxShadow = 'none';
                                         }}
@@ -1514,11 +1554,11 @@ export default function Users() {
                                         borderRadius: '4px',
                                         transition: 'all 0.2s ease'
                                     }}
-                                    onMouseEnter={(e: ReactMouseEvent) => {
+                                    onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => {
                                         e.currentTarget.style.backgroundColor = `${currentTheme.buttonHover}50`;
                                         e.currentTarget.style.transform = 'scale(1.1)';
                                     }}
-                                    onMouseLeave={(e: ReactMouseEvent) => {
+                                    onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => {
                                         e.currentTarget.style.backgroundColor = 'transparent';
                                         e.currentTarget.style.transform = 'scale(1)';
                                     }}
@@ -1556,7 +1596,7 @@ export default function Users() {
                                     <input
                                         type="text"
                                         value={newUser.username}
-                                        onChange={(e: ReactChangeEvent) => setNewUser({ ...newUser, username: e.target.value })}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => setNewUser({ ...newUser, username: e.target.value })}
                                         style={{
                                             width: '100%',
                                             padding: '0.75rem',
@@ -1581,7 +1621,7 @@ export default function Users() {
                                     </label>
                                     <select
                                         value={newUser.role}
-                                        onChange={(e: ReactChangeEvent) => {
+                                        onChange={(e: ChangeEvent<HTMLSelectElement>) => {
                                             console.log('Role selected:', e.target.value);
                                             setNewUser({ ...newUser, role: e.target.value as 'admin' | 'viewer' });
                                         }}
@@ -1613,7 +1653,7 @@ export default function Users() {
                                     <input
                                         type="password"
                                         value={newUser.password}
-                                        onChange={(e: ReactChangeEvent) => {
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => {
                                             setNewUser({ ...newUser, password: e.target.value });
                                             setPasswordError(null);
                                         }}
@@ -1642,7 +1682,7 @@ export default function Users() {
                                     <input
                                         type="password"
                                         value={newUser.confirmPassword}
-                                        onChange={(e: ReactChangeEvent) => {
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => {
                                             setNewUser({ ...newUser, confirmPassword: e.target.value });
                                             setPasswordError(null);
                                         }}
@@ -1682,10 +1722,10 @@ export default function Users() {
                                             fontSize: '1rem',
                                             transition: 'all 0.2s ease'
                                         }}
-                                        onMouseEnter={(e: ReactMouseEvent) => {
+                                        onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => {
                                             e.currentTarget.style.backgroundColor = `${currentTheme.buttonHover}50`;
                                         }}
-                                        onMouseLeave={(e: ReactMouseEvent) => {
+                                        onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => {
                                             e.currentTarget.style.backgroundColor = 'transparent';
                                         }}
                                     >
@@ -1703,11 +1743,11 @@ export default function Users() {
                                             fontSize: '1rem',
                                             transition: 'all 0.2s ease'
                                         }}
-                                        onMouseEnter={(e: ReactMouseEvent) => {
+                                        onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => {
                                             e.currentTarget.style.transform = 'translateY(-2px)';
                                             e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
                                         }}
-                                        onMouseLeave={(e: ReactMouseEvent) => {
+                                        onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => {
                                             e.currentTarget.style.transform = 'translateY(0)';
                                             e.currentTarget.style.boxShadow = 'none';
                                         }}
@@ -1762,11 +1802,11 @@ export default function Users() {
                                         borderRadius: '4px',
                                         transition: 'all 0.2s ease'
                                     }}
-                                    onMouseEnter={(e: ReactMouseEvent) => {
+                                    onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => {
                                         e.currentTarget.style.backgroundColor = `${currentTheme.buttonHover}50`;
                                         e.currentTarget.style.transform = 'scale(1.1)';
                                     }}
-                                    onMouseLeave={(e: ReactMouseEvent) => {
+                                    onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => {
                                         e.currentTarget.style.backgroundColor = 'transparent';
                                         e.currentTarget.style.transform = 'scale(1)';
                                     }}
@@ -1808,10 +1848,10 @@ export default function Users() {
                                         fontSize: '1rem',
                                         transition: 'all 0.2s ease'
                                     }}
-                                    onMouseEnter={(e: ReactMouseEvent) => {
+                                    onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => {
                                         e.currentTarget.style.backgroundColor = `${currentTheme.buttonHover}50`;
                                     }}
-                                    onMouseLeave={(e: ReactMouseEvent) => {
+                                    onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => {
                                         e.currentTarget.style.backgroundColor = 'transparent';
                                     }}
                                 >
@@ -1829,11 +1869,11 @@ export default function Users() {
                                         fontSize: '1rem',
                                         transition: 'all 0.2s ease'
                                     }}
-                                    onMouseEnter={(e: ReactMouseEvent) => {
+                                    onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => {
                                         e.currentTarget.style.transform = 'translateY(-2px)';
                                         e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
                                     }}
-                                    onMouseLeave={(e: ReactMouseEvent) => {
+                                    onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => {
                                         e.currentTarget.style.transform = 'translateY(0)';
                                         e.currentTarget.style.boxShadow = 'none';
                                     }}

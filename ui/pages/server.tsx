@@ -13,14 +13,14 @@ import Logo from '../components/Logo';
 const themes = {
     light: {
         background: '#ffffff',
-        text: '#333333',
-        primary: '#4CAF50',
-        secondary: '#2196F3',
-        border: '#dddddd',
-        tableHeader: '#f2f2f2',
+        text: '#1a1a1a',           // Cambiado de #333333 a #1a1a1a para mejor contraste
+        primary: '#2E7D32',        // Verde más oscuro para mejor contraste
+        secondary: '#1565C0',      // Azul más oscuro para mejor contraste
+        border: '#e0e0e0',         // Borde más visible
+        tableHeader: '#f5f5f5',
         tableRow: '#ffffff',
         tableRowHover: '#f5f5f5',
-        cardBackground: '#f9f9f9',
+        cardBackground: '#ffffff',
         errorBackground: '#FFEBEE',
         statusIndicator: '#E3F2FD',
         navbar: '#ffffff',
@@ -1147,7 +1147,8 @@ export default function ServerManagement() {
                             fontSize: '1.75rem',
                             margin: '0 0 1.5rem 0',
                             display: 'flex',
-                            alignItems: 'center'
+                            alignItems: 'center',
+                            color: currentTheme.text
                         }}>
                             <span className="material-icons" style={{
                                 fontSize: '28px',
@@ -1172,7 +1173,8 @@ export default function ServerManagement() {
                             fontSize: '1rem',
                             opacity: 0.8,
                             maxWidth: '800px',
-                            lineHeight: '1.5'
+                            lineHeight: '1.5',
+                            color: currentTheme.text
                         }}>
                             Configure and manage your OpenVPN server settings, monitor connections, and create client configurations.
                         </p>
@@ -1512,14 +1514,16 @@ export default function ServerManagement() {
                         border: `1px solid ${currentTheme.border}`,
                         borderRadius: '12px',
                         padding: '1.5rem',
-                        marginBottom: '2rem'
+                        marginBottom: '2rem',
+                        color: currentTheme.text
                     }}>
                         <h2 style={{
                             margin: '0 0 1.5rem 0',
                             fontSize: '1.3rem',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '8px'
+                            gap: '8px',
+                            color: currentTheme.text
                         }}>
                             <span className="material-icons" style={{ color: currentTheme.secondary }}>
                                 info
@@ -1537,8 +1541,8 @@ export default function ServerManagement() {
                                 flexDirection: 'column',
                                 gap: '0.5rem'
                             }}>
-                                <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>IP Address</div>
-                                <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>{serverConfig.public_ip || "-"}</div>
+                                <div style={{ opacity: 0.7, fontSize: '0.9rem', color: currentTheme.text }}>IP Address</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: '500', color: currentTheme.text }}>{serverConfig.public_ip || "-"}</div>
                             </div>
 
                             <div style={{
@@ -1546,8 +1550,8 @@ export default function ServerManagement() {
                                 flexDirection: 'column',
                                 gap: '0.5rem'
                             }}>
-                                <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>Port</div>
-                                <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>{serverConfig.openvpn_port ? `${serverConfig.openvpn_port} (${serverConfig.openvpn_proto.toUpperCase()})` : "-"}</div>
+                                <div style={{ opacity: 0.7, fontSize: '0.9rem', color: currentTheme.text }}>Port</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: '500', color: currentTheme.text }}>{serverConfig.openvpn_port ? `${serverConfig.openvpn_port} (${serverConfig.openvpn_proto.toUpperCase()})` : "-"}</div>
                             </div>
 
                             <div style={{
@@ -1555,8 +1559,8 @@ export default function ServerManagement() {
                                 flexDirection: 'column',
                                 gap: '0.5rem'
                             }}>
-                                <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>Protocol</div>
-                                <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>{serverConfig.openvpn_proto ? serverConfig.openvpn_proto.toUpperCase() : "-"}</div>
+                                <div style={{ opacity: 0.7, fontSize: '0.9rem', color: currentTheme.text }}>Protocol</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: '500', color: currentTheme.text }}>{serverConfig.openvpn_proto ? serverConfig.openvpn_proto.toUpperCase() : "-"}</div>
                             </div>
 
                             <div style={{
@@ -1564,8 +1568,8 @@ export default function ServerManagement() {
                                 flexDirection: 'column',
                                 gap: '0.5rem'
                             }}>
-                                <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>VPN Network</div>
-                                <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>{serverConfig.vpn_network || "-"}</div>
+                                <div style={{ opacity: 0.7, fontSize: '0.9rem', color: currentTheme.text }}>VPN Network</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: '500', color: currentTheme.text }}>{serverConfig.vpn_network || "-"}</div>
                             </div>
 
                             <div style={{
@@ -1573,8 +1577,8 @@ export default function ServerManagement() {
                                 flexDirection: 'column',
                                 gap: '0.5rem'
                             }}>
-                                <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>Netmask</div>
-                                <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>{serverConfig.vpn_netmask || "-"}</div>
+                                <div style={{ opacity: 0.7, fontSize: '0.9rem', color: currentTheme.text }}>Netmask</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: '500', color: currentTheme.text }}>{serverConfig.vpn_netmask || "-"}</div>
                             </div>
 
                             <div style={{
@@ -1582,8 +1586,8 @@ export default function ServerManagement() {
                                 flexDirection: 'column',
                                 gap: '0.5rem'
                             }}>
-                                <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>Encryption</div>
-                                <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>{serverConfig.vpn_network ? "AES-256-GCM" : "-"}</div>
+                                <div style={{ opacity: 0.7, fontSize: '0.9rem', color: currentTheme.text }}>Encryption</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: '500', color: currentTheme.text }}>{serverConfig.vpn_network ? "AES-256-GCM" : "-"}</div>
                             </div>
                         </div>
                     </div>
