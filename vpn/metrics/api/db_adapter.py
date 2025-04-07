@@ -16,7 +16,7 @@ import os
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from vpn.metrics.collector.classes.databases.database_ping import PingDatabase
+from vpn.metrics.collector.classes.databases.database_factory import create_database
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -28,17 +28,17 @@ class DBAdapter:
     Adaptador para comunicarse con la base de datos y formatear datos para la API.
 
     :param db: Instancia de la base de datos
-    :type db: PingDatabase
+    :type db: Database
     """
 
-    def __init__(self, db: PingDatabase):
+    def __init__(self, db=None):
         """
         Inicializar el adaptador con una instancia de base de datos.
 
-        :param db: Instancia de la base de datos
-        :type db: PingDatabase
+        :param db: Instancia de la base de datos, si es None se crea una nueva
+        :type db: Database
         """
-        self.db = db
+        self.db = db if db is not None else create_database()
 
     def get_targets(self) -> List[Dict[str, Any]]:
         """

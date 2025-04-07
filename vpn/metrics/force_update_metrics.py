@@ -17,9 +17,9 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from vpn.metrics.api.db_adapter import DBAdapter
-from vpn.metrics.collector.classes.databases.database_ping import PingDatabase
+from vpn.metrics.collector.classes.databases.database_factory import create_database
 from vpn.metrics.collector.classes.extractor.ping_extractor import PingExtractor
-from vpn.metrics.conf import LOG_LEVEL, PING_DB_PATH
+from vpn.metrics.conf import LOG_LEVEL
 
 # Configure logging
 logging.basicConfig(
@@ -48,8 +48,8 @@ def force_update_metrics(targets: List[str], verbose: bool = False, interval: Op
         logging.getLogger().setLevel(logging.DEBUG)
 
     # Inicializar conexión a la base de datos
-    logger.info(f"Conectando a la base de datos: {PING_DB_PATH}")
-    db = PingDatabase(PING_DB_PATH)
+    logger.info("Conectando a la base de datos")
+    db = create_database()
 
     # Crear adaptador para formatear los datos
     adapter = DBAdapter(db)
@@ -234,34 +234,26 @@ def validate_formatted_data(data: Dict[str, Any]) -> None:
 
 
 def main():
-    """Función principal del script."""
-    parser = argparse.ArgumentParser(description="Forzar actualización de métricas VPN")
+    """Parse command line arguments and run the force update."""
+    parser = argparse.ArgumentParser(description="Forzar la actualización de métricas de VPN")
     parser.add_argument(
-        "targets", nargs="*", default=["google.com"],
-        help="Objetivos a monitorear (hostnames o IPs)"
+        "targets",
+        nargs="+",
+        help="Lista de objetivos (hostname o IP) para monitorizar",
     )
     parser.add_argument(
-        "-v", "--verbose", action="store_true",
-        help="Mostrar información detallada de depuración"
+        "-v", "--verbose",
+        action="store_true",
+        help="Mostrar información detallada de depuración",
     )
     parser.add_argument(
-        "-i", "--interval", type=int, default=0,
-        help="Intervalo en segundos para actualización continua (0 = una sola vez)"
+        "-i", "--interval",
+        type=int,
+        help="Intervalo en segundos para actualizaciones continuas",
     )
 
     args = parser.parse_args()
-
-    if not args.targets:
-        logger.warning("No se proporcionaron objetivos, usando google.com por defecto")
-
-    if args.interval > 0:
-        logger.info(f"Modo de actualización continua cada {args.interval} segundos")
-        try:
-            force_update_metrics(args.targets, args.verbose, args.interval)
-        except KeyboardInterrupt:
-            logger.info("Actualización continua interrumpida por el usuario")
-    else:
-        force_update_metrics(args.targets, args.verbose)
+    force_update_metrics(args.targets, args.verbose, args.interval)
 
 
 if __name__ == "__main__":

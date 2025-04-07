@@ -13,9 +13,9 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Any
 
-from vpn.metrics.collector.classes.databases.database_ping import PingDatabase
+from vpn.metrics.collector.classes.databases.database_factory import create_database
 from vpn.metrics.collector.classes.extractor.ping_extractor import PingExtractor
-from vpn.metrics.conf import LOG_LEVEL, PING_DB_PATH, WORK_DIR
+from vpn.metrics.conf import LOG_LEVEL, WORK_DIR
 
 # Configure logging
 logging.basicConfig(
@@ -58,8 +58,8 @@ def process_target(target: Dict[str, str]) -> None:
         extractor = PingExtractor(target['ip'])
         ping_results = extractor.collect()
 
-        # Initialize database connection
-        db = PingDatabase(PING_DB_PATH)
+        # Initialize database connection using factory
+        db = create_database()
 
         # Store in database
         metric_id = db.store_ping_result(ping_results)

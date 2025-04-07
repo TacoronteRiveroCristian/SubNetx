@@ -3,7 +3,7 @@ Servicio de recolección de métricas para SubNetx VPN.
 
 Este script se encarga de recopilar métricas de rendimiento y disponibilidad
 para el servidor VPN y los clientes conectados. Ejecuta comprobaciones
-periódicas de ping y guarda los resultados en una base de datos SQLite.
+periódicas de ping y guarda los resultados en una base de datos.
 
 :module: vpn.metrics.main
 :author: SubNetx Team
@@ -22,6 +22,7 @@ from apscheduler.schedulers.background import BackgroundScheduler  # type: ignor
 from apscheduler.triggers.interval import IntervalTrigger  # type: ignore
 
 from vpn.metrics.conf import LOG_FORMAT, LOG_LEVEL, WORK_DIR
+from vpn.metrics.collector.classes.databases.database_factory import create_database
 
 # Configurar logging
 logging.basicConfig(
@@ -33,6 +34,17 @@ logger = logging.getLogger(__name__)
 
 # Variable global para control de ejecución
 running = True
+
+def init_database():
+    """Inicializar la base de datos."""
+    try:
+        logger.info("Inicializando conexión a la base de datos...")
+        db = create_database()
+        logger.info("Conexión a la base de datos inicializada correctamente")
+        return db
+    except Exception as e:
+        logger.error(f"Error inicializando la base de datos: {str(e)}")
+        return None
 
 def init_vpn_clients_file():
     """Inicializar el archivo de configuración de clientes VPN si no existe."""
@@ -134,6 +146,12 @@ def run_ping_check() -> None:
 def main() -> None:
     """Configurar y ejecutar el servicio de recolección de métricas."""
     logger.info("Iniciando servicio de recolección de métricas de SubNetx")
+
+    # Inicializar la base de datos
+    db = init_database()
+    if db is None:
+        logger.error("No se pudo inicializar la base de datos. Terminando...")
+        return
 
     # Inicializar archivo de configuración de clientes VPN
     init_vpn_clients_file()
