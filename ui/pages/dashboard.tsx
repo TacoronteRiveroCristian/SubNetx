@@ -13,8 +13,8 @@ import Logo from '../components/Logo';
 // URL base de la API de métricas
 // Use a proxy through our own Next.js API for client-side requests
 const API_BASE_URL = typeof window !== 'undefined'
-  ? `${window.location.origin}/api/proxy`
-  : 'http://subnetx_vpn:8000';
+    ? `${window.location.origin}/api/proxy`
+    : 'http://subnetx_vpn:8000';
 
 // Define the Target interface to type our data
 interface Target {

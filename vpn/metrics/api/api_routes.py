@@ -26,6 +26,8 @@ La API está diseñada para ser:
 
 import logging
 import re
+import os
+import json
 from typing import Any, Dict, List, Optional, Union
 
 from fastapi import APIRouter, FastAPI, HTTPException, Response
@@ -738,5 +740,25 @@ def get_active_target_hostnames() -> List[str]:
     Returns:
         List[str]: List of active target hostnames
     """
-    # These targets are hardcoded in the extract_and_save_ping.py script
-    return ["google.com", "invalid.example.domain"]
+    # Get default targets
+    targets = ["google.com", "invalid.example.domain"]
+
+    # Add VPN clients from the config file
+    try:
+        work_dir = os.getenv("WORK_DIR", "")
+        vpn_clients_file = os.path.join(work_dir, "collector", "config", "vpn_clients.json")
+
+        if os.path.exists(vpn_clients_file):
+            with open(vpn_clients_file, 'r') as f:
+                data = json.load(f)
+                # Add IP addresses of VPN clients
+                for client in data.get('clients', []):
+                    if client.get('ip'):
+                        targets.append(client.get('ip'))
+            logger.info(f"Loaded {len(data.get('clients', []))} VPN clients for monitoring")
+        else:
+            logger.warning(f"VPN clients file not found at {vpn_clients_file}")
+    except Exception as e:
+        logger.error(f"Error loading VPN clients for monitoring: {str(e)}")
+
+    return targets

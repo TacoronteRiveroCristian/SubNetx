@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 """
-SubNetx VPN Ping Extractor and Storage Test.
+SubNetx VPN Ping Extractor and Storage.
 
-Este script prueba la funcionalidad de extracción de ping y almacenamiento en la base de datos
-haciendo ping tanto a un dominio válido (google.com) como a un dominio no válido,
-y luego almacenando los resultados en la base de datos SQLite.
+Este script monitoriza los clientes VPN configurados usando un pool de workers
+para manejar múltiples clientes eficientemente.
 """
 
 import json
 import logging
+import os
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Any
 
 from vpn.metrics.collector.classes.databases.database_ping import PingDatabase
 from vpn.metrics.collector.classes.extractor.ping_extractor import PingExtractor
-from vpn.metrics.conf import LOG_LEVEL, PING_DB_PATH
+from vpn.metrics.conf import LOG_LEVEL, PING_DB_PATH, WORK_DIR
 
 # Configure logging
 logging.basicConfig(
@@ -22,108 +23,79 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Path to the VPN clients configuration file
+VPN_CLIENTS_FILE = os.path.join(WORK_DIR, "collector", "config", "vpn_clients.json")
 
-def test_ping_and_store(targets: List[str]) -> None:
+def load_vpn_clients() -> List[Dict[str, str]]:
     """
-    Test ping extraction and database storage for a list of targets.
+    Load VPN clients from the configuration file.
 
-    :param targets: List of target hostnames or IPs to test
-    :type targets: List[str]
+    Returns:
+        List[Dict[str, str]]: List of client configurations
     """
-    # Initialize database connection
-    db = PingDatabase(PING_DB_PATH)
+    try:
+        if not os.path.exists(VPN_CLIENTS_FILE):
+            logger.warning(f"VPN clients file not found at {VPN_CLIENTS_FILE}")
+            return []
 
-    for target in targets:
-        try:
-            # Extract ping data
-            logger.info(f"Testing ping for target: {target}")
-            extractor = PingExtractor(target)
-            ping_results = extractor.collect()
+        with open(VPN_CLIENTS_FILE, 'r') as f:
+            data = json.load(f)
+            return data.get('clients', [])
+    except Exception as e:
+        logger.error(f"Error loading VPN clients: {str(e)}")
+        return []
 
-            # Validate RTT data
-            primary_target = ping_results.get("primary_target", {})
-            rtt_stats = primary_target.get("rtt_stats", {})
-            logger.info("Validating RTT statistics:")
-            logger.info(f"  min_rtt: {rtt_stats.get('min_ms', 'N/A')}")
-            logger.info(f"  avg_rtt: {rtt_stats.get('avg_ms', 'N/A')}")
-            logger.info(f"  max_rtt: {rtt_stats.get('max_ms', 'N/A')}")
-            logger.info(f"  mdev_rtt: {rtt_stats.get('mdev_ms', 'N/A')}")
-
-            # Validate packet data
-            packets = primary_target.get("packets", {})
-            logger.info("Validating packet statistics:")
-            logger.info(f"  transmitted: {packets.get('transmitted', 'N/A')}")
-            logger.info(f"  received: {packets.get('received', 'N/A')}")
-            logger.info(f"  packet_loss: {primary_target.get('packet_loss_percent', 'N/A')}%")
-
-            # Validate TLS info
-            tls_info = primary_target.get("tls_info", {})
-            logger.info("Validating TLS information:")
-            logger.info(f"  expiry: {tls_info.get('expiry', 'N/A')}")
-            logger.info(f"  issuer: {tls_info.get('issuer', 'N/A')}")
-            logger.info(f"  subject: {tls_info.get('subject', 'N/A')}")
-            logger.info(f"  version: {tls_info.get('version', 'N/A')}")
-            logger.info(f"  cipher: {tls_info.get('cipher', 'N/A')}")
-
-            # Log the complete results as JSON
-            logger.info(f"Complete ping results for {target}:")
-            logger.info(json.dumps(ping_results, indent=2))
-
-            # Store in database
-            logger.info(f"Storing results for {target} in database")
-            metric_id = db.store_ping_result(ping_results)
-            logger.info(f"Successfully stored results with ID: {metric_id}")
-
-            # Verify storage by retrieving latest ping
-            latest = db.get_latest_ping(target)
-            logger.info(f"Retrieved latest ping for {target}:")
-            logger.info(json.dumps(latest, indent=2))
-
-            # Validate database retrieval
-            validate_database_data(latest)
-
-        except Exception as e:
-            logger.error(f"Error processing {target}: {str(e)}")
-            logger.error(f"Error type: {e.__class__.__name__}")
-
-
-def validate_database_data(data: Dict[str, Any]) -> None:
+def process_target(target: Dict[str, str]) -> None:
     """
-    Validate that all required fields are present in the database result.
+    Process a single target and store its metrics.
 
-    :param data: Database data to validate
-    :type data: Dict[str, Any]
+    Args:
+        target (Dict[str, str]): Target configuration with name and IP
     """
-    logger.info("Validating database retrieval:")
+    try:
+        # Extract ping data
+        logger.info(f"Testing ping for target: {target['name']} ({target['ip']})")
+        extractor = PingExtractor(target['ip'])
+        ping_results = extractor.collect()
 
-    # Check RTT data
-    logger.info("  RTT data present: %s", all(
-        k in data for k in ['min_rtt', 'avg_rtt', 'max_rtt', 'mdev_rtt']
-    ))
+        # Initialize database connection
+        db = PingDatabase(PING_DB_PATH)
 
-    # Check packet data
-    logger.info("  Packet data present: %s", all(
-        k in data for k in ['packets_transmitted', 'packets_received', 'packet_loss_percent']
-    ))
+        # Store in database
+        metric_id = db.store_ping_result(ping_results)
+        logger.info(f"Successfully stored results for {target['name']} with ID: {metric_id}")
 
-    # Check TLS data if present
-    if 'tls_info' in data and data['tls_info']:
-        logger.info("  TLS data present: %s", all(
-            k in data['tls_info'] for k in ['cert_expiry', 'issuer', 'subject', 'version', 'cipher']
-        ))
-    else:
-        logger.info("  TLS data not available in database result")
-
+    except Exception as e:
+        logger.error(f"Error processing {target['name']}: {str(e)}")
 
 def main() -> None:
-    """Execute the main ping extraction and storage test."""
-    # Test targets - use command line arguments if provided, otherwise default to google.com
-    targets = sys.argv[1:] if len(sys.argv) > 1 else ["google.com", "invalid.example.domain"]
+    """Execute the main ping extraction and storage process."""
+    logger.info("Starting VPN clients monitoring")
 
-    logger.info("Starting ping extraction and storage test")
-    test_ping_and_store(targets)
-    logger.info("Test completed")
+    # Load VPN clients
+    clients = load_vpn_clients()
+    if not clients:
+        logger.warning("No VPN clients found to monitor")
+        return
 
+    # Create a thread pool
+    max_workers = min(len(clients), 10)  # Limitar a 10 workers máximo
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit tasks for each client
+        future_to_client = {
+            executor.submit(process_target, client): client
+            for client in clients
+        }
+
+        # Process completed tasks
+        for future in as_completed(future_to_client):
+            client = future_to_client[future]
+            try:
+                future.result()
+            except Exception as e:
+                logger.error(f"Error monitoring client {client['name']}: {str(e)}")
+
+    logger.info("VPN clients monitoring completed")
 
 if __name__ == "__main__":
     main()

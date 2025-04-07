@@ -16,11 +16,12 @@ import signal
 import subprocess
 import sys
 import time
+import json
 
 from apscheduler.schedulers.background import BackgroundScheduler  # type: ignore
 from apscheduler.triggers.interval import IntervalTrigger  # type: ignore
 
-from vpn.metrics.conf import LOG_FORMAT, LOG_LEVEL
+from vpn.metrics.conf import LOG_FORMAT, LOG_LEVEL, WORK_DIR
 
 # Configurar logging
 logging.basicConfig(
@@ -32,6 +33,67 @@ logger = logging.getLogger(__name__)
 
 # Variable global para control de ejecución
 running = True
+
+def init_vpn_clients_file():
+    """Inicializar el archivo de configuración de clientes VPN si no existe."""
+    config_path = os.path.join(WORK_DIR, "collector", "config", "vpn_clients.json")
+    os.makedirs(os.path.dirname(config_path), exist_ok=True)
+
+    if not os.path.exists(config_path):
+        logger.info(f"Creating initial VPN clients configuration file at {config_path}")
+        # Crear un archivo vacío con la estructura correcta
+        data = {"clients": []}
+        with open(config_path, 'w') as f:
+            json.dump(data, f, indent=4)
+    else:
+        logger.info(f"VPN clients configuration file already exists at {config_path}")
+
+    # Si hay clientes OpenVPN configurados, añadirlos al archivo
+    try:
+        # Listar clientes usando el comando
+        result = subprocess.run(
+            ["/app/scripts/client/openvpn-client-list.sh"],
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode == 0 and result.stdout.strip():
+            # Leer el archivo existente
+            with open(config_path, 'r') as f:
+                data = json.load(f)
+
+            # Obtener los nombres de clientes ya registrados
+            existing_clients = [c.get('name') for c in data.get('clients', [])]
+
+            # Procesar la salida para obtener los clientes
+            clients_found = 0
+            for line in result.stdout.strip().split('\n'):
+                client_name = line.strip()
+                if client_name and client_name not in existing_clients:
+                    # Obtener la IP del archivo CCD
+                    ccd_file = f"/etc/openvpn/ccd/{client_name}"
+                    if os.path.exists(ccd_file):
+                        with open(ccd_file, 'r') as f:
+                            ccd_content = f.read()
+                            import re
+                            ip_match = re.search(r'ifconfig-push\s+(\d+\.\d+\.\d+\.\d+)', ccd_content)
+                            if ip_match:
+                                ip = ip_match.group(1)
+                                # Añadir el cliente a la lista
+                                data['clients'].append({
+                                    "name": client_name,
+                                    "ip": ip,
+                                    "created_at": time.strftime("%Y-%m-%dT%H:%M:%S.000000", time.gmtime())
+                                })
+                                clients_found += 1
+
+            # Si se encontraron nuevos clientes, actualizar el archivo
+            if clients_found > 0:
+                logger.info(f"Found {clients_found} OpenVPN clients to add to monitoring")
+                with open(config_path, 'w') as f:
+                    json.dump(data, f, indent=4)
+    except Exception as e:
+        logger.error(f"Error initializing VPN clients from OpenVPN configuration: {str(e)}")
 
 def signal_handler(sig, frame):
     """Manejador de señales para terminar limpiamente."""
@@ -72,6 +134,9 @@ def run_ping_check() -> None:
 def main() -> None:
     """Configurar y ejecutar el servicio de recolección de métricas."""
     logger.info("Iniciando servicio de recolección de métricas de SubNetx")
+
+    # Inicializar archivo de configuración de clientes VPN
+    init_vpn_clients_file()
 
     # Configurar manejadores de señales
     signal.signal(signal.SIGINT, signal_handler)

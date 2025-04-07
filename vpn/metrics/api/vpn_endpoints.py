@@ -24,6 +24,8 @@ import re
 import subprocess
 from datetime import datetime
 from typing import Dict, List, Optional, Union
+import asyncio
+import json
 
 from fastapi import APIRouter, HTTPException, Path, Query
 from pydantic import BaseModel, Field, IPvAnyAddress, validator
@@ -407,44 +409,6 @@ async def create_client(client: ClientRequest):
     Returns:
         ClientResponse: Resultado de la operación de creación
     """
-    # Obtener la configuración del servidor
-    server_conf_path = "/etc/openvpn/server/server.conf"
-    if not os.path.exists(server_conf_path):
-        raise HTTPException(
-            status_code=400,
-            detail="El servidor no está configurado. Configure el servidor primero."
-        )
-
-    # Leer la configuración del servidor para obtener la red VPN
-    with open(server_conf_path, 'r') as f:
-        server_conf = f.read()
-        network_match = re.search(r'server\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+)', server_conf)
-        if not network_match:
-            raise HTTPException(
-                status_code=400,
-                detail="No se pudo determinar la red VPN del servidor"
-            )
-        vpn_network = network_match.group(1)
-        vpn_netmask = network_match.group(2)
-
-    # Convertir la red y la máscara a objetos de red
-    try:
-        import ipaddress
-        network = ipaddress.IPv4Network(f"{vpn_network}/{vpn_netmask}", strict=False)
-        client_ip = ipaddress.IPv4Address(client.ip)
-
-        # Verificar si la IP del cliente está en la red
-        if client_ip not in network:
-            raise HTTPException(
-                status_code=400,
-                detail=f"La IP {client.ip} no está dentro de la red VPN configurada ({network})"
-            )
-    except ValueError as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Error al validar la IP: {str(e)}"
-        )
-
     # Verificar si el nombre o la IP ya están en uso
     existing_clients = await list_clients()
     for existing_client in existing_clients:
@@ -466,32 +430,99 @@ async def create_client(client: ClientRequest):
         "--ip", client.ip
     ]
 
-    # Ejecutar script de creación de cliente
-    result = run_command(command)
+    try:
+        # Ejecutar el comando
+        process = await asyncio.create_subprocess_exec(
+            *command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await process.communicate()
 
-    if result["success"]:
-        # Buscar la ruta del archivo de configuración en la salida
-        output = str(result["output"])
-        config_path_match = re.search(r'Config file: (.*\.ovpn)', output)
-        config_path = config_path_match.group(1) if config_path_match else None
+        if process.returncode != 0:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error creating client: {stderr.decode()}"
+            )
 
-        return {
-            "success": True,
-            "message": f"Cliente {client.name} creado correctamente",
-            "config_path": config_path
-        }
-    else:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error creando el cliente: {result['output']}"
+        # Añadir el cliente al archivo de monitorización
+        await update_monitoring_clients(client)
+
+        # Devolver la respuesta
+        return ClientResponse(
+            success=True,
+            message=f"Client {client.name} created successfully",
+            config_path=f"/etc/openvpn/client/{client.name}.ovpn"
         )
 
-@router.delete("/client/{client_name}", response_model=OperationResponse, summary="Eliminar cliente OpenVPN")
-async def delete_client(client_name: str = Path(..., description="Nombre del cliente a eliminar")):
-    """
-    Elimina un cliente OpenVPN existente.
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
-    Revoca el certificado del cliente y elimina su configuración.
+async def update_monitoring_clients(client: ClientRequest):
+    """
+    Actualiza el archivo JSON de clientes para monitorización.
+
+    Args:
+        client: Cliente a añadir al monitoreo
+    """
+    try:
+        work_dir = os.getenv("WORK_DIR", "")
+        config_path = os.path.join(work_dir, "collector", "config", "vpn_clients.json")
+
+        # Asegurar que el directorio exista
+        os.makedirs(os.path.dirname(config_path), exist_ok=True)
+
+        # Leer el archivo existente o crear uno nuevo
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                data = json.load(f)
+        else:
+            logger.info(f"Creating new vpn_clients.json file at {config_path}")
+            data = {"clients": []}
+
+        # Añadir el nuevo cliente si no existe
+        client_exists = any(c.get('name') == client.name for c in data['clients'])
+        if not client_exists:
+            data['clients'].append({
+                "name": client.name,
+                "ip": client.ip,
+                "created_at": datetime.now().isoformat()
+            })
+
+            # Guardar el archivo actualizado
+            with open(config_path, 'w') as f:
+                json.dump(data, f, indent=4)
+
+            logger.info(f"Added client {client.name} with IP {client.ip} to monitoring")
+
+            # Intentar registrar el cliente en la base de datos de métricas
+            try:
+                db_path = os.path.join(work_dir, "databases", "ping.db")
+                if os.path.exists(db_path):
+                    from vpn.metrics.collector.classes.databases.database_ping import PingDatabase
+                    db = PingDatabase(db_path)
+                    target_id = db.add_target(client.ip, f"VPN Client: {client.name}")
+                    logger.info(f"Added client {client.name} to metrics database with ID {target_id}")
+            except Exception as db_err:
+                logger.error(f"Error adding client to metrics database: {str(db_err)}")
+        else:
+            logger.info(f"Client {client.name} already exists in monitoring file")
+
+    except Exception as e:
+        logger.error(f"Error updating monitoring clients: {str(e)}")
+        # No lanzamos excepción para no interrumpir la creación del cliente
+
+@router.delete("/client/{client_name}", response_model=OperationResponse, summary="Eliminar cliente OpenVPN")
+async def delete_client(
+    client_name: str = Path(..., description="Nombre del cliente a eliminar")
+):
+    """
+    Elimina un cliente OpenVPN.
+
+    Elimina la configuración y certificados del cliente especificado.
 
     Args:
         client_name: Nombre del cliente a eliminar
@@ -499,35 +530,98 @@ async def delete_client(client_name: str = Path(..., description="Nombre del cli
     Returns:
         OperationResponse: Resultado de la operación de eliminación
     """
-    # Validar formato de nombre de cliente
-    if not re.match(r'^[a-zA-Z0-9_-]+$', client_name):
-        raise HTTPException(
-            status_code=400,
-            detail="Nombre de cliente inválido. Debe ser alfanumérico."
+    # Construir comando con los parámetros
+    command = [
+        "/app/scripts/client/openvpn-client-delete.sh",
+        "--name", client_name
+    ]
+
+    try:
+        # Ejecutar el comando
+        process = await asyncio.create_subprocess_exec(
+            *command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
         )
+        stdout, stderr = await process.communicate()
 
-    # Ejecutar script para eliminar cliente
-    result = run_command(["/app/scripts/client/openvpn-client-delete.sh", client_name])
-
-    if result["success"]:
-        return {
-            "success": True,
-            "message": f"Cliente {client_name} eliminado correctamente",
-            "output": result["output"]
-        }
-    else:
-        # Verificar si el error es porque el cliente no existe
-        output = str(result["output"])
-        if "no existe" in output.lower() or "not found" in output.lower():
-            raise HTTPException(
-                status_code=404,
-                detail=f"Cliente {client_name} no encontrado"
-            )
-        else:
+        if process.returncode != 0:
             raise HTTPException(
                 status_code=500,
-                detail=f"Error eliminando el cliente: {result['output']}"
+                detail=f"Error deleting client: {stderr.decode()}"
             )
+
+        # Eliminar el cliente del archivo de monitorización
+        await remove_monitoring_client(client_name)
+
+        return OperationResponse(
+            success=True,
+            message=f"Client {client_name} deleted successfully"
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
+async def remove_monitoring_client(client_name: str):
+    """
+    Elimina un cliente del archivo JSON de monitorización.
+
+    Args:
+        client_name: Nombre del cliente a eliminar
+    """
+    try:
+        work_dir = os.getenv("WORK_DIR", "")
+        config_path = os.path.join(work_dir, "collector", "config", "vpn_clients.json")
+        if not os.path.exists(config_path):
+            logger.warning(f"VPN clients file not found at {config_path}")
+            return
+
+        # Leer el archivo
+        client_ip = None
+        with open(config_path, 'r') as f:
+            data = json.load(f)
+
+            # Buscar la IP del cliente antes de eliminarlo
+            for client in data.get('clients', []):
+                if client.get('name') == client_name:
+                    client_ip = client.get('ip')
+                    break
+
+        # Filtrar el cliente a eliminar
+        data['clients'] = [c for c in data['clients'] if c.get('name') != client_name]
+
+        # Guardar el archivo actualizado
+        with open(config_path, 'w') as f:
+            json.dump(data, f, indent=4)
+
+        logger.info(f"Removed client {client_name} from monitoring")
+
+        # Si encontramos la IP, intentar eliminar el cliente de la base de datos
+        if client_ip:
+            try:
+                # Obtener todos los targets de la base de datos y eliminar el que coincida con la IP
+                db_path = os.path.join(work_dir, "databases", "ping.db")
+                if os.path.exists(db_path):
+                    from vpn.metrics.collector.classes.databases.database_ping import PingDatabase
+                    db = PingDatabase(db_path)
+
+                    # Buscamos el target con la IP del cliente
+                    targets = db.get_all_targets()
+                    for target in targets:
+                        if target.get('target') == client_ip:
+                            # No hay método para eliminar targets, pero podríamos eliminar las métricas
+                            # Esto es una medida temporal hasta que se implemente
+                            logger.info(f"Found target with ID {target.get('id')} for removed client {client_name}")
+                            break
+            except Exception as db_err:
+                logger.error(f"Error managing metrics database for client removal: {str(db_err)}")
+
+    except Exception as e:
+        logger.error(f"Error removing monitoring client: {str(e)}")
+        # No lanzamos excepción para no interrumpir la eliminación del cliente
 
 @router.get("/has-certificates", summary="Verificar si existen certificados del servidor")
 async def has_certificates():

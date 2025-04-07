@@ -47,7 +47,49 @@ class DBAdapter:
         :return: Lista de objetivos
         :rtype: List[Dict[str, Any]]
         """
+        # Obtener todos los targets de la base de datos
         targets = self.db.get_all_targets()
+
+        # Agregar clientes VPN si no están en los targets
+        try:
+            import os
+            import json
+            work_dir = os.getenv("WORK_DIR", "")
+            vpn_clients_file = os.path.join(work_dir, "collector", "config", "vpn_clients.json")
+
+            # Si existe el archivo de clientes VPN
+            if os.path.exists(vpn_clients_file):
+                with open(vpn_clients_file, 'r') as f:
+                    data = json.load(f)
+
+                    # Extraer las IPs existentes en la BD
+                    existing_ips = [t['target'] for t in targets]
+
+                    # Añadir cada cliente que no esté ya en la BD
+                    for client in data.get('clients', []):
+                        ip = client.get('ip')
+                        if ip and ip not in existing_ips:
+                            # Añadir el cliente a la BD y a la lista de targets
+                            try:
+                                target_id = self.db.add_target(
+                                    ip,
+                                    f"VPN Client: {client.get('name', 'Unknown')}"
+                                )
+
+                                # Añadir el target a la lista de retorno
+                                targets.append({
+                                    'id': target_id,
+                                    'target': ip,
+                                    'description': f"VPN Client: {client.get('name', 'Unknown')}",
+                                    'added_at': client.get('created_at', '')
+                                })
+
+                                logger.info(f"Added VPN client {client.get('name')} with IP {ip} to targets")
+                            except Exception as e:
+                                logger.error(f"Error adding VPN client to database: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error processing VPN clients for targets: {str(e)}")
+
         return targets
 
     def get_target(self, target_id: int) -> Dict[str, Any]:

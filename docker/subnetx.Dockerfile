@@ -67,6 +67,12 @@ COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 # Copiar módulos Python
 COPY vpn/metrics /app/vpn/metrics/
 
+# Crear directorio para configuración de métricas
+RUN mkdir -p /app/collector/config
+
+# Copiar archivo de configuración de clientes
+COPY vpn/metrics/collector/config/vpn_clients.json /app/collector/config/
+
 # Mover fichero de configuracion de red para OpenVPN
 RUN mv /app/config/sysctl.conf /etc/sysctl.conf
 
