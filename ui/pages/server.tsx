@@ -4,7 +4,7 @@
  */
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import BackgroundEffect from '../components/BackgroundEffect';
 import Footer from '../components/Footer';
 import Logo from '../components/Logo';
@@ -43,6 +43,13 @@ const themes = {
     },
 };
 
+// Define client type
+interface Client {
+    name: string;
+    ip: string;
+    created_at: string;
+}
+
 export default function ServerManagement() {
     // Initialize router for navigation
     const router = useRouter();
@@ -53,6 +60,7 @@ export default function ServerManagement() {
     const [isHamburgerOpen, setIsHamburgerOpen] = useState(false);
     const [serverStatus, setServerStatus] = useState<'running' | 'stopped' | 'unknown'>('unknown');
     const [serverHasCertificates, setServerHasCertificates] = useState(false);
+    const [clients, setClients] = useState<Client[]>([]);
     const [serverConfig, setServerConfig] = useState({
         vpn_network: "",
         vpn_netmask: "",
@@ -340,6 +348,8 @@ export default function ServerManagement() {
                 };
 
                 setServerConfig(emptyConfig);
+                // Limpiar la lista de clientes
+                setClients([]);
 
                 // Eliminar la configuración del localStorage
                 localStorage.removeItem('serverConfig');
@@ -484,81 +494,105 @@ export default function ServerManagement() {
         setSetupError(null);
     };
 
+    // Function to load clients
+    const loadClients = async () => {
+        try {
+            const response = await fetch('/api/vpn/clients');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            setClients(data);
+        } catch (error) {
+            console.error('Failed to load clients:', error);
+            showNotification('Failed to load clients list', 'error');
+        }
+    };
+
+    // Load clients on mount and after client operations
+    useEffect(() => {
+        if (serverStatus === 'running') {
+            loadClients();
+        }
+    }, [serverStatus]);
+
+    // Función para validar si una IP está dentro de la red VPN
+    const isIPInVPNNetwork = (ip: string): boolean => {
+        if (!serverConfig.vpn_network || !serverConfig.vpn_netmask) return false;
+
+        try {
+            const network = `${serverConfig.vpn_network}/${serverConfig.vpn_netmask}`;
+            const clientIP = ip;
+            return clientIP.startsWith(serverConfig.vpn_network.split('.').slice(0, 3).join('.'));
+        } catch (error) {
+            console.error('Error validating IP:', error);
+            return false;
+        }
+    };
+
     // Function to create a new client
     const handleCreateClient = async () => {
-        // Validar nombre del cliente
-        if (!newClientName.trim()) {
-            setClientError('Client name is required');
+        if (!newClientName || !newClientIP) {
+            setClientError('Please fill in all fields');
             return;
         }
 
-        // Validar que el nombre solo contenga caracteres alfanuméricos y guiones
-        if (!/^[a-zA-Z0-9-_]+$/.test(newClientName.trim())) {
+        // Validate name format (only letters, numbers, hyphens and underscores)
+        if (!/^[a-zA-Z0-9_-]+$/.test(newClientName)) {
             setClientError('Client name can only contain letters, numbers, hyphens and underscores');
             return;
         }
 
-        // Validar dirección IP del cliente
-        if (!newClientIP.trim()) {
-            setClientError('Client IP address is required');
+        // Validate IP format
+        const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+        if (!ipRegex.test(newClientIP)) {
+            setClientError('Invalid IP format');
             return;
         }
 
-        // Validar formato de dirección IP (simple)
-        if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(newClientIP.trim())) {
-            setClientError('Invalid IP address format (e.g. 10.8.0.10)');
+        // Verify if IP is within VPN network
+        if (!isIPInVPNNetwork(newClientIP)) {
+            setClientError(`IP ${newClientIP} is not within the configured VPN network (${serverConfig.vpn_network})`);
             return;
         }
 
-        // Validación adicional para comprobar que cada octeto está entre 0-255
-        const octets = newClientIP.trim().split('.');
-        if (octets.some(octet => {
-            const num = parseInt(octet, 10);
-            return isNaN(num) || num < 0 || num > 255;
-        })) {
-            setClientError('IP address octets must be between 0-255');
+        // Check if name or IP already exists
+        const existingClient = clients.find(
+            client => client.name === newClientName || client.ip === newClientIP
+        );
+        if (existingClient) {
+            if (existingClient.name === newClientName) {
+                setClientError(`A client with name ${newClientName} already exists`);
+            } else {
+                setClientError(`IP ${newClientIP} is already assigned to client ${existingClient.name}`);
+            }
             return;
         }
-
-        setClientCreating(true);
-        setClientError(null);
 
         try {
-            // Realizar llamada a la API real usando el nuevo endpoint de proxy
             const response = await fetch('/api/vpn/client/create', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    name: newClientName.trim(),
-                    ip: newClientIP.trim()
-                })
+                    name: newClientName,
+                    ip: newClientIP,
+                }),
             });
 
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Error creating client');
             }
 
             const data = await response.json();
-
-            if (data.success) {
-                // Si hay éxito, cerrar modal y limpiar el formulario
-                setClientCreating(false);
-                setCreateClientModalOpen(false);
-                setNewClientName('');
-                setNewClientIP(''); // Reset to empty
-                // Mostrar notificación de éxito
-                showNotification(`Client "${newClientName}" created successfully`, 'success');
-            } else {
-                // Mostrar mensaje de error
-                setClientError(data.message || 'Error creating client');
-                setClientCreating(false);
-            }
+            setClientError('');
+            setNewClientName('');
+            setNewClientIP('');
+            loadClients(); // Reload clients list
         } catch (error) {
-            console.error('Failed to create client:', error);
-            setClientError('Failed to connect to server');
-            setClientCreating(false);
+            setClientError(error instanceof Error ? error.message : 'Error creating client');
         }
     };
 
@@ -591,6 +625,7 @@ export default function ServerManagement() {
             z-index: 0;
             background-color: ${currentTheme.background};
             transition: background-color 0.3s ease;
+            overflow: hidden;
           }
           .content-container {
             position: relative;
@@ -599,6 +634,8 @@ export default function ServerManagement() {
             display: flex;
             flex-direction: column;
             background: transparent;
+            overflow-y: auto;
+            max-height: 100vh;
           }
           .nav-button {
             background: none;
@@ -1591,6 +1628,75 @@ export default function ServerManagement() {
                             </div>
                         </div>
                     </div>
+
+                    {/* Add clients list section after server info card */}
+                    <div style={{
+                        backgroundColor: currentTheme.cardBackground,
+                        border: `1px solid ${currentTheme.border}`,
+                        borderRadius: '12px',
+                        padding: '1.5rem',
+                        marginBottom: '2rem',
+                        color: currentTheme.text
+                    }}>
+                        <h2 style={{
+                            margin: '0 0 1.5rem 0',
+                            fontSize: '1.3rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            color: currentTheme.text
+                        }}>
+                            <span className="material-icons" style={{ color: currentTheme.secondary }}>
+                                people
+                            </span>
+                            Created Clients
+                        </h2>
+
+                        {clients.length > 0 ? (
+                            <div style={{
+                                display: 'grid',
+                                gap: '1rem',
+                                maxHeight: '400px',
+                                overflowY: 'auto',
+                                paddingRight: '10px'
+                            }}>
+                                {clients.map((client) => (
+                                    <div
+                                        key={client.name}
+                                        style={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            padding: '1rem',
+                                            backgroundColor: `${currentTheme.background}`,
+                                            borderRadius: '8px',
+                                            border: `1px solid ${currentTheme.border}`
+                                        }}
+                                    >
+                                        <div>
+                                            <div style={{ fontWeight: '500', marginBottom: '0.25rem' }}>
+                                                {client.name}
+                                            </div>
+                                            <div style={{ fontSize: '0.9rem', opacity: 0.8 }}>
+                                                IP: {client.ip}
+                                            </div>
+                                            <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>
+                                                Created: {new Date(client.created_at).toLocaleString()}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div style={{
+                                textAlign: 'center',
+                                padding: '2rem',
+                                opacity: 0.7
+                            }}>
+                                No clients connected
+                            </div>
+                        )}
+                    </div>
                 </main>
 
                 <Footer theme={currentTheme} />
@@ -1612,6 +1718,20 @@ export default function ServerManagement() {
                             </span>
                             Create New Client
                         </h2>
+
+                        {serverConfig.vpn_network && (
+                            <div style={{
+                                marginBottom: '1.5rem',
+                                padding: '0.75rem',
+                                backgroundColor: `${currentTheme.primary}15`,
+                                borderRadius: '8px',
+                                border: `1px solid ${currentTheme.primary}30`,
+                                fontSize: '0.9rem',
+                                color: currentTheme.text
+                            }}>
+                                <strong>Configured VPN Network:</strong> {serverConfig.vpn_network}/{serverConfig.vpn_netmask}
+                            </div>
+                        )}
 
                         <div style={{ marginBottom: '1.5rem' }}>
                             <label style={{

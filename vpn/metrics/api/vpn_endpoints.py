@@ -22,6 +22,7 @@ import logging
 import os
 import re
 import subprocess
+from datetime import datetime
 from typing import Dict, List, Optional, Union
 
 from fastapi import APIRouter, HTTPException, Path, Query
@@ -114,6 +115,12 @@ class OperationResponse(BaseModel):
     success: bool = Field(..., description="Indica si la operación fue exitosa")
     message: str = Field(..., description="Mensaje descriptivo sobre la operación")
     output: Optional[str] = Field(None, description="Salida de la operación")
+
+class ClientInfo(BaseModel):
+    """Modelo para la información detallada de un cliente OpenVPN."""
+    name: str = Field(..., description="Nombre del cliente")
+    ip: str = Field(..., description="IP asignada al cliente")
+    created_at: datetime = Field(default_factory=datetime.now, description="Fecha de creación del cliente")
 
 # Función auxiliar para ejecutar comandos
 def run_command(command: List[str]) -> Dict[str, Union[bool, str]]:
@@ -339,13 +346,60 @@ async def reset_server():
         )
 
 # Rutas para gestión de clientes
+@router.get("/clients", response_model=List[ClientInfo], summary="Listar clientes OpenVPN")
+async def list_clients():
+    """
+    Lista todos los clientes OpenVPN configurados con su información detallada.
+
+    Returns:
+        List[ClientInfo]: Lista de clientes con su información detallada
+    """
+    # Ejecutar script para listar clientes
+    result = run_command(["/app/scripts/client/openvpn-client-list.sh"])
+
+    if result["success"]:
+        # Obtener lista de clientes desde la salida
+        output = str(result["output"])
+        clients = []
+
+        # Procesar cada cliente
+        for line in output.split("\n"):
+            if line.strip():
+                # Obtener información del cliente del archivo CCD
+                client_name = line.strip()
+                ccd_file = f"/etc/openvpn/ccd/{client_name}"
+
+                if os.path.exists(ccd_file):
+                    # Leer IP del archivo CCD
+                    with open(ccd_file, 'r') as f:
+                        ccd_content = f.read()
+                        ip_match = re.search(r'ifconfig-push\s+(\d+\.\d+\.\d+\.\d+)', ccd_content)
+                        ip = ip_match.group(1) if ip_match else "Unknown"
+
+                    # Obtener fecha de creación del archivo
+                    created_at = datetime.fromtimestamp(os.path.getctime(ccd_file))
+
+                    clients.append(ClientInfo(
+                        name=client_name,
+                        ip=ip,
+                        created_at=created_at
+                    ))
+
+        return clients
+    else:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error listando clientes: {result['output']}"
+        )
+
 @router.post("/client/create", response_model=ClientResponse, summary="Crear cliente OpenVPN")
 async def create_client(client: ClientRequest):
     """
     Crea un nuevo cliente OpenVPN.
 
     Genera la configuración y certificados para un nuevo cliente con
-    la IP especificada.
+    la IP especificada. Verifica que la IP y el nombre no estén ya en uso
+    y que la IP esté dentro de la red configurada.
 
     Args:
         client: Datos del cliente a crear
@@ -353,6 +407,58 @@ async def create_client(client: ClientRequest):
     Returns:
         ClientResponse: Resultado de la operación de creación
     """
+    # Obtener la configuración del servidor
+    server_conf_path = "/etc/openvpn/server/server.conf"
+    if not os.path.exists(server_conf_path):
+        raise HTTPException(
+            status_code=400,
+            detail="El servidor no está configurado. Configure el servidor primero."
+        )
+
+    # Leer la configuración del servidor para obtener la red VPN
+    with open(server_conf_path, 'r') as f:
+        server_conf = f.read()
+        network_match = re.search(r'server\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+)', server_conf)
+        if not network_match:
+            raise HTTPException(
+                status_code=400,
+                detail="No se pudo determinar la red VPN del servidor"
+            )
+        vpn_network = network_match.group(1)
+        vpn_netmask = network_match.group(2)
+
+    # Convertir la red y la máscara a objetos de red
+    try:
+        import ipaddress
+        network = ipaddress.IPv4Network(f"{vpn_network}/{vpn_netmask}", strict=False)
+        client_ip = ipaddress.IPv4Address(client.ip)
+
+        # Verificar si la IP del cliente está en la red
+        if client_ip not in network:
+            raise HTTPException(
+                status_code=400,
+                detail=f"La IP {client.ip} no está dentro de la red VPN configurada ({network})"
+            )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Error al validar la IP: {str(e)}"
+        )
+
+    # Verificar si el nombre o la IP ya están en uso
+    existing_clients = await list_clients()
+    for existing_client in existing_clients:
+        if existing_client.name == client.name:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Ya existe un cliente con el nombre {client.name}"
+            )
+        if existing_client.ip == client.ip:
+            raise HTTPException(
+                status_code=400,
+                detail=f"La IP {client.ip} ya está asignada al cliente {existing_client.name}"
+            )
+
     # Construir comando con los parámetros
     command = [
         "/app/scripts/client/openvpn-client-new.sh",
@@ -378,28 +484,6 @@ async def create_client(client: ClientRequest):
         raise HTTPException(
             status_code=500,
             detail=f"Error creando el cliente: {result['output']}"
-        )
-
-@router.get("/clients", response_model=List[str], summary="Listar clientes OpenVPN")
-async def list_clients():
-    """
-    Lista todos los clientes OpenVPN configurados.
-
-    Returns:
-        List[str]: Lista de nombres de clientes configurados
-    """
-    # Ejecutar script para listar clientes
-    result = run_command(["/app/scripts/client/openvpn-client-list.sh"])
-
-    if result["success"]:
-        # Obtener lista de clientes desde la salida
-        output = str(result["output"])
-        clients = [line.strip() for line in output.split("\n") if line.strip()]
-        return clients
-    else:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error listando clientes: {result['output']}"
         )
 
 @router.delete("/client/{client_name}", response_model=OperationResponse, summary="Eliminar cliente OpenVPN")
