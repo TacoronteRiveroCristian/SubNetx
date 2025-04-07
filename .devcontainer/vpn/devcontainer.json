@@ -1,10 +1,11 @@
 {
-    "name": "SubnetX Development",
+    "name": "SubNetx VPN Development",
     "dockerComposeFile": "../../docker-compose.yaml",
     "service": "subnetx",
     "workspaceFolder": "/app",
     "mounts": [
-        "source=${localWorkspaceFolder},target=/app,type=bind"
+        "source=${localWorkspaceFolder}/services/vpn,target=/app,type=bind",
+        "source=${localWorkspaceFolder}/pyproject.toml,target=/app/pyproject.toml,type=bind"
     ],
     "remoteUser": "root",
     "overrideCommand": true,
@@ -20,9 +21,7 @@
                 "python.analysis.inlayHints.functionReturnTypes": true,
                 "python.analysis.inlayHints.variableTypes": true,
                 "python.analysis.extraPaths": [
-                    "/app",
-                    "/app/vpn/metrics",
-                    "/app/vpn/openvpn/src"
+                    "/app"
                 ],
                 // Editor settings
                 "editor.formatOnSave": true,
@@ -72,18 +71,16 @@
                 "ms-python.flake8",
                 "ms-python.mypy-type-checker",
                 "ms-python.debugpy",
-                "njpwerner.autodocstring@0.6.0",
-                "github.copilot@1.133.0",
-                "eamodio.gitlens@14.0.1",
-                "ms-azuretools.vscode-docker@2.27.0",
-                "vscode-icons-team.vscode-icons@12.0.1",
-                "oderwat.indent-rainbow@8.0.1",
-                "qwtel.sqlite-viewer@0.1.2"
+                "njpwerner.autodocstring",
+                "eamodio.gitlens",
+                "ms-azuretools.vscode-docker",
+                "vscode-icons-team.vscode-icons",
+                "oderwat.indent-rainbow"
             ]
         }
     },
     "shutdownAction": "none",
-    "postCreateCommand": "bash ./.devcontainer/post-create.sh",
+    "postCreateCommand": "pip install -e /app",
     "features": {
         "ghcr.io/devcontainers/features/git:1": {},
         "ghcr.io/devcontainers/features/github-cli:1": {}

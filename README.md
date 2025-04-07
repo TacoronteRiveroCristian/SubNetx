@@ -1,4 +1,103 @@
-# SubNetx - OpenVPN Container Manager
+# SubNetx - VPN Management System
+
+A modern, scalable VPN management system with microservices architecture.
+
+## Project Structure
+
+The project is organized into three main services:
+
+### 1. VPN Service (`services/vpn/`)
+
+Handles all VPN-related operations:
+- OpenVPN server management
+- Client certificate management
+- Network metrics collection
+- Performance monitoring
+
+### 2. API Service (`services/api/`)
+
+Provides REST API for the system:
+- VPN management endpoints
+- Metrics data access
+- User management
+- Database operations
+
+### 3. UI Service (`services/ui/`)
+
+Frontend application for user interaction:
+- Dashboard for VPN management
+- Metrics visualization
+- User interface
+
+## Getting Started
+
+### Prerequisites
+
+- Docker and Docker Compose
+- Git
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/SubNetx.git
+   cd SubNetx
+   ```
+
+2. Start the services:
+   ```bash
+   docker-compose up -d
+   ```
+
+3. Access the UI:
+   ```
+   http://localhost:3000
+   ```
+
+## Development
+
+### VPN Service
+
+The VPN service is responsible for managing the OpenVPN server and collecting metrics.
+
+```bash
+# Build and run the VPN service
+docker-compose build vpn
+docker-compose up -d vpn
+```
+
+### API Service
+
+The API service provides the REST API for the system.
+
+```bash
+# Build and run the API service
+docker-compose build api
+docker-compose up -d api
+```
+
+### UI Service
+
+The UI service provides the user interface.
+
+```bash
+# Build and run the UI service
+docker-compose build ui
+docker-compose up -d ui
+```
+
+## Architecture
+
+The system uses a microservices architecture with the following components:
+
+- **VPN Service**: Manages OpenVPN server and collects metrics
+- **API Service**: Provides REST API for the system
+- **UI Service**: Provides user interface
+- **PostgreSQL**: Database for storing data
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ```ascii
    _____       _     _   _      _

@@ -1,8 +1,10 @@
+version: '3.8'
+
 services:
   subnetx:
     build:
       context: .
-      dockerfile: ./docker/subnetx.Dockerfile
+      dockerfile: ./services/vpn/Dockerfile
     container_name: subnetx_vpn
     restart: unless-stopped
     cap_add:
@@ -10,20 +12,13 @@ services:
       - SYS_ADMIN
     privileged: true
     volumes:
-      - .:/app
       - ./docker/volumes/certs:/etc/openvpn/certs
       - ./docker/volumes/logs:/var/log/openvpn
-      - ./databases:/app/databases:cached
     ports:
-      - 1194:1194/udp
-      - "8000:8000"
+      - ${OPENVPN_PORT}:${OPENVPN_PORT}/${OPENVPN_PROTO}
     environment:
-      - LOG_LEVEL=INFO
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
     networks:
       - subnetx
     depends_on:
@@ -32,42 +27,37 @@ services:
 
   duckdns:
     image: linuxserver/duckdns
-    container_name: subnetx_vpn_duckdns
+    container_name: subnetx_duckdns
     restart: unless-stopped
     environment:
       - SUBDOMAINS=${PUBLIC_IP}
       - TOKEN=${DUCKDNS_TOKEN}
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
     networks:
       - subnetx
 
-  ui:
-    build:
-      context: .
-      dockerfile: ./docker/ui.Dockerfile
-    container_name: subnetx_ui
-    volumes:
-      - ./ui:/app
-      - ui_node_modules:/app/node_modules
-      - ui_next_cache:/app/.next
-    ports:
-      - "3200:3200"
-    environment:
-      - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=http://subnetx_vpn:8000
-      - WATCHPACK_POLLING=true
-      - CHOKIDAR_USEPOLLING=true
-      - NEXT_TELEMETRY_DISABLED=1
-      - NODE_OPTIONS=--max_old_space_size=4096
-    networks:
-      - subnetx
-    depends_on:
-      - subnetx
-    restart: unless-stopped
+  # ui:
+  #   build:
+  #     context: .
+  #     dockerfile: ./docker/ui.Dockerfile
+  #   container_name: subnetx_ui
+  #   volumes:
+  #     - ./ui:/app
+  #     - ui_node_modules:/app/node_modules
+  #     - ui_next_cache:/app/.next
+  #   ports:
+  #     - "3200:3200"
+  #   environment:
+  #     - NODE_ENV=development
+  #     - NEXT_PUBLIC_API_URL=http://subnetx_vpn:8000
+  #     - WATCHPACK_POLLING=true
+  #     - CHOKIDAR_USEPOLLING=true
+  #     - NEXT_TELEMETRY_DISABLED=1
+  #     - NODE_OPTIONS=--max_old_space_size=4096
+  #   networks:
+  #     - subnetx
+  #   depends_on:
+  #     - subnetx
+  #   restart: unless-stopped
 
   postgres:
     image: postgres:16
@@ -78,7 +68,7 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./docker/volumes/postgres:/var/lib/postgresql/data
     ports:
       - "${POSTGRES_PORT}:5432"
     healthcheck:
@@ -92,11 +82,3 @@ services:
 networks:
   subnetx:
     driver: bridge
-
-volumes:
-  ui_node_modules:
-    name: subnetx_ui_node_modules
-  ui_next_cache:
-    name: subnetx_ui_next_cache
-  postgres_data:
-    name: subnetx_postgres_data
