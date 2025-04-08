@@ -5,8 +5,8 @@
     "workspaceFolder": "/app",
     "mounts": [
         "source=${localWorkspaceFolder}/services/vpn,target=/app,type=bind",
-        "source=${localWorkspaceFolder}/pyproject.toml,target=/app/pyproject.toml,consistency=consistent",
-        "source=${localWorkspaceFolder}/.flake8,target=/app/.flake8,consistency=consistent"
+        "source=${localWorkspaceFolder}/.flake8,target=/app/.flake8,consistency=cached",
+        "source=${localWorkspaceFolder}/pyproject.toml,target=/app/pyproject.toml,consistency=cached"
     ],
     "remoteUser": "root",
     "overrideCommand": true,
@@ -84,8 +84,8 @@
         }
     },
     "shutdownAction": "stopCompose",
-    "postCreateCommand": "chmod +x /app/scripts/sync-config.sh /app/scripts/backup-config.sh /app/scripts/container-init.sh",
-    "postStartCommand": "/app/scripts/container-init.sh",
+    "postCreateCommand": "",
+    "postStartCommand": "",
     "features": {
         "ghcr.io/devcontainers/features/github-cli:1": {}
     }

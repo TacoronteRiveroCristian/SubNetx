@@ -1,4 +1,4 @@
-services/**/.pyproject.toml
+services/**/pyproject.toml
 services/**/.flake8
 *.db
 *.ipynb

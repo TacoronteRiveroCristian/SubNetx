@@ -16,10 +16,11 @@ import argparse
 import json
 import logging
 import sys
+from datetime import datetime
 from typing import Dict, Any
 
-from config import LOG_FORMAT, LOG_LEVEL, DEFAULT_PING_COUNT, DEFAULT_PING_TIMEOUT, CHECK_TLS
-from host_monitor import HostPingMonitor
+from scripts.metrics.new_structure.config import LOG_FORMAT, LOG_LEVEL, DEFAULT_PING_COUNT, DEFAULT_PING_TIMEOUT, CHECK_TLS
+from scripts.metrics.new_structure.host_monitor.ping_monitor import HostPingMonitor
 
 # Configure logging
 logging.basicConfig(
@@ -46,7 +47,43 @@ def collect_host_metrics(
         check_tls: Whether to check TLS certificate information
 
     Returns:
-        Dictionary with collected metrics
+        Dictionary with collected metrics in the following format:
+        {
+            "timestamp": "ISO-8601 timestamp of the measurement",
+            "target": "Target hostname or IP being monitored",
+            "primary_target": {
+                "ip": "IP address of the target",
+                "status": "Connection status ('online', 'offline', or 'timeout')",
+                "timestamp": "ISO-8601 timestamp of the ping test",
+                "connection_quality": "Quality assessment ('excellent', 'good', 'fair', 'poor', or 'none')",
+                "rtt_stats": {
+                    "min_ms": "Minimum round-trip time in milliseconds",
+                    "avg_ms": "Average round-trip time in milliseconds",
+                    "max_ms": "Maximum round-trip time in milliseconds",
+                    "mdev_ms": "Mean deviation of round-trip times in milliseconds"
+                },
+                "icmp_details": [
+                    {
+                        "sequence": "ICMP sequence number",
+                        "response_time_ms": "Response time for this packet in milliseconds"
+                    }
+                ],
+                "packet_loss_percent": "Percentage of lost packets (0-100)",
+                "packets": {
+                    "transmitted": "Number of packets sent",
+                    "received": "Number of packets received"
+                },
+                "raw_output": "Raw output from the ping command",
+                "tls_info": {
+                    "certificate": "SSL/TLS certificate information (if applicable)",
+                    "expiry": "Certificate expiration date",
+                    "issuer": "Certificate issuer details",
+                    "subject": "Certificate subject details",
+                    "version": "SSL/TLS version",
+                    "cipher": "SSL/TLS cipher"
+                }
+            }
+        }
     """
     try:
         logger.info(f"Collecting metrics for target: {target}")
@@ -70,9 +107,21 @@ def collect_host_metrics(
         logger.error(f"Error collecting metrics for {target}: {str(e)}")
         # Return a basic error structure
         return {
+            "timestamp": datetime.now().isoformat(),
             "target": target,
-            "error": str(e),
-            "status": "error"
+            "primary_target": {
+                "ip": target,
+                "status": "error",
+                "error": str(e),
+                "timestamp": datetime.now().isoformat(),
+                "connection_quality": "none",
+                "rtt_stats": {"min_ms": 0, "avg_ms": 0, "max_ms": 0, "mdev_ms": 0},
+                "icmp_details": [],
+                "packet_loss_percent": 100,
+                "packets": {"transmitted": 0, "received": 0},
+                "raw_output": "",
+                "tls_info": None
+            }
         }
 
 
