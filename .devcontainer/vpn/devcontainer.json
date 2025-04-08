@@ -5,7 +5,8 @@
     "workspaceFolder": "/app",
     "mounts": [
         "source=${localWorkspaceFolder}/services/vpn,target=/app,type=bind",
-        "source=${localWorkspaceFolder}/pyproject.toml,target=/app/pyproject.toml,type=bind"
+        "source=${localWorkspaceFolder}/pyproject.toml,target=/app/pyproject.toml,consistency=consistent",
+        "source=${localWorkspaceFolder}/.flake8,target=/app/.flake8,consistency=consistent"
     ],
     "remoteUser": "root",
     "overrideCommand": true,
@@ -14,7 +15,6 @@
             "settings": {
                 "python.defaultInterpreterPath": "/usr/bin/python3",
                 "python.terminal.activateEnvironment": true,
-                // Analysis settings (modern replacements for linting settings)
                 "python.analysis.typeCheckingMode": "basic",
                 "python.analysis.diagnosticMode": "workspace",
                 "python.analysis.autoImportCompletions": true,
@@ -33,7 +33,6 @@
                 ],
                 "[python]": {
                     "editor.formatOnSave": true
-                    // "editor.defaultFormatter": "ms-python.python"
                 },
                 // File exclusions
                 "files.exclude": {
@@ -44,7 +43,7 @@
                 "terminal.integrated.defaultProfile.linux": "bash",
                 "editor.theme": "Solarized Dark",
                 "workbench.colorTheme": "Solarized Dark",
-                "editor.fontFamily": "Fira Code",
+                "editor.fontFamily": "monospace",
                 "editor.fontLigatures": false,
                 "editor.fontWeight": "normal",
                 "editor.fontWeightBold": "bold",
@@ -60,7 +59,7 @@
                 "terminal.integrated.fontWeightBold": "bold",
                 "terminal.integrated.fontWeightLight": "normal",
                 "terminal.integrated.fontWeightMedium": "normal",
-                "terminal.integrated.fontFamily": "Fira Code"
+                "terminal.integrated.fontFamily": "monospace"
             },
             "extensions": [
                 "ms-python.python",
@@ -71,18 +70,23 @@
                 "ms-python.flake8",
                 "ms-python.mypy-type-checker",
                 "ms-python.debugpy",
-                "njpwerner.autodocstring",
-                "eamodio.gitlens",
-                "ms-azuretools.vscode-docker",
-                "vscode-icons-team.vscode-icons",
-                "oderwat.indent-rainbow"
+                "njpwerner.autoDocstring",
+                "oderwat.indent-rainbow",
+                "mikoz.black-py",
+                "miguelsolorio.fluent-icons",
+                "ms-toolsai.jupyter",
+                "ms-toolsai.vscode-jupyter-cell-tags",
+                "ms-toolsai.jupyter-keymap",
+                "ms-toolsai.jupyter-renderers",
+                "ms-toolsai.vscode-jupyter-slideshow",
+                "matangover.mypy"
             ]
         }
     },
-    "shutdownAction": "none",
-    "postCreateCommand": "pip install -e /app",
+    "shutdownAction": "stopCompose",
+    "postCreateCommand": "chmod +x /app/scripts/sync-config.sh /app/scripts/backup-config.sh /app/scripts/container-init.sh",
+    "postStartCommand": "/app/scripts/container-init.sh",
     "features": {
-        "ghcr.io/devcontainers/features/git:1": {},
         "ghcr.io/devcontainers/features/github-cli:1": {}
     }
 }
