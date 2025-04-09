@@ -6,7 +6,9 @@
     "mounts": [
         "source=${localWorkspaceFolder}/services/vpn,target=/app,type=bind",
         "source=${localWorkspaceFolder}/.flake8,target=/app/.flake8,consistency=cached",
-        "source=${localWorkspaceFolder}/pyproject.toml,target=/app/pyproject.toml,consistency=cached"
+        "source=${localWorkspaceFolder}/pyproject.toml,target=/app/pyproject.toml,consistency=cached",
+        // Extensions in remote container
+        // "source=${localEnv:HOME}/.vscode-server/extensions,target=/root/.cursor-server/extensions,type=bind,consistency=cached"
     ],
     "remoteUser": "root",
     "overrideCommand": true,
@@ -41,8 +43,8 @@
                     "**/*.egg-info": true
                 },
                 "terminal.integrated.defaultProfile.linux": "bash",
-                "editor.theme": "Solarized Dark",
-                "workbench.colorTheme": "Solarized Dark",
+                "editor.theme": "One Dark Pro Darker",
+                "workbench.colorTheme": "One Dark Pro Darker",
                 "editor.fontFamily": "monospace",
                 "editor.fontLigatures": false,
                 "editor.fontWeight": "normal",

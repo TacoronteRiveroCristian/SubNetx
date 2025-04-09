@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional, TypedDict
 
 class TlsInfo(TypedDict):
     """TLS information structure."""
+
     certificate: Optional[str]
     expiry: Optional[str]
     issuer: Optional[str]
@@ -48,7 +49,7 @@ class TlsChecker:
             True if target is a hostname, False if it's an IP address
         """
         # Simple check if the target contains only digits and dots
-        ip_pattern = re.compile(r'^(\d{1,3}\.){3}\d{1,3}$')
+        ip_pattern = re.compile(r"^(\d{1,3}\.){3}\d{1,3}$")
         if ip_pattern.match(target):
             return False
         return True
@@ -67,7 +68,9 @@ class TlsChecker:
 
         # If SSL module method failed to get meaningful data, try OpenSSL command
         if tls_info.get("certificate") is None:
-            print(f"SSL module method failed, trying OpenSSL command for {hostname}:{port}")
+            print(
+                f"SSL module method failed, trying OpenSSL command for {hostname}:{port}"
+            )
             tls_info = self._check_tls_with_openssl(hostname, port)
 
         return tls_info
@@ -105,7 +108,9 @@ class TlsChecker:
             "cipher": None,
         }
 
-    def _check_tls_with_ssl_module(self, hostname: str, port: int = 443) -> TlsInfo:
+    def _check_tls_with_ssl_module(
+        self, hostname: str, port: int = 443
+    ) -> TlsInfo:
         """Check TLS using Python's ssl module.
 
         Args:
@@ -176,7 +181,9 @@ class TlsChecker:
                     try:
                         # The cipher tuple contains (cipher_name, tls_version, secret_bits)
                         if len(cipher) >= 3:
-                            cipher_name, cipher_version, cipher_bits = cipher[:3]
+                            cipher_name, cipher_version, cipher_bits = cipher[
+                                :3
+                            ]
                             cipher_str = f"{cipher_name} ({cipher_version}, {cipher_bits} bits)"
                         else:
                             # Convert cipher to string directly to avoid iteration issues
@@ -207,7 +214,9 @@ class TlsChecker:
 
         return self._get_default_tls_info()
 
-    def _check_tls_with_openssl(self, hostname: str, port: int = 443) -> TlsInfo:
+    def _check_tls_with_openssl(
+        self, hostname: str, port: int = 443
+    ) -> TlsInfo:
         """Check TLS using OpenSSL command.
 
         Args:
@@ -220,7 +229,9 @@ class TlsChecker:
         try:
             # Run OpenSSL command to get certificate info
             cmd = f"echo | openssl s_client -connect {hostname}:{port} -servername {hostname} 2>/dev/null | openssl x509 -text"
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            result = subprocess.run(
+                cmd, shell=True, capture_output=True, text=True, check=False
+            )
 
             if result.returncode != 0:
                 print(f"OpenSSL command failed for {hostname}: {result.stderr}")
@@ -238,7 +249,13 @@ class TlsChecker:
 
             # Get cipher and TLS version
             cipher_cmd = f"echo | openssl s_client -connect {hostname}:{port} -servername {hostname} 2>/dev/null | grep 'Protocol\\|Cipher'"
-            cipher_result = subprocess.run(cipher_cmd, shell=True, capture_output=True, text=True)
+            cipher_result = subprocess.run(
+                cipher_cmd,
+                shell=True,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
 
             version = None
             cipher = None
@@ -262,7 +279,9 @@ class TlsChecker:
             print(f"Error checking TLS with OpenSSL for {hostname}: {e}")
             return self._get_default_tls_info()
 
-    def _extract_openssl_field(self, text: str, field_prefix: str) -> Optional[str]:
+    def _extract_openssl_field(
+        self, text: str, field_prefix: str
+    ) -> Optional[str]:
         """Extract a field from OpenSSL output.
 
         Args:
@@ -323,7 +342,7 @@ class TlsChecker:
             "serialNumber": "SN",
         }
 
-        parts = []
+        parts: List[str] = []
 
         # Handle different certificate formats
         if isinstance(dn_data, list):
@@ -337,7 +356,9 @@ class TlsChecker:
 
         return ", ".join(parts) if parts else str(dn_data)
 
-    def _extract_dn_parts(self, item: Any, key_map: Dict[str, str], parts: List[str]) -> None:
+    def _extract_dn_parts(
+        self, item: Any, key_map: Dict[str, str], parts: List[str]
+    ) -> None:
         """Extract parts of a Distinguished Name.
 
         Args:

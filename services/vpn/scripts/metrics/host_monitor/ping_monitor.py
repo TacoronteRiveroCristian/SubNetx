@@ -5,14 +5,18 @@ This module provides functionality to monitor host connectivity
 through ICMP ping tests, measuring latency, packet loss, and response times.
 """
 
-import json
 import logging
 import re
 import subprocess
 from datetime import datetime
 from typing import Any, Dict, List, Optional, TypedDict
 
-from ..config import DEFAULT_PING_COUNT, DEFAULT_PING_TIMEOUT, CHECK_TLS
+from scripts.metrics.config import (
+    CHECK_TLS,
+    DEFAULT_PING_COUNT,
+    DEFAULT_PING_TIMEOUT,
+)
+
 from .tls_checker import TlsChecker, TlsInfo
 
 # Configure module logger
@@ -21,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 class RttStats(TypedDict):
     """Round-trip time statistics."""
+
     min_ms: float
     avg_ms: float
     max_ms: float
@@ -29,18 +34,21 @@ class RttStats(TypedDict):
 
 class Packets(TypedDict):
     """Packet statistics."""
+
     transmitted: int
     received: int
 
 
 class IcmpDetail(TypedDict):
     """Individual ICMP packet detail."""
+
     sequence: int
     response_time_ms: float
 
 
 class PingResult(TypedDict):
     """Ping result structure."""
+
     ip: str
     status: str
     timestamp: str
@@ -71,7 +79,11 @@ class HostPingMonitor:
         self.target = target
         self.tls_checker = TlsChecker(target)
 
-    def ping_target(self, count: int = DEFAULT_PING_COUNT, timeout: int = DEFAULT_PING_TIMEOUT) -> PingResult:
+    def ping_target(
+        self,
+        count: int = DEFAULT_PING_COUNT,
+        timeout: int = DEFAULT_PING_TIMEOUT,
+    ) -> PingResult:
         """Execute a ping test to the target and process the results.
 
         Args:
@@ -127,7 +139,7 @@ class HostPingMonitor:
 
                     # Calculate packet loss percentage
                     if transmitted > 0:
-                        packet_loss = 100 - (received / transmitted * 100)
+                        packet_loss = 100.0 - (received / transmitted * 100.0)
                         result["packet_loss_percent"] = round(packet_loss, 2)
                     else:
                         # Default to 100% loss if no packets transmitted
@@ -177,7 +189,9 @@ class HostPingMonitor:
 
         return result
 
-    def _extract_icmp_details(self, stdout: str, result: PingResult, count: int) -> None:
+    def _extract_icmp_details(
+        self, stdout: str, result: PingResult, count: int
+    ) -> None:
         """Extract individual ICMP packet details from ping output.
 
         Args:
@@ -200,10 +214,12 @@ class HostPingMonitor:
                 if match:
                     sequence = int(match.group(1))
                     response_time = float(match.group(2))
-                    details.append({
-                        "sequence": sequence,
-                        "response_time_ms": response_time
-                    })
+                    details.append(
+                        {
+                            "sequence": sequence,
+                            "response_time_ms": response_time,
+                        }
+                    )
 
         # If we didn't find all expected responses, some packets were lost
         if len(details) < count:
@@ -218,9 +234,17 @@ class HostPingMonitor:
                 self._calculate_rtt_from_icmp_details(result)
 
         # Update the result with extracted details
-        result["icmp_details"] = details
+        result["icmp_details"] = [
+            IcmpDetail(
+                sequence=int(d["sequence"]),
+                response_time_ms=d["response_time_ms"],
+            )
+            for d in details
+        ]
 
-    def _generate_simulated_icmp_details(self, result: PingResult, count: int) -> None:
+    def _generate_simulated_icmp_details(
+        self, result: PingResult, count: int
+    ) -> None:
         """Generate simulated ICMP details for error or timeout cases.
 
         Args:
@@ -230,13 +254,23 @@ class HostPingMonitor:
         details = []
         for i in range(1, count + 1):
             # For timed out or failed pings, use None for response time
-            details.append({
-                "sequence": i,
-                "response_time_ms": 0.0  # Using 0.0 for timed out packets
-            })
-        result["icmp_details"] = details
+            details.append(
+                {
+                    "sequence": i,
+                    "response_time_ms": 0.0,  # Using 0.0 for timed out packets
+                }
+            )
+        result["icmp_details"] = [
+            IcmpDetail(
+                sequence=int(d["sequence"]),
+                response_time_ms=d["response_time_ms"],
+            )
+            for d in details
+        ]
 
-    def _extract_rtt_from_icmp_lines(self, stdout: str, result: PingResult) -> None:
+    def _extract_rtt_from_icmp_lines(
+        self, stdout: str, result: PingResult
+    ) -> None:
         """Extract RTT statistics from individual ICMP response lines.
 
         Args:
@@ -256,14 +290,18 @@ class HostPingMonitor:
         # Calculate RTT statistics if we have response times
         if response_times:
             result["rtt_stats"]["min_ms"] = min(response_times)
-            result["rtt_stats"]["avg_ms"] = sum(response_times) / len(response_times)
+            result["rtt_stats"]["avg_ms"] = sum(response_times) / len(
+                response_times
+            )
             result["rtt_stats"]["max_ms"] = max(response_times)
 
             # Calculate standard deviation for mdev
             mean = result["rtt_stats"]["avg_ms"]
             sum_squared_diff = sum((x - mean) ** 2 for x in response_times)
             if len(response_times) > 1:
-                result["rtt_stats"]["mdev_ms"] = (sum_squared_diff / len(response_times)) ** 0.5
+                result["rtt_stats"]["mdev_ms"] = (
+                    sum_squared_diff / len(response_times)
+                ) ** 0.5
             else:
                 result["rtt_stats"]["mdev_ms"] = 0.0
 
@@ -274,20 +312,27 @@ class HostPingMonitor:
             result: Result dictionary to update
         """
         # Extract response times from details
-        response_times = [detail["response_time_ms"] for detail in result["icmp_details"]
-                         if detail["response_time_ms"] > 0]
+        response_times = [
+            detail["response_time_ms"]
+            for detail in result["icmp_details"]
+            if detail["response_time_ms"] > 0
+        ]
 
         # Calculate statistics if there are valid response times
         if response_times:
             result["rtt_stats"]["min_ms"] = min(response_times)
-            result["rtt_stats"]["avg_ms"] = sum(response_times) / len(response_times)
+            result["rtt_stats"]["avg_ms"] = sum(response_times) / len(
+                response_times
+            )
             result["rtt_stats"]["max_ms"] = max(response_times)
 
             # Calculate standard deviation for mdev
             mean = result["rtt_stats"]["avg_ms"]
             sum_squared_diff = sum((x - mean) ** 2 for x in response_times)
             if len(response_times) > 1:
-                result["rtt_stats"]["mdev_ms"] = (sum_squared_diff / len(response_times)) ** 0.5
+                result["rtt_stats"]["mdev_ms"] = (
+                    sum_squared_diff / len(response_times)
+                ) ** 0.5
             else:
                 result["rtt_stats"]["mdev_ms"] = 0.0
 
@@ -308,5 +353,5 @@ class HostPingMonitor:
         return {
             "timestamp": datetime.now().isoformat(),
             "target": self.target,
-            "primary_target": result
+            "primary_target": result,
         }

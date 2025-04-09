@@ -16,12 +16,18 @@ import argparse
 import json
 import logging
 import sys
-from typing import Dict, Any
+from datetime import datetime
+from typing import Any, Dict, Optional
 
-from config import LOG_FORMAT, LOG_LEVEL, DEFAULT_PING_COUNT, DEFAULT_PING_TIMEOUT, CHECK_TLS
-from host_monitor import HostPingMonitor
+from scripts.metrics.config import (
+    CHECK_TLS,
+    DEFAULT_PING_COUNT,
+    DEFAULT_PING_TIMEOUT,
+    LOG_FORMAT,
+    LOG_LEVEL,
+)
+from scripts.metrics.host_monitor.ping_monitor import HostPingMonitor
 
-# Configure logging
 logging.basicConfig(
     level=LOG_LEVEL,
     format=LOG_FORMAT,
@@ -34,7 +40,7 @@ def collect_host_metrics(
     target: str,
     count: int = DEFAULT_PING_COUNT,
     timeout: int = DEFAULT_PING_TIMEOUT,
-    check_tls: bool = CHECK_TLS
+    check_tls_override: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """
     Collect metrics from the specified target host.
@@ -43,42 +49,101 @@ def collect_host_metrics(
         target: Target hostname or IP address
         count: Number of ping packets to send
         timeout: Ping timeout in seconds
-        check_tls: Whether to check TLS certificate information
+        check_tls_override: Override the default TLS check behavior.
+                          If None, uses config default.
 
     Returns:
-        Dictionary with collected metrics
+        Dictionary with collected metrics in the following format:
+        {
+            "timestamp": "ISO-8601 timestamp of the measurement",
+            "target": "Target hostname or IP being monitored",
+            "primary_target": {
+                "ip": "IP address of the target",
+                "status": "Conn status ('online', 'offline', or 'timeout')",
+                "timestamp": "ISO-8601 timestamp of the ping test",
+                "connection_quality": ("Quality ('excellent', 'good', 'fair', "
+                                       "'poor', or 'none')"),
+                "rtt_stats": {
+                    "min_ms": "Min round-trip time (ms)",
+                    "avg_ms": "Avg round-trip time (ms)",
+                    "max_ms": "Max round-trip time (ms)",
+                    "mdev_ms": "Mean dev of round-trip times (ms)"
+                },
+                "icmp_details": [
+                    {
+                        "sequence": "ICMP sequence number",
+                        "response_time_ms": "Response time (ms)"
+                    }
+                ],
+                "packet_loss_percent": "Percentage of lost packets (0-100)",
+                "packets": {
+                    "transmitted": "Number of packets sent",
+                    "received": "Number of packets received"
+                },
+                "raw_output": "Raw output from the ping command",
+                "tls_info": {
+                    "certificate": "TLS certificate info (if applicable)",
+                    "expiry": "Certificate expiration date",
+                    "issuer": "Certificate issuer details",
+                    "subject": "Certificate subject details",
+                    "version": "SSL/TLS version",
+                    "cipher": "SSL/TLS cipher"
+                }
+            }
+        }
     """
     try:
         logger.info(f"Collecting metrics for target: {target}")
 
-        # Override global TLS check setting if needed
-        global CHECK_TLS
-        original_check_tls = CHECK_TLS
-        CHECK_TLS = check_tls
+        from scripts.metrics import config
 
-        # Create monitor and collect metrics
+        use_tls_check = (
+            check_tls_override if check_tls_override is not None else CHECK_TLS
+        )
+
+        original_check_tls = config.CHECK_TLS
+        config.CHECK_TLS = use_tls_check
+        logger.debug(f"TLS check for {target}: {config.CHECK_TLS}")
+
         monitor = HostPingMonitor(target)
-        result = monitor.collect()
+        result: Dict[str, Any] = monitor.collect()
 
-        # Restore original TLS check setting
-        CHECK_TLS = original_check_tls
+        config.CHECK_TLS = original_check_tls
 
         logger.info(f"Successfully collected metrics for {target}")
         return result
 
     except Exception as e:
         logger.error(f"Error collecting metrics for {target}: {str(e)}")
-        # Return a basic error structure
         return {
+            "timestamp": datetime.now().isoformat(),
             "target": target,
-            "error": str(e),
-            "status": "error"
+            "primary_target": {
+                "ip": target,
+                "status": "error",
+                "error": str(e),
+                "timestamp": datetime.now().isoformat(),
+                "connection_quality": "none",
+                "rtt_stats": {
+                    "min_ms": 0,
+                    "avg_ms": 0,
+                    "max_ms": 0,
+                    "mdev_ms": 0,
+                },
+                "icmp_details": [],
+                "packet_loss_percent": 100,
+                "packets": {"transmitted": 0, "received": 0},
+                "raw_output": "",
+                "tls_info": None,
+            },
         }
 
 
 def main() -> None:
     """Parse command line arguments and run metrics collection."""
-    parser = argparse.ArgumentParser(description="Collect metrics from a target host")
+    parser = argparse.ArgumentParser(
+        description="Collect metrics from a target host"
+    )
     parser.add_argument(
         "--target",
         required=True,
@@ -106,34 +171,32 @@ def main() -> None:
         help="Save results to the specified file (JSON format)",
     )
     parser.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
         help="Enable verbose logging",
     )
 
     args = parser.parse_args()
 
-    # Set verbose logging if requested
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
         logger.debug("Verbose logging enabled")
 
-    # Collect metrics
-    check_tls = not args.no_tls
+    tls_override_value: Optional[bool] = False if args.no_tls else None
+
     results = collect_host_metrics(
         target=args.target,
         count=args.count,
         timeout=args.timeout,
-        check_tls=check_tls
+        check_tls_override=tls_override_value,
     )
 
-    # Format results as JSON with indentation
     json_results = json.dumps(results, indent=2, default=str)
 
-    # Output results to file if specified, otherwise to stdout
     if args.output_file:
         try:
-            with open(args.output_file, 'w') as f:
+            with open(args.output_file, "w", encoding="utf-8") as f:
                 f.write(json_results)
             logger.info(f"Results saved to {args.output_file}")
         except Exception as e:
