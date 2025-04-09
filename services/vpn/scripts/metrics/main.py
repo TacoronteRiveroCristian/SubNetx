@@ -19,13 +19,7 @@ import sys
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from scripts.metrics.config import (
-    CHECK_TLS,
-    DEFAULT_PING_COUNT,
-    DEFAULT_PING_TIMEOUT,
-    LOG_FORMAT,
-    LOG_LEVEL,
-)
+from scripts.metrics.config import CHECK_TLS, LOG_FORMAT, LOG_LEVEL
 from scripts.metrics.host_monitor.ping_monitor import HostPingMonitor
 
 logging.basicConfig(
@@ -38,8 +32,6 @@ logger = logging.getLogger(__name__)
 
 def collect_host_metrics(
     target: str,
-    count: int = DEFAULT_PING_COUNT,
-    timeout: int = DEFAULT_PING_TIMEOUT,
     check_tls_override: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """
@@ -47,8 +39,6 @@ def collect_host_metrics(
 
     Args:
         target: Target hostname or IP address
-        count: Number of ping packets to send
-        timeout: Ping timeout in seconds
         check_tls_override: Override the default TLS check behavior.
                           If None, uses config default.
 
@@ -62,7 +52,7 @@ def collect_host_metrics(
                 "status": "Conn status ('online', 'offline', or 'timeout')",
                 "timestamp": "ISO-8601 timestamp of the ping test",
                 "connection_quality": ("Quality ('excellent', 'good', 'fair', "
-                                       "'poor', or 'none')"),
+                "'poor', or 'none')"),
                 "rtt_stats": {
                     "min_ms": "Min round-trip time (ms)",
                     "avg_ms": "Avg round-trip time (ms)",
@@ -150,18 +140,6 @@ def main() -> None:
         help="Target hostname or IP address to monitor",
     )
     parser.add_argument(
-        "--count",
-        type=int,
-        default=DEFAULT_PING_COUNT,
-        help=f"Number of ping packets to send (default: {DEFAULT_PING_COUNT})",
-    )
-    parser.add_argument(
-        "--timeout",
-        type=int,
-        default=DEFAULT_PING_TIMEOUT,
-        help=f"Ping timeout in seconds (default: {DEFAULT_PING_TIMEOUT})",
-    )
-    parser.add_argument(
         "--no-tls",
         action="store_true",
         help="Disable TLS certificate checking for HTTPS targets",
@@ -187,8 +165,6 @@ def main() -> None:
 
     results = collect_host_metrics(
         target=args.target,
-        count=args.count,
-        timeout=args.timeout,
         check_tls_override=tls_override_value,
     )
 

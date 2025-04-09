@@ -132,7 +132,7 @@ chown root:root "$LOGS_DIR/openvpn.log" "$LOGS_DIR/status.log" # Establece propi
 # Generar server.conf
 # ---------------------------
 SERVER_CONF="${SERVER_CONF_DIR}/server.conf" # Ruta al archivo de configuracion del servidor
-SERVER_TEMPLATE="/app/config/server.conf.template" # Ruta al template
+SERVER_TEMPLATE="/app/config/openvpn/server.conf.template" # Ruta al template
 
 # Verificar que el template existe
 if [ ! -f "$SERVER_TEMPLATE" ]; then # Verifica si existe el archivo template
