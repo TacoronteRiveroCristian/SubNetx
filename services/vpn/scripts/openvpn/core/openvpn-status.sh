@@ -1,27 +1,27 @@
 #!/bin/bash
-# openvpn-status.sh - Script para verificar el estado del servidor OpenVPN
-# Descripción: Verifica si el servidor OpenVPN está en ejecución, su tiempo de actividad
-# y cuántos clientes están conectados actualmente.
-# Autor: SubNetx Team
-# Versión: 1.0.0
+# openvpn-status.sh - Script to check the status of the OpenVPN server
+# Description: Checks if the OpenVPN server is running, its uptime
+# and how many clients are currently connected.
+# Author: SubNetx Team
+# Version: 1.0.0
 
-# Verificar si existe el archivo PID
+# Check if PID file exists
 if [ -f "${OPENVPN_PID_FILE}" ]; then
-    # Leer el PID del archivo
+    # Read PID from file
     PID=$(cat "${OPENVPN_PID_FILE}")
 
-    # Verificar si el proceso está en ejecución
+    # Check if process is running
     if ps -p "${PID}" > /dev/null; then
-        # OpenVPN está en ejecución
-        # Obtener tiempo de actividad en segundos
+        # OpenVPN is running
+        # Get uptime in seconds
         START_TIME=$(ps -o lstart= -p "${PID}")
         START_SECONDS=$(date -d "${START_TIME}" +%s)
         CURRENT_SECONDS=$(date +%s)
         UPTIME=$((CURRENT_SECONDS - START_SECONDS))
 
-        # Contar clientes conectados usando el archivo de estado
+        # Count connected clients using status file
         if [ -f "${LOGS_DIR}/status.log" ]; then
-            # Contar líneas que contienen "ROUTING TABLE" (indica clientes conectados)
+            # Count lines containing "ROUTING TABLE" (indicates connected clients)
             CLIENTS=$(grep -c "ROUTING TABLE" "${LOGS_DIR}/status.log")
         else
             CLIENTS=0
@@ -33,29 +33,29 @@ if [ -f "${OPENVPN_PID_FILE}" ]; then
         echo "Server is running with PID ${PID}"
         exit 0
     else
-        # El PID existe pero el proceso no está en ejecución
+        # PID exists but process is not running
         echo "status: stopped"
-        echo "El archivo PID existe pero el proceso no está en ejecución"
-        # Limpiar el archivo PID obsoleto
+        echo "PID file exists but the process is not running"
+        # Clean up obsolete PID file
         rm -f "${OPENVPN_PID_FILE}"
         exit 0
     fi
 else
-    # No existe archivo PID
-    # Comprobar si de todos modos hay un proceso OpenVPN en ejecución
+    # PID file does not exist
+    # Check if there is still an OpenVPN process running
     if pgrep -f "openvpn --config" > /dev/null; then
-        # Hay un proceso pero sin archivo PID
+        # There is a process but no PID file
         PID=$(pgrep -f "openvpn --config")
         echo "status: running"
         echo "Server is running with PID ${PID} (no PID file)"
 
-        # Crear el archivo PID
+        # Create PID file
         echo "${PID}" > "${OPENVPN_PID_FILE}"
         exit 0
     else
-        # No hay proceso ni archivo PID
+        # No process and no PID file
         echo "status: stopped"
-        echo "OpenVPN no está en ejecución"
+        echo "OpenVPN is not running"
         exit 0
     fi
 fi

@@ -37,9 +37,12 @@ services:
       - ./docker/volumes/logs:/var/log/openvpn
     ports:
       - ${OPENVPN_PORT}:${OPENVPN_PORT}/${OPENVPN_PROTO}
+      - ${VPN_API_PORT}:${VPN_API_PORT}
     environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
+      - VPN_API_HOST=${VPN_API_HOST}
+      - VPN_API_PORT=${VPN_API_PORT}
     networks:
       - subnetx
     depends_on:

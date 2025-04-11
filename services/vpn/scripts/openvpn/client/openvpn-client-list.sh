@@ -1,40 +1,40 @@
 #!/bin/bash
-# openvpn-client-list.sh - Script para listar clientes OpenVPN
-# Descripción: Lista todos los clientes OpenVPN configurados en el sistema
-# examinando los archivos de configuración y certificados.
-# Autor: SubNetx Team
-# Versión: 1.0.0
+# openvpn-client-list.sh - Script to list OpenVPN clients
+# Description: Lists all OpenVPN clients configured in the system
+# by examining configuration files and certificates.
+# Author: SubNetx Team
+# Version: 1.0.0
 
-# Verificar que las variables de entorno estén definidas
+# Verify that environment variables are defined
 if [ -z "${CLIENTS_DIR}" ] || [ -z "${EASYRSA_DIR}" ]; then
-    echo "Error: Variables de entorno CLIENTS_DIR o EASYRSA_DIR no definidas."
+    echo "ERROR: Environment variables CLIENTS_DIR or EASYRSA_DIR not defined."
     exit 1
 fi
 
-# Método 1: Listar clientes a partir de archivos .ovpn
+# Method 1: List clients from .ovpn files
 if [ -d "${CLIENTS_DIR}" ]; then
     OVPN_CLIENTS=$(find "${CLIENTS_DIR}" -name "*.ovpn" 2>/dev/null | sed 's/.*\///' | sed 's/\.ovpn$//')
 fi
 
-# Método 2: Listar clientes a partir de archivos en CCD (Cliente Config Directory)
+# Method 2: List clients from CCD (Client Config Directory) files
 if [ -d "${CCD_DIR}" ]; then
     CCD_CLIENTS=$(find "${CCD_DIR}" -type f 2>/dev/null | sed 's/.*\///')
 fi
 
-# Método 3: Listar clientes a partir de certificados emitidos
+# Method 3: List clients from issued certificates
 if [ -d "${EASYRSA_DIR}/pki/issued" ]; then
     CERT_CLIENTS=$(find "${EASYRSA_DIR}/pki/issued" -name "*.crt" 2>/dev/null | grep -v "server.crt" | sed 's/.*\///' | sed 's/\.crt$//')
 fi
 
-# Combinar todas las fuentes y eliminar duplicados
+# Combine all sources and remove duplicates
 ALL_CLIENTS=$(echo -e "${OVPN_CLIENTS}\n${CCD_CLIENTS}\n${CERT_CLIENTS}" | sort | uniq | grep -v "^$")
 
-# Si no hay clientes, mostrar mensaje informativo
+# If there are no clients, display informative message
 if [ -z "${ALL_CLIENTS}" ]; then
-    echo "No hay clientes OpenVPN configurados."
+    echo "No OpenVPN clients configured."
     exit 0
 fi
 
-# Mostrar la lista de clientes
+# Display the client list
 echo "${ALL_CLIENTS}"
 exit 0

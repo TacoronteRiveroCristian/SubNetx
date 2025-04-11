@@ -1,17 +1,17 @@
 #!/bin/bash
-# Descripcion: Inicia OpenVPN en segundo plano, guarda su PID y verifica la conexion.
-# Usa las variables de entorno definidas en el Dockerfile para mantener coherencia.
+# Description: Starts OpenVPN in the background, saves its PID and verifies the connection.
+# Uses environment variables defined in the Dockerfile for consistency.
 
-# Función para leer el archivo de configuración JSON
+# Function to read JSON configuration file
 read_config() {
     local config_file="$OPENVPN_DIR/vpn_config.json"
 
     if [ ! -f "$config_file" ]; then
-        echo "⚠️ No se encontró el archivo de configuración JSON. Usando variables de entorno..."
+        echo "Warning: JSON configuration file not found. Using environment variables..."
         return 1
     fi
 
-    # Leer variables del JSON
+    # Read variables from JSON
     export VPN_NETWORK=$(jq -r '.vpn_network' "$config_file")
     export VPN_NETMASK=$(jq -r '.vpn_netmask' "$config_file")
     export OPENVPN_PORT=$(jq -r '.openvpn_port' "$config_file")
@@ -19,83 +19,83 @@ read_config() {
     export TUN_DEVICE=$(jq -r '.tun_device' "$config_file")
     export PUBLIC_IP=$(jq -r '.public_ip' "$config_file")
 
-    echo "✅ Configuración leída del archivo JSON"
+    echo "Configuration read from JSON file"
 }
 
-# Leer configuración del JSON
+# Read configuration from JSON
 read_config
 
-echo "🛠️ Iniciando OpenVPN en segundo plano..."
+echo "Starting OpenVPN in the background..."
 
-# Asegurar que el directorio de logs existe y tiene los permisos correctos
-echo "📁 Verificando directorio de logs..."
-mkdir -p "$LOGS_DIR" # Crea directorio de logs si no existe
-touch "$LOGS_DIR/openvpn.log" "$LOGS_DIR/status.log" # Crea archivos de log si no existen
-chmod 644 "$LOGS_DIR/openvpn.log" "$LOGS_DIR/status.log" # Establece permisos de lectura para todos
-chown root:root "$LOGS_DIR/openvpn.log" "$LOGS_DIR/status.log" # Establece propietario root
+# Ensure logs directory exists and has correct permissions
+echo "Verifying logs directory..."
+mkdir -p "$LOGS_DIR" # Create logs directory if it doesn't exist
+touch "$LOGS_DIR/openvpn.log" "$LOGS_DIR/status.log" # Create log files if they don't exist
+chmod 644 "$LOGS_DIR/openvpn.log" "$LOGS_DIR/status.log" # Set read permissions for everyone
+chown root:root "$LOGS_DIR/openvpn.log" "$LOGS_DIR/status.log" # Set root ownership
 
-# Verificar que los certificados existen en el directorio correcto
-for cert in ca.crt server.crt server.key dh.pem ta.key; do # Itera por cada certificado necesario
-    if [ ! -f "$CERTS_DIR/$cert" ]; then # Si no existe el certificado
-        echo "❌ Error: No se encontro el archivo $cert en $CERTS_DIR"
-        echo "Por favor, ejecute primero el script de configuracion: openvpn-setup.sh"
-        exit 1 # Termina con error
+# Verify that certificates exist in the correct directory
+for cert in ca.crt server.crt server.key dh.pem ta.key; do # Iterate through each required certificate
+    if [ ! -f "$CERTS_DIR/$cert" ]; then # If certificate doesn't exist
+        echo "Error: File $cert not found in $CERTS_DIR"
+        echo "Please run the configuration script first: openvpn-setup.sh"
+        exit 1 # Exit with error
     fi
 done
 
-# Verificar si server.conf existe
-if [ ! -f "${SERVER_CONF_DIR}/server.conf" ]; then # Si no existe el archivo de configuracion
-    echo "❌ Error: No se encontro el archivo de configuracion del servidor"
-    echo "Por favor, ejecute primero el script de configuracion: openvpn-setup.sh"
-    exit 1 # Termina con error
+# Check if server.conf exists
+if [ ! -f "${SERVER_CONF_DIR}/server.conf" ]; then # If configuration file doesn't exist
+    echo "Error: Server configuration file not found"
+    echo "Please run the configuration script first: openvpn-setup.sh"
+    exit 1 # Exit with error
 fi
 
-# Iniciar OpenVPN en segundo plano con `--daemon`
-openvpn --config "${SERVER_CONF_DIR}/server.conf" --daemon # Inicia OpenVPN en segundo plano
+# Start OpenVPN in the background with `--daemon`
+openvpn --config "${SERVER_CONF_DIR}/server.conf" --daemon # Start OpenVPN in the background
 
-# Esperar 2 segundos para que OpenVPN cree el proceso
-sleep 2 # Pausa para dar tiempo a que OpenVPN inicie
+# Wait 2 seconds for OpenVPN to create the process
+sleep 2 # Pause to give OpenVPN time to start
 
-# Obtener el PID del proceso OpenVPN
-PID=$(pgrep -f "openvpn --config ${SERVER_CONF_DIR}/server.conf") # Obtiene el ID del proceso
+# Get OpenVPN process PID
+PID=$(pgrep -f "openvpn --config ${SERVER_CONF_DIR}/server.conf") # Get process ID
 
-if [ -z "$PID" ]; then # Si no se encontro el PID
-    echo "❌ Error: OpenVPN no se esta ejecutando."
-    echo "Revise los logs en ${LOGS_DIR}/openvpn.log para mas informacion."
-    exit 1 # Termina con error
+if [ -z "$PID" ]; then # If PID not found
+    echo "Error: OpenVPN is not running."
+    echo "Check the logs in ${LOGS_DIR}/openvpn.log for more information."
+    exit 1 # Exit with error
 fi
 
-# Guardar el PID
-echo "$PID" > "${OPENVPN_PID_FILE}" # Guarda el PID en un archivo
+# Save the PID
+echo "$PID" > "${OPENVPN_PID_FILE}" # Save PID to a file
 
-echo "✅ OpenVPN iniciado correctamente en segundo plano (PID: $PID)."
+echo "OpenVPN started successfully in the background (PID: $PID)."
 
-# Esperar unos segundos para asegurar que OpenVPN establezca la red
-sleep 3 # Pausa para dar tiempo a que se establezca la interfaz de red
+# Wait a few seconds to ensure OpenVPN establishes the network
+sleep 3 # Pause to give time for the network interface to be established
 
-# Verificar si la interfaz TUN esta activa
-if ip a show "${TUN_DEVICE}" > /dev/null 2>&1; then # Si existe la interfaz TUN
-    echo "🔍 Estado de la interfaz TUN:"
-    ip a show "${TUN_DEVICE}" # Muestra informacion de la interfaz
+# Check if TUN interface is active
+if ip a show "${TUN_DEVICE}" > /dev/null 2>&1; then # If TUN interface exists
+    echo "TUN interface status:"
+    ip a show "${TUN_DEVICE}" # Show interface information
 
-    # Extraer los primeros tres octetos y agregar ".1"
-    VPN_GATEWAY="${VPN_NETWORK%.*}.1" # Calcula la direccion IP de la puerta de enlace
+    # Extract the first three octets and add ".1"
+    VPN_GATEWAY="${VPN_NETWORK%.*}.1" # Calculate gateway IP address
 
-    # Ejecutar un ping a la IP de la VPN para verificar conectividad
-    echo "📡 Probando conexion con la VPN en ${VPN_GATEWAY}..."
-    if ping -c 1 "${VPN_GATEWAY}" > /dev/null 2>&1; then # Envia un ping a la puerta de enlace
-        echo "🚀 OpenVPN esta activo y funcionando correctamente."
+    # Ping VPN IP to verify connectivity
+    echo "Testing VPN connection to ${VPN_GATEWAY}..."
+    if ping -c 1 "${VPN_GATEWAY}" > /dev/null 2>&1; then # Send ping to gateway
+        echo "OpenVPN is active and working correctly."
     else
-        echo "⚠️ OpenVPN esta corriendo, pero la conexion a ${VPN_GATEWAY} fallo."
+        echo "Warning: OpenVPN is running, but connection to ${VPN_GATEWAY} failed."
     fi
 
 else
-    echo "❌ Error: La interfaz ${TUN_DEVICE} no se creo."
-    echo "Revise los logs en ${LOGS_DIR}/openvpn.log para mas informacion."
-    exit 1 # Termina con error
+    echo "Error: Interface ${TUN_DEVICE} was not created."
+    echo "Check the logs in ${LOGS_DIR}/openvpn.log for more information."
+    exit 1 # Exit with error
 fi
 
-# Corregir permisos de logs despues de iniciar el servicio
-echo "🔒 Ajustando permisos de archivos de log..."
-sleep 2 # Espera para asegurar que OpenVPN haya creado/actualizado los logs
-chmod 644 "$LOGS_DIR/openvpn.log" "$LOGS_DIR/status.log" # Establece permisos de lectura para todos
+# Fix log permissions after starting the service
+echo "Adjusting log file permissions..."
+sleep 2 # Wait to ensure OpenVPN has created/updated logs
+chmod 644 "$LOGS_DIR/openvpn.log" "$LOGS_DIR/status.log" # Set read permissions for everyone

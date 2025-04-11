@@ -1,65 +1,65 @@
 #!/bin/bash
-# Descripcion: Elimina un cliente OpenVPN, revocando su certificado y eliminando todos sus archivos.
-# Usa las variables de entorno definidas en el Dockerfile para mantener coherencia.
+# Description: Removes an OpenVPN client by revoking its certificate and deleting all its files.
+# Uses environment variables defined in the Dockerfile to maintain consistency.
 
-# Validar que se ha proporcionado un nombre de cliente
-if [ -z "$1" ]; then # Si no se proporciona el nombre del cliente
-    echo "❌ Error: Debes especificar el nombre del cliente a eliminar."
-    echo "Uso: $0 <nombre_cliente>"
-    exit 1 # Termina con error
+# Validate that a client name has been provided
+if [ -z "$1" ]; then # If no client name is provided
+    echo "ERROR: You must specify the name of the client to delete."
+    echo "Usage: $0 <client_name>"
+    exit 1 # Exit with error
 fi
 
-CLIENT_NAME="$1" # Nombre del cliente a eliminar
+CLIENT_NAME="$1" # Name of the client to delete
 
-echo "🔒 Revocando certificado y eliminando cliente: $CLIENT_NAME"
+echo "INFO: Revoking certificate and deleting client: $CLIENT_NAME"
 
-# Verificar si el cliente existe
-if [ ! -f "$EASYRSA_DIR/pki/issued/$CLIENT_NAME.crt" ]; then # Si no existe el certificado
-    echo "❌ Error: El cliente $CLIENT_NAME no existe o su certificado no fue encontrado."
-    exit 1 # Termina con error
+# Verify if the client exists
+if [ ! -f "$EASYRSA_DIR/pki/issued/$CLIENT_NAME.crt" ]; then # If certificate does not exist
+    echo "ERROR: Client $CLIENT_NAME does not exist or its certificate was not found."
+    exit 1 # Exit with error
 fi
 
-# Revocar el certificado del cliente
-cd "$EASYRSA_DIR" || { # Cambia al directorio Easy-RSA
-    echo "❌ Error: No se pudo acceder al directorio $EASYRSA_DIR"
-    exit 1 # Termina con error
+# Change to the EasyRSA directory
+cd "$EASYRSA_DIR" || {
+    echo "ERROR: Could not change to directory $EASYRSA_DIR"
+    exit 1
 }
 
-echo "🔐 Revocando certificado..."
-if ! ./easyrsa --batch revoke "$CLIENT_NAME"; then # Revoca el certificado
-    echo "⚠️ Advertencia: Error al revocar el certificado. Continuando con la eliminacion de archivos."
-fi
-
-# Generar una nueva CRL (Certificate Revocation List)
-echo "🔄 Actualizando lista de certificados revocados (CRL)..."
-if ! ./easyrsa gen-crl; then # Genera la CRL
-    echo "⚠️ Advertencia: Error al generar la CRL. Continuando con la eliminacion de archivos."
+# Revoke client certificate
+echo "INFO: Revoking client certificate..."
+if ./easyrsa --batch revoke "$CLIENT_NAME"; then
+    echo "INFO: Certificate for client $CLIENT_NAME revoked successfully."
 else
-    # Copiar la CRL al directorio de certificados
-    cp -f "$EASYRSA_DIR/pki/crl.pem" "$CERTS_DIR/" # Copia la CRL al directorio de certificados
-    echo "✅ CRL actualizada correctamente."
+    echo "WARNING: Error revoking certificate for client $CLIENT_NAME."
 fi
 
-# Eliminar archivos del cliente
-echo "🗑️ Eliminando archivos del cliente..."
+# Generate new CRL
+echo "INFO: Generating updated Certificate Revocation List (CRL)..."
+if ./easyrsa gen-crl; then
+    echo "INFO: CRL generated successfully."
 
-# Eliminar configuracion especifica del cliente (CCD)
-if [ -f "$CCD_DIR/$CLIENT_NAME" ]; then # Si existe el archivo CCD
-    rm -f "$CCD_DIR/$CLIENT_NAME" # Elimina el archivo CCD
-    echo "✅ Configuracion CCD eliminada."
+    # Copy CRL to OpenVPN directory
+    cp -f "$EASYRSA_DIR/pki/crl.pem" "$OPENVPN_DIR" || {
+        echo "WARNING: Could not copy CRL to $OPENVPN_DIR"
+    }
+else
+    echo "WARNING: Error generating CRL."
 fi
 
-# Eliminar archivo .ovpn
-if [ -f "$CLIENTS_DIR/$CLIENT_NAME.ovpn" ]; then # Si existe el archivo de configuracion
-    rm -f "$CLIENTS_DIR/$CLIENT_NAME.ovpn" # Elimina el archivo de configuracion
-    echo "✅ Archivo de configuracion .ovpn eliminado."
+# Remove client config file from CCD if it exists
+if [ -f "$CCD_DIR/$CLIENT_NAME" ]; then
+    echo "INFO: Removing client-specific config from CCD..."
+    rm -f "$CCD_DIR/$CLIENT_NAME"
+    echo "INFO: Client-specific config removed."
 fi
 
-# Eliminar directorio del cliente en el directorio centralizado
-if [ -d "$CERTS_DIR/clients/$CLIENT_NAME" ]; then # Si existe el directorio del cliente
-    rm -rf "$CERTS_DIR/clients/$CLIENT_NAME" # Elimina el directorio del cliente
-    echo "✅ Directorio de certificados del cliente eliminado de: $CERTS_DIR/clients/$CLIENT_NAME"
+# Remove client .ovpn file if it exists
+CLIENT_OVPN_DIR="$CLIENTS_DIR/$CLIENT_NAME"
+if [ -d "$CLIENT_OVPN_DIR" ]; then
+    echo "INFO: Removing client configuration directory..."
+    rm -rf "$CLIENT_OVPN_DIR"
+    echo "INFO: Client configuration directory removed."
 fi
 
-echo "✅ Cliente $CLIENT_NAME eliminado correctamente."
-echo "📝 Nota: Si el servidor OpenVPN estaba en ejecucion, debera reiniciarlo para aplicar los cambios de revocacion."
+echo "SUCCESS: Client $CLIENT_NAME has been deleted successfully."
+exit 0

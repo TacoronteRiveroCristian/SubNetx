@@ -1,27 +1,33 @@
 #!/bin/bash
-# Descripción: Script para detener OpenVPN y eliminar todos los certificados y clientes.
-# Este script permite reiniciar completamente la configuración de OpenVPN,
-# eliminando todos los certificados, claves y configuraciones de clientes.
-# Autor: SubNetx Team
-# Versión: 1.0.0
+# Description: Script to stop OpenVPN and remove all certificates and clients.
+# This script allows for completely resetting the OpenVPN configuration,
+# removing all certificates, keys, and client configurations.
+# Author: SubNetx Team
+# Version: 1.0.0
 
-# Función para manejar errores
+# Function to handle errors
 handle_error() {
-    echo "❌ Error: $1" # Muestra mensaje de error
-    echo "❌ El proceso de reset no se completó correctamente." # Indica fallo en el reset
-    exit 1 # Termina con código de error
+    echo "ERROR: $1"
+    echo "Process failed: The cleanup process did not complete successfully."
+    exit 1
 }
 
-echo "🔄 Iniciando proceso de reset de OpenVPN..."
+echo "INFO: Starting complete OpenVPN cleanup process..."
 
-# Detener el servidor OpenVPN si está en ejecución
-echo "🛑 Deteniendo OpenVPN..."
-if ! /app/scripts/openvpn/core/openvpn-stop.sh; then # Llama al script de detención
-    handle_error "No se pudo detener el servidor OpenVPN"
+# Check if OpenVPN is running before attempting to stop it
+vpn_status=$(/app/scripts/openvpn/core/openvpn-status.sh)
+if [[ "$vpn_status" == *"status: running"* ]]; then
+    # Only attempt to stop if running
+    echo "INFO: Stopping OpenVPN service..."
+    if ! /app/scripts/openvpn/core/openvpn-stop.sh; then
+        handle_error "Failed to stop OpenVPN server"
+    fi
+    echo "INFO: OpenVPN service stopped successfully."
+else
+    echo "INFO: OpenVPN is not running, continuing with cleanup..."
 fi
-echo "✅ OpenVPN detenido correctamente."
 
-# Verificar variables de entorno requeridas
+# Verify required environment variables
 required_vars=(
     "OPENVPN_DIR"
     "CERTS_DIR"
@@ -31,92 +37,93 @@ required_vars=(
     "SERVER_CONF_DIR"
 )
 
-missing_vars=() # Inicializa array para variables faltantes
+missing_vars=() # Initialize array for missing variables
 
 for var in "${required_vars[@]}"; do
-    if [ -z "${!var}" ]; then # Verifica si la variable está vacía
-        missing_vars+=("$var") # Añade variable faltante al array
+    if [ -z "${!var}" ]; then # Check if variable is empty
+        missing_vars+=("$var") # Add missing variable to array
     fi
 done
 
-if [ ${#missing_vars[@]} -ne 0 ]; then # Si hay variables faltantes
-    echo "❌ Faltan las siguientes variables de entorno:"
-    printf '%s\n' "${missing_vars[@]}" # Imprime cada variable faltante
-    exit 1 # Termina con error
+if [ ${#missing_vars[@]} -ne 0 ]; then # If there are missing variables
+    echo "ERROR: The following environment variables are missing:"
+    printf '%s\n' "${missing_vars[@]}" # Print each missing variable
+    exit 1 # Exit with error
 fi
 
-# Eliminar todos los certificados y claves de clientes
-echo "🗑️ Eliminando certificados y claves de clientes..."
+# Remove all client certificates and keys
+echo "INFO: Removing client certificates and keys..."
 
-# Obtener lista de clientes
-CLIENT_LIST=$(/app/scripts/client/openvpn-client-list.sh)
+# Get client list
+CLIENT_LIST=$(/app/scripts/openvpn/client/openvpn-client-list.sh)
 
-# Si hay clientes, eliminarlos uno por uno
-if [ -n "$CLIENT_LIST" ]; then
+# Check if there are any clients to remove
+if [ -n "$CLIENT_LIST" ] && [ "$CLIENT_LIST" != "No OpenVPN clients configured." ]; then
+    echo "   INFO: Found clients to remove."
     while IFS= read -r client; do
-        echo "   🔥 Eliminando cliente: $client"
-        if ! /app/scripts/client/openvpn-client-delete.sh "$client"; then
-            echo "   ⚠️ Advertencia: Error al eliminar cliente $client, continuando con el proceso..."
+        echo "   INFO: Removing client: $client"
+        if ! /app/scripts/openvpn/client/openvpn-client-delete.sh "$client"; then
+            echo "   WARNING: Error removing client $client, continuing process..."
         fi
     done <<< "$CLIENT_LIST"
-    echo "   ✅ Todos los clientes han sido eliminados."
+    echo "   INFO: All clients have been removed."
 else
-    echo "   ℹ️ No se encontraron clientes para eliminar."
+    echo "   INFO: No clients found to remove."
 fi
 
-# Eliminar directorio de clientes
-echo "🗑️ Eliminando directorio de clientes..."
+# Remove clients directory
+echo "INFO: Removing clients directory..."
 if [ -d "$CLIENTS_DIR" ]; then
     rm -rf "$CLIENTS_DIR"/*
-    echo "   ✅ Directorio de clientes limpiado: $CLIENTS_DIR"
+    echo "   INFO: Clients directory cleaned: $CLIENTS_DIR"
 fi
 
-# Eliminar directorio CCD (Client Config Directory)
-echo "🗑️ Eliminando directorio de configuración de clientes (CCD)..."
+# Remove CCD (Client Config Directory)
+echo "INFO: Removing client configuration directory (CCD)..."
 if [ -d "$CCD_DIR" ]; then
     rm -rf "$CCD_DIR"/*
-    echo "   ✅ Directorio CCD limpiado: $CCD_DIR"
+    echo "   INFO: CCD directory cleaned: $CCD_DIR"
 fi
 
-# Eliminar certificados y claves del servidor
-echo "🗑️ Eliminando certificados y claves del servidor..."
+# Remove server certificates and keys
+echo "INFO: Removing server certificates and keys..."
 if [ -d "$CERTS_DIR" ]; then
-    # Preservar el directorio pero eliminar contenido
+    # Preserve directory but remove content
     rm -rf "$CERTS_DIR"/* 2>/dev/null
-    echo "   ✅ Certificados y claves del servidor eliminados: $CERTS_DIR"
+    echo "   INFO: Server certificates and keys removed: $CERTS_DIR"
 fi
 
-# Eliminar la PKI (Public Key Infrastructure)
-echo "🗑️ Eliminando estructura PKI..."
+# Remove PKI (Public Key Infrastructure)
+echo "INFO: Removing PKI structure..."
 if [ -d "$EASYRSA_DIR/pki" ]; then
     rm -rf "$EASYRSA_DIR/pki"
-    echo "   ✅ Estructura PKI eliminada: $EASYRSA_DIR/pki"
+    echo "   INFO: PKI structure removed: $EASYRSA_DIR/pki"
 fi
 
-# Crear directorio para certificados si no existe
+# Create certificate directory if it doesn't exist
 mkdir -p "$CERTS_DIR"
 mkdir -p "$CERTS_DIR/clients"
 mkdir -p "$CLIENTS_DIR"
 mkdir -p "$CCD_DIR"
 
-# Ajustar permisos
+# Adjust permissions
 chmod 755 "$CERTS_DIR" "$CERTS_DIR/clients" "$CLIENTS_DIR" "$CCD_DIR"
 
-echo "🧹 Limpiando configuración del servidor..."
-# Eliminar archivo de configuración del servidor
+echo "INFO: Cleaning server configuration..."
+# Remove server configuration file
 if [ -f "$SERVER_CONF_DIR/server.conf" ]; then
     rm -f "$SERVER_CONF_DIR/server.conf"
-    echo "   ✅ Configuración del servidor eliminada: $SERVER_CONF_DIR/server.conf"
+    echo "   INFO: Server configuration removed: $SERVER_CONF_DIR/server.conf"
 fi
 
-# Eliminar archivo de configuración JSON
+# Remove JSON configuration file
 if [ -f "$OPENVPN_DIR/vpn_config.json" ]; then
     rm -f "$OPENVPN_DIR/vpn_config.json"
-    echo "   ✅ Archivo de configuración JSON eliminado: $OPENVPN_DIR/vpn_config.json"
+    echo "   INFO: JSON configuration file removed: $OPENVPN_DIR/vpn_config.json"
 fi
 
-echo "✅ Reset de OpenVPN completado con éxito."
-echo "📝 Ahora puede ejecutar openvpn-setup.sh para configurar OpenVPN nuevamente."
-echo "🔒 Todos los certificados, claves y configuraciones de clientes han sido eliminados."
+echo "SUCCESS: OpenVPN cleanup completed successfully."
+echo "INFO: You can now run openvpn-setup.sh to reconfigure OpenVPN."
+echo "INFO: All certificates, keys, and client configurations have been removed."
 
 exit 0

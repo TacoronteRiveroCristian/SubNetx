@@ -3,7 +3,7 @@ FROM python:3.12-slim
 
 # Install PostgreSQL client and dependency packages
 RUN apt-get update && apt-get install -y \
-iputils-ping \
+    iputils-ping \
     procps \
     net-tools \
     lsof \

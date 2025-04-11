@@ -1,29 +1,29 @@
 #!/bin/bash
-# Descripcion: Configura OpenVPN, genera certificados, habilita el reenvio de paquetes y configura NAT.
-# Las rutas estan definidas como variables de entorno en el Dockerfile para mayor coherencia.
+# Description: Configures OpenVPN, generates certificates, enables packet forwarding and configures NAT.
+# The paths are defined as environment variables in the Dockerfile for greater consistency.
 
-# Funcion para manejar errores
+# Function to handle errors
 handle_error() {
-    echo "❌ Error: $1" # Muestra mensaje de error
-    echo "❌ La configuracion no se completo correctamente." # Indica fallo en la configuracion
-    exit 1 # Termina con codigo de error
+    echo "Error: $1" # Shows error message
+    echo "Error: The configuration was not completed correctly." # Indicates configuration failure
+    exit 1 # Terminates with error code
 }
 
-# Función para mostrar ayuda
+# Function to show help
 show_help() {
-    echo "Uso: $0 [opciones]"
-    echo "Opciones:"
-    echo "  --red <ip>        Red VPN (ej: 10.10.10.0)"
-    echo "  --mask <mask>     Máscara de red (ej: 255.255.255.0)"
-    echo "  --port <port>     Puerto OpenVPN (ej: 1194)"
-    echo "  --proto <proto>   Protocolo (udp/tcp)"
-    echo "  --tun <device>    Dispositivo TUN (ej: tun0)"
-    echo "  --ip <ip>         IP pública o dominio"
-    echo "  --help           Mostrar esta ayuda"
+    echo "Usage: $0 [options]"
+    echo "Options:"
+    echo "  --red <ip>        VPN Network (e.g.: 10.10.10.0)"
+    echo "  --mask <mask>     Network mask (e.g.: 255.255.255.0)"
+    echo "  --port <port>     OpenVPN Port (e.g.: 1194)"
+    echo "  --proto <proto>   Protocol (udp/tcp)"
+    echo "  --tun <device>    TUN Device (e.g.: tun0)"
+    echo "  --ip <ip>         Public IP or domain"
+    echo "  --help           Show this help"
     exit 0
 }
 
-# Parsear argumentos de línea de comandos
+# Parse command line arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
         --red)
@@ -54,14 +54,14 @@ while [[ $# -gt 0 ]]; do
             show_help
             ;;
         *)
-            echo "❌ Opción desconocida: $1"
+            echo "Error: Unknown option: $1"
             show_help
             ;;
     esac
 done
 
 # ---------------------------
-# Validar variables de entorno requeridas
+# Validate required environment variables
 # ---------------------------
 required_vars=(
     "VPN_NETWORK"
@@ -77,27 +77,27 @@ required_vars=(
     "LOGS_DIR"
 )
 
-missing_vars=() # Inicializa array para variables faltantes
+missing_vars=() # Initialize array for missing variables
 
 for var in "${required_vars[@]}"; do
-    if [ -z "${!var}" ]; then # Verifica si la variable esta vacia
-        missing_vars+=("$var") # Anade variable faltante al array
+    if [ -z "${!var}" ]; then # Check if the variable is empty
+        missing_vars+=("$var") # Add missing variable to the array
     fi
 done
 
-if [ ${#missing_vars[@]} -ne 0 ]; then # Si hay variables faltantes
-    echo "❌ Faltan las siguientes variables de entorno:"
-    printf '%s\n' "${missing_vars[@]}" # Imprime cada variable faltante
-    echo "Por favor, consulte la ayuda con --help para mas informacion."
-    /app/scripts/utils/openvpn-help.sh # Muestra ayuda
-    exit 1 # Termina con error
+if [ ${#missing_vars[@]} -ne 0 ]; then # If there are missing variables
+    echo "Error: The following environment variables are missing:"
+    printf '%s\n' "${missing_vars[@]}" # Print each missing variable
+    echo "Please check the help with --help for more information."
+    /app/scripts/utils/openvpn-help.sh # Show help
+    exit 1 # Exit with error
 fi
 
-# Crear directorio OpenVPN si no existe
+# Create OpenVPN directory if it doesn't exist
 mkdir -p "$OPENVPN_DIR"
 
-# Crear archivo de configuración JSON
-echo "📄 Creando archivo de configuración..."
+# Create JSON configuration file
+echo "Creating configuration file..."
 cat > "$OPENVPN_DIR/vpn_config.json" << EOF
 {
     "vpn_network": "$VPN_NETWORK",
@@ -109,145 +109,145 @@ cat > "$OPENVPN_DIR/vpn_config.json" << EOF
 }
 EOF
 
-# Verificar que el archivo se creó correctamente
+# Verify that the file was created correctly
 if [ ! -f "$OPENVPN_DIR/vpn_config.json" ]; then
-    handle_error "No se pudo crear el archivo de configuración JSON"
+    handle_error "Could not create JSON configuration file"
 fi
 
-# Establecer permisos de lectura para todos
+# Set read permissions for everyone
 chmod 644 "$OPENVPN_DIR/vpn_config.json"
-echo "✅ Archivo de configuración creado en $OPENVPN_DIR/vpn_config.json"
+echo "Configuration file created in $OPENVPN_DIR/vpn_config.json"
 
 # ---------------------------
-# Preparar directorio de logs
+# Prepare logs directory
 # ---------------------------
-# Asegurar que el directorio de logs existe y tiene los permisos correctos
-echo "📁 Preparando directorio de logs..."
-mkdir -p "$LOGS_DIR" # Crea directorio de logs si no existe
-touch "$LOGS_DIR/openvpn.log" "$LOGS_DIR/status.log" # Crea archivos de log si no existen
-chmod 644 "$LOGS_DIR/openvpn.log" "$LOGS_DIR/status.log" # Establece permisos de lectura para todos
-chown root:root "$LOGS_DIR/openvpn.log" "$LOGS_DIR/status.log" # Establece propietario root
+# Ensure logs directory exists and has correct permissions
+echo "Preparing logs directory..."
+mkdir -p "$LOGS_DIR" # Create logs directory if it doesn't exist
+touch "$LOGS_DIR/openvpn.log" "$LOGS_DIR/status.log" # Create log files if they don't exist
+chmod 644 "$LOGS_DIR/openvpn.log" "$LOGS_DIR/status.log" # Set read permissions for everyone
+chown root:root "$LOGS_DIR/openvpn.log" "$LOGS_DIR/status.log" # Set root ownership
 
 # ---------------------------
-# Generar server.conf
+# Generate server.conf
 # ---------------------------
-SERVER_CONF="${SERVER_CONF_DIR}/server.conf" # Ruta al archivo de configuracion del servidor
-SERVER_TEMPLATE="/app/config/openvpn/server.conf.template" # Ruta al template
+SERVER_CONF="${SERVER_CONF_DIR}/server.conf" # Path to server configuration file
+SERVER_TEMPLATE="/app/config/openvpn/server.conf.template" # Path to template
 
-# Verificar que el template existe
-if [ ! -f "$SERVER_TEMPLATE" ]; then # Verifica si existe el archivo template
-    handle_error "No se encontro el template de server.conf: $SERVER_TEMPLATE"
+# Verify that the template exists
+if [ ! -f "$SERVER_TEMPLATE" ]; then # Check if the template file exists
+    handle_error "Server.conf template not found: $SERVER_TEMPLATE"
 fi
 
-# Crear directorio para la configuracion del servidor si no existe
-mkdir -p "$SERVER_CONF_DIR" # Crea el directorio para la configuracion
+# Create directory for server configuration if it doesn't exist
+mkdir -p "$SERVER_CONF_DIR" # Create directory for configuration
 
-# Utilizar sed para reemplazar los placeholders con las variables de entorno
+# Use sed to replace placeholders with environment variables
 if ! sed -e "s/{{PORT}}/${OPENVPN_PORT}/g" \
     -e "s/{{PROTO}}/${OPENVPN_PROTO}/g" \
     -e "s/{{TUN}}/${TUN_DEVICE}/g" \
     -e "s/{{NETWORK}}/${VPN_NETWORK}/g" \
     -e "s/{{NETMASK}}/${VPN_NETMASK}/g" \
     -e "s|{{LOGS_DIR}}|${LOGS_DIR}|g" \
-    "$SERVER_TEMPLATE" > "$SERVER_CONF"; then # Reemplaza variables en el template
-    handle_error "Error al generar el archivo server.conf"
+    "$SERVER_TEMPLATE" > "$SERVER_CONF"; then # Replace variables in the template
+    handle_error "Error generating server.conf file"
 fi
 
-echo "✅ Archivo server.conf generado en $SERVER_CONF"
+echo "Server.conf file generated in $SERVER_CONF"
 
 # ---------------------------
-# Inicializar Easy-RSA si es necesario
+# Initialize Easy-RSA if necessary
 # ---------------------------
-if [ ! -d "$EASYRSA_DIR" ]; then # Verifica si existe el directorio Easy-RSA
-    echo "📂 Creando e inicializando directorio Easy-RSA..."
-    if ! make-cadir "$EASYRSA_DIR"; then # Inicializa Easy-RSA
-        handle_error "No se pudo inicializar Easy-RSA"
+if [ ! -d "$EASYRSA_DIR" ]; then # Check if Easy-RSA directory exists
+    echo "Creating and initializing Easy-RSA directory..."
+    if ! make-cadir "$EASYRSA_DIR"; then # Initialize Easy-RSA
+        handle_error "Could not initialize Easy-RSA"
     fi
-    if ! chmod -R 755 "$EASYRSA_DIR"; then # Establece permisos
-        handle_error "No se pudieron establecer los permisos en el directorio Easy-RSA"
+    if ! chmod -R 755 "$EASYRSA_DIR"; then # Set permissions
+        handle_error "Could not set permissions on Easy-RSA directory"
     fi
 else
-    echo "✅ Directorio Easy-RSA ya existe."
+    echo "Easy-RSA directory already exists."
 fi
 
-# Copiar vars si esta disponible
+# Copy vars if available
 EASYRSA_VARS_TEMPLATE="/app/config/vars"
-if [ -f "$EASYRSA_VARS_TEMPLATE" ]; then # Si existe el archivo vars template
-    cp "$EASYRSA_VARS_TEMPLATE" "$EASYRSA_DIR/vars" # Copia el archivo vars
-    echo "✅ Archivo vars copiado a $EASYRSA_DIR/vars"
+if [ -f "$EASYRSA_VARS_TEMPLATE" ]; then # If vars template file exists
+    cp "$EASYRSA_VARS_TEMPLATE" "$EASYRSA_DIR/vars" # Copy vars file
+    echo "Vars file copied to $EASYRSA_DIR/vars"
 fi
 
 # ---------------------------
-# Generar certificados y claves
+# Generate certificates and keys
 # ---------------------------
-echo "🛠️ Configurando OpenVPN..."
+echo "Configuring OpenVPN..."
 
-# Moverse al directorio Easy-RSA
-cd "$EASYRSA_DIR" || { # Cambia al directorio Easy-RSA
-    handle_error "No se pudo acceder al directorio Easy-RSA: $EASYRSA_DIR"
+# Move to Easy-RSA directory
+cd "$EASYRSA_DIR" || { # Change to Easy-RSA directory
+    handle_error "Could not access Easy-RSA directory: $EASYRSA_DIR"
 }
 
-# Inicializar la PKI si no existe
-if [ ! -d "$EASYRSA_DIR/pki" ]; then # Verifica si existe la PKI
-    echo "🔑 Inicializando PKI..."
-    if ! ./easyrsa --batch init-pki; then # Inicializa PKI
-        handle_error "Error al inicializar PKI"
+# Initialize PKI if it doesn't exist
+if [ ! -d "$EASYRSA_DIR/pki" ]; then # Check if PKI exists
+    echo "Initializing PKI..."
+    if ! ./easyrsa --batch init-pki; then # Initialize PKI
+        handle_error "Error initializing PKI"
     fi
 fi
 
-# Crear la CA si no existe
-if [ ! -f "$CERTS_DIR/ca.crt" ]; then # Verifica si existe el certificado CA
-    echo "🔏 Generando Autoridad de Certificacion (CA)..."
-    if ! ./easyrsa --batch build-ca nopass; then # Genera CA sin contrasena
-        handle_error "Error al generar la CA"
+# Create CA if it doesn't exist
+if [ ! -f "$CERTS_DIR/ca.crt" ]; then # Check if CA certificate exists
+    echo "Generating Certificate Authority (CA)..."
+    if ! ./easyrsa --batch build-ca nopass; then # Generate CA without password
+        handle_error "Error generating CA"
     fi
-    if ! cp pki/ca.crt "$CERTS_DIR/"; then # Copia el certificado CA al directorio de certificados
-        handle_error "Error al copiar el certificado CA"
-    fi
-fi
-
-# Crear clave y certificado del servidor si no existen
-if [ ! -f "$CERTS_DIR/server.crt" ]; then # Verifica si existe el certificado del servidor
-    echo "🔐 Generando clave y certificado del servidor..."
-    if ! ./easyrsa --batch gen-req server nopass; then # Genera solicitud de certificado sin contrasena
-        handle_error "Error al generar la clave del servidor"
-    fi
-    if ! echo "yes" | ./easyrsa --batch sign-req server server; then # Firma la solicitud de certificado
-        handle_error "Error al firmar el certificado del servidor"
-    fi
-    if ! cp pki/private/server.key "$CERTS_DIR/"; then # Copia la clave privada al directorio de certificados
-        handle_error "Error al copiar la clave del servidor"
-    fi
-    if ! cp pki/issued/server.crt "$CERTS_DIR/"; then # Copia el certificado al directorio de certificados
-        handle_error "Error al copiar el certificado del servidor"
+    if ! cp pki/ca.crt "$CERTS_DIR/"; then # Copy CA certificate to certificates directory
+        handle_error "Error copying CA certificate"
     fi
 fi
 
-# Generar Diffie-Hellman si no existe
-if [ ! -f "$CERTS_DIR/dh.pem" ]; then # Verifica si existen los parametros Diffie-Hellman
-    echo "🔀 Generando Diffie-Hellman..."
-    if ! ./easyrsa gen-dh; then # Genera parametros Diffie-Hellman
-        handle_error "Error al generar los parametros Diffie-Hellman"
+# Create server key and certificate if they don't exist
+if [ ! -f "$CERTS_DIR/server.crt" ]; then # Check if server certificate exists
+    echo "Generating server key and certificate..."
+    if ! ./easyrsa --batch gen-req server nopass; then # Generate certificate request without password
+        handle_error "Error generating server key"
     fi
-    if ! cp pki/dh.pem "$CERTS_DIR/"; then # Copia los parametros al directorio de certificados
-        handle_error "Error al copiar los parametros Diffie-Hellman"
+    if ! echo "yes" | ./easyrsa --batch sign-req server server; then # Sign certificate request
+        handle_error "Error signing server certificate"
     fi
-fi
-
-# Generar clave TLS si no existe
-if [ ! -f "$CERTS_DIR/ta.key" ]; then # Verifica si existe la clave TLS
-    echo "🔑 Generando clave TLS..."
-    if ! openvpn --genkey secret "$CERTS_DIR/ta.key"; then # Genera clave TLS
-        handle_error "Error al generar la clave TLS"
+    if ! cp pki/private/server.key "$CERTS_DIR/"; then # Copy private key to certificates directory
+        handle_error "Error copying server key"
+    fi
+    if ! cp pki/issued/server.crt "$CERTS_DIR/"; then # Copy certificate to certificates directory
+        handle_error "Error copying server certificate"
     fi
 fi
 
-# Establecer permisos correctos para los certificados
-chmod 600 "$CERTS_DIR/server.key" # Establece permiso restrictivo para la clave del servidor
-chmod 644 "$CERTS_DIR/ca.crt" "$CERTS_DIR/server.crt" "$CERTS_DIR/dh.pem" # Establece permisos de lectura para certificados
-chmod 600 "$CERTS_DIR/ta.key" # Establece permiso restrictivo para la clave TLS
+# Generate Diffie-Hellman if it doesn't exist
+if [ ! -f "$CERTS_DIR/dh.pem" ]; then # Check if Diffie-Hellman parameters exist
+    echo "Generating Diffie-Hellman..."
+    if ! ./easyrsa gen-dh; then # Generate Diffie-Hellman parameters
+        handle_error "Error generating Diffie-Hellman parameters"
+    fi
+    if ! cp pki/dh.pem "$CERTS_DIR/"; then # Copy parameters to certificates directory
+        handle_error "Error copying Diffie-Hellman parameters"
+    fi
+fi
 
-# Crear archivo README en el directorio de certificados
+# Generate TLS key if it doesn't exist
+if [ ! -f "$CERTS_DIR/ta.key" ]; then # Check if TLS key exists
+    echo "Generating TLS key..."
+    if ! openvpn --genkey secret "$CERTS_DIR/ta.key"; then # Generate TLS key
+        handle_error "Error generating TLS key"
+    fi
+fi
+
+# Set correct permissions for certificates
+chmod 600 "$CERTS_DIR/server.key" # Set restrictive permission for server key
+chmod 644 "$CERTS_DIR/ca.crt" "$CERTS_DIR/server.crt" "$CERTS_DIR/dh.pem" # Set read permissions for certificates
+chmod 600 "$CERTS_DIR/ta.key" # Set restrictive permission for TLS key
+
+# Create README file in certificates directory
 cat > "$CERTS_DIR/README.txt" << EOF
 # OpenVPN Certificates Directory
 
@@ -266,33 +266,32 @@ Contenido:
 Fecha de creacion: $(date)
 EOF
 
-# Aplicar los cambios en sysctl sin necesidad de reiniciar
-echo "📡 Configurando reenvio de paquetes..."
-if ! sysctl -w net.ipv4.ip_forward=1; then # Habilita el reenvio de paquetes
-    handle_error "Error al habilitar el reenvio de paquetes"
+# Apply sysctl changes without needing to restart
+echo "Configuring packet forwarding..."
+if ! sysctl -w net.ipv4.ip_forward=1; then # Enable packet forwarding
+    handle_error "Error enabling packet forwarding"
 fi
-if ! sysctl -p; then # Aplica configuracion de sysctl
-    handle_error "Error al aplicar la configuracion de sysctl"
-fi
-
-echo "📡 Configurando iptables para enrutar trafico de la VPN..."
-# Modificar tablas de enrutamiento
-if ! iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE; then # Configura NAT para eth0
-    handle_error "Error al configurar iptables para eth0"
-fi
-if ! iptables -t nat -A POSTROUTING -o lo -j MASQUERADE; then # Configura NAT para loopback
-    handle_error "Error al configurar iptables para lo"
+if ! sysctl -p; then # Apply sysctl configuration
+    handle_error "Error applying sysctl configuration"
 fi
 
-# Verificar reglas de iptables
-echo "📜 Reglas de iptables aplicadas:"
-if ! iptables -t nat -L -n -v; then # Muestra reglas de NAT aplicadas
-    handle_error "Error al verificar las reglas de iptables"
+echo "Configuring iptables to route VPN traffic..."
+# Modify routing tables
+if ! iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE; then # Configure NAT for eth0
+    handle_error "Error configuring iptables for eth0"
+fi
+if ! iptables -t nat -A POSTROUTING -o lo -j MASQUERADE; then # Configure NAT for loopback
+    handle_error "Error configuring iptables for lo"
 fi
 
-echo "✅ Configuracion de OpenVPN completada correctamente."
-echo "🔒 Todos los certificados y claves se han almacenado en $CERTS_DIR"
-echo "📝 Para montar este directorio como volumen Docker, anada la siguiente linea a su docker-compose.yml:"
+# Verify iptables rules
+echo "Applied iptables rules:"
+if ! iptables -t nat -L -n -v; then # Show applied NAT rules
+    handle_error "Error verifying iptables rules"
+fi
+
+echo "OpenVPN configuration completed successfully."
+echo "All certificates and keys stored in $CERTS_DIR"
+echo "To mount this directory as a Docker volume, add the following line to your docker-compose.yml:"
 echo "   volumes:"
 echo "     - ./certs:/etc/openvpn/certs"
-echo "     - ./logs:/var/log/openvpn"

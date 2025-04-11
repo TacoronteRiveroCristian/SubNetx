@@ -1,98 +1,98 @@
 #!/bin/bash
-# Descripcion: Detiene el servicio de OpenVPN y limpia las reglas de iptables.
-# Usa las variables de entorno definidas en el Dockerfile para mantener coherencia.
+# Description: Stops the OpenVPN service and cleans up iptables rules.
+# Uses environment variables defined in the Dockerfile for consistency.
 
-# Funcion para manejar errores
+# Function to handle errors
 handle_error() {
-    echo "❌ Error: $1" # Muestra mensaje de error
-    echo "❌ No se pudo detener OpenVPN correctamente." # Indica fallo en la detencion
-    exit 1 # Termina con codigo de error
+    echo "Error: $1" # Shows error message
+    echo "Error: Could not stop OpenVPN correctly." # Indicates stop failure
+    exit 1 # Exits with error code
 }
 
-echo "🛑 Deteniendo OpenVPN..."
+echo "Stopping OpenVPN..."
 
-# Antes de detener el servicio, guardar una copia de los logs con timestamp
-# para mantener un historial de sesiones anteriores
-if [ -f "${LOGS_DIR}/openvpn.log" ]; then # Si existe el archivo de log
-    TIMESTAMP=$(date +"%Y%m%d_%H%M%S") # Genera timestamp
-    echo "📄 Guardando copia de logs con timestamp: $TIMESTAMP"
-    cp "${LOGS_DIR}/openvpn.log" "${LOGS_DIR}/openvpn_${TIMESTAMP}.log" # Copia con timestamp
-    cp "${LOGS_DIR}/status.log" "${LOGS_DIR}/status_${TIMESTAMP}.log" 2>/dev/null # Copia con timestamp
-    # Ajustar permisos de las copias
+# Before stopping the service, save a copy of logs with timestamp
+# to maintain a history of previous sessions
+if [ -f "${LOGS_DIR}/openvpn.log" ]; then # If log file exists
+    TIMESTAMP=$(date +"%Y%m%d_%H%M%S") # Generate timestamp
+    echo "Saving log copy with timestamp: $TIMESTAMP"
+    cp "${LOGS_DIR}/openvpn.log" "${LOGS_DIR}/openvpn_${TIMESTAMP}.log" # Copy with timestamp
+    cp "${LOGS_DIR}/status.log" "${LOGS_DIR}/status_${TIMESTAMP}.log" 2>/dev/null # Copy with timestamp
+    # Adjust copy permissions
     chmod 644 "${LOGS_DIR}/openvpn_${TIMESTAMP}.log" "${LOGS_DIR}/status_${TIMESTAMP}.log" 2>/dev/null
 fi
 
-# Verificar si el archivo PID existe
-if [ -f "${OPENVPN_PID_FILE}" ]; then # Usa la variable de entorno definida en el Dockerfile
-    # Leer el PID del archivo
-    PID=$(cat "${OPENVPN_PID_FILE}") # Obtiene el PID del archivo
+# Check if PID file exists
+if [ -f "${OPENVPN_PID_FILE}" ]; then # Use environment variable defined in the Dockerfile
+    # Read PID from file
+    PID=$(cat "${OPENVPN_PID_FILE}") # Get PID from file
 
-    # Verificar si el proceso existe
-    if kill -0 "$PID" 2>/dev/null; then # Comprueba si el proceso esta en ejecucion
-        echo "📝 Deteniendo proceso OpenVPN (PID: $PID)..."
-        if ! kill "$PID"; then # Intenta detener el proceso
-            handle_error "No se pudo detener el proceso con kill normal"
+    # Check if process exists
+    if kill -0 "$PID" 2>/dev/null; then # Check if process is running
+        echo "Stopping OpenVPN process (PID: $PID)..."
+        if ! kill "$PID"; then # Try to stop the process
+            handle_error "Could not stop the process with normal kill"
         fi
 
-        # Esperar a que el proceso termine
-        for i in {1..10}; do # Espera hasta 10 segundos
-            if ! kill -0 "$PID" 2>/dev/null; then # Verifica si el proceso ya termino
-                echo "✅ Proceso OpenVPN detenido correctamente."
-                break # Sale del bucle si el proceso termino
+        # Wait for process to terminate
+        for i in {1..10}; do # Wait up to 10 seconds
+            if ! kill -0 "$PID" 2>/dev/null; then # Check if process has terminated
+                echo "OpenVPN process stopped successfully."
+                break # Exit loop if process has terminated
             fi
-            sleep 1 # Espera 1 segundo antes de verificar de nuevo
+            sleep 1 # Wait 1 second before checking again
         done
 
-        # Si el proceso sigue activo, usar kill -9
-        if kill -0 "$PID" 2>/dev/null; then # Si el proceso aun sigue en ejecucion
-            echo "⚠️ Forzando detencion del proceso..."
-            if ! kill -9 "$PID"; then # Fuerza la terminacion del proceso
-                handle_error "No se pudo detener el proceso con kill -9"
+        # If process is still active, use kill -9
+        if kill -0 "$PID" 2>/dev/null; then # If process is still running
+            echo "Warning: Forcing process termination..."
+            if ! kill -9 "$PID"; then # Force process termination
+                handle_error "Could not stop the process with kill -9"
             fi
-            echo "✅ Proceso OpenVPN forzado a detenerse."
+            echo "OpenVPN process forced to stop."
         fi
     else
-        echo "⚠️ El proceso OpenVPN ya no esta en ejecucion."
+        echo "Warning: OpenVPN process is no longer running."
     fi
 else
-    echo "⚠️ No se encontro el archivo PID de OpenVPN."
+    echo "Warning: OpenVPN PID file not found."
 fi
 
-# Detener cualquier proceso OpenVPN que pueda estar corriendo
-echo "🔍 Verificando procesos OpenVPN restantes..."
-if pgrep -f "openvpn.*server.conf" > /dev/null; then # Busca procesos OpenVPN en ejecucion
-    echo "📝 Deteniendo procesos OpenVPN restantes..."
-    if ! pkill -f "openvpn.*server.conf"; then # Termina todos los procesos OpenVPN
-        handle_error "No se pudo detener los procesos OpenVPN restantes"
+# Stop any OpenVPN process that might be running
+echo "Checking remaining OpenVPN processes..."
+if pgrep -f "openvpn.*server.conf" > /dev/null; then # Look for running OpenVPN processes
+    echo "Stopping remaining OpenVPN processes..."
+    if ! pkill -f "openvpn.*server.conf"; then # Terminate all OpenVPN processes
+        handle_error "Could not stop remaining OpenVPN processes"
     fi
-    echo "✅ Procesos OpenVPN restantes detenidos."
+    echo "Remaining OpenVPN processes stopped."
 fi
 
-# Verificar si la interfaz TUN esta activa
-if ip link show "${TUN_DEVICE}" >/dev/null 2>&1; then # Verifica si la interfaz TUN existe
-    echo "🔌 Desactivando interfaz ${TUN_DEVICE}..."
-    if ! ip link set "${TUN_DEVICE}" down; then # Desactiva la interfaz TUN
-        handle_error "No se pudo desactivar la interfaz ${TUN_DEVICE}"
+# Check if TUN interface is active
+if ip link show "${TUN_DEVICE}" >/dev/null 2>&1; then # Check if TUN interface exists
+    echo "Deactivating interface ${TUN_DEVICE}..."
+    if ! ip link set "${TUN_DEVICE}" down; then # Deactivate TUN interface
+        handle_error "Could not deactivate interface ${TUN_DEVICE}"
     fi
-    echo "✅ Interfaz ${TUN_DEVICE} desactivada."
+    echo "Interface ${TUN_DEVICE} deactivated."
 fi
 
-# Limpiar reglas de iptables
-echo "🧹 Limpiando reglas de iptables..."
-if ! iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE 2>/dev/null; then # Elimina regla NAT para eth0
-    echo "ℹ️ No se encontro regla MASQUERADE para eth0"
+# Clean iptables rules
+echo "Cleaning iptables rules..."
+if ! iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE 2>/dev/null; then # Remove NAT rule for eth0
+    echo "Info: MASQUERADE rule for eth0 not found"
 fi
-if ! iptables -t nat -D POSTROUTING -o lo -j MASQUERADE 2>/dev/null; then # Elimina regla NAT para loopback
-    echo "ℹ️ No se encontro regla MASQUERADE para lo"
+if ! iptables -t nat -D POSTROUTING -o lo -j MASQUERADE 2>/dev/null; then # Remove NAT rule for loopback
+    echo "Info: MASQUERADE rule for lo not found"
 fi
 
-# Eliminar archivo PID si existe
-if [ -f "${OPENVPN_PID_FILE}" ]; then # Usa la variable de entorno definida en el Dockerfile
-    if ! rm "${OPENVPN_PID_FILE}"; then # Elimina el archivo PID
-        handle_error "No se pudo eliminar el archivo PID"
+# Delete PID file if it exists
+if [ -f "${OPENVPN_PID_FILE}" ]; then # Use environment variable defined in the Dockerfile
+    if ! rm "${OPENVPN_PID_FILE}"; then # Delete PID file
+        handle_error "Could not delete PID file"
     fi
-    echo "🗑️ Archivo PID eliminado."
+    echo "PID file deleted."
 fi
 
-echo "✅ OpenVPN detenido correctamente."
-echo "📝 Los logs de esta sesion se han guardado con timestamp para referencia futura."
+echo "OpenVPN stopped successfully."
+echo "Logs from this session have been saved with timestamp for future reference."
