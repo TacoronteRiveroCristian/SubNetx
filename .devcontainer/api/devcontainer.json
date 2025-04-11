@@ -1,0 +1,92 @@
+{
+    "name": "SubNetx API Development",
+    "dockerComposeFile": "../../docker-compose.yaml",
+    "service": "api",
+    "workspaceFolder": "/app",
+    "mounts": [
+        "source=${localWorkspaceFolder}/services/api,target=/app,type=bind",
+        "source=${localWorkspaceFolder}/.flake8,target=/app/.flake8,consistency=cached",
+        "source=${localWorkspaceFolder}/pyproject.toml,target=/app/pyproject.toml,consistency=cached"
+    ],
+    "remoteUser": "root",
+    "overrideCommand": true,
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "python.defaultInterpreterPath": "/usr/local/bin/python3",
+                "python.terminal.activateEnvironment": true,
+                "python.analysis.typeCheckingMode": "basic",
+                "python.analysis.diagnosticMode": "workspace",
+                "python.analysis.autoImportCompletions": true,
+                "python.analysis.inlayHints.functionReturnTypes": true,
+                "python.analysis.inlayHints.variableTypes": true,
+                "python.analysis.extraPaths": [
+                    "/app"
+                ],
+                // Editor settings
+                "editor.formatOnSave": true,
+                "editor.codeActionsOnSave": {
+                    "source.organizeImports": "explicit"
+                },
+                "editor.rulers": [
+                    88
+                ],
+                "[python]": {
+                    "editor.formatOnSave": true
+                },
+                // File exclusions
+                "files.exclude": {
+                    "**/__pycache__": true,
+                    "**/.pytest_cache": true,
+                    "**/*.egg-info": true
+                },
+                "terminal.integrated.defaultProfile.linux": "bash",
+                "editor.theme": "One Dark Pro Darker",
+                "workbench.colorTheme": "One Dark Pro Darker",
+                "editor.fontFamily": "monospace",
+                "editor.fontLigatures": false,
+                "editor.fontWeight": "normal",
+                "editor.fontWeightBold": "bold",
+                "editor.fontWeightLight": "normal",
+                "editor.fontWeightMedium": "normal",
+                "editor.fontSize": 14,
+                "editor.lineHeight": 20,
+                "editor.tabSize": 2,
+                "editor.insertSpaces": true,
+                "editor.detectIndentation": false,
+                "terminal.integrated.fontSize": 14,
+                "terminal.integrated.fontWeight": "normal",
+                "terminal.integrated.fontWeightBold": "bold",
+                "terminal.integrated.fontWeightLight": "normal",
+                "terminal.integrated.fontWeightMedium": "normal",
+                "terminal.integrated.fontFamily": "monospace"
+            },
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "ms-python.black-formatter",
+                "ms-python.isort",
+                "ms-python.pylint",
+                "ms-python.flake8",
+                "ms-python.mypy-type-checker",
+                "ms-python.debugpy",
+                "njpwerner.autoDocstring",
+                "oderwat.indent-rainbow",
+                "mikoz.black-py",
+                "miguelsolorio.fluent-icons",
+                "ms-toolsai.jupyter",
+                "ms-toolsai.vscode-jupyter-cell-tags",
+                "ms-toolsai.jupyter-keymap",
+                "ms-toolsai.jupyter-renderers",
+                "ms-toolsai.vscode-jupyter-slideshow",
+                "matangover.mypy"
+            ]
+        }
+    },
+    "shutdownAction": "stopCompose",
+    "postCreateCommand": "",
+    "postStartCommand": "",
+    "features": {
+        "ghcr.io/devcontainers/features/github-cli:1": {}
+    }
+}

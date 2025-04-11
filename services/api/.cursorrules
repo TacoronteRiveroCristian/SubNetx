@@ -1,0 +1,70 @@
+// ⏳ Prompt suggestion for Cursor:
+// "Please scan the current folder structure and contents, then update or generate the README.md accordingly following the documentation rule defined below."
+
+// 📘 Project Documentation and Code Commenting Rule
+
+// 🎯 Objective:
+// Ensure that each project contains a comprehensive, up-to-date README.md file, and that all source code is thoroughly documented with inline comments and script-level docstrings.
+
+
+// 📁 SECTION 1: README.md MAINTENANCE
+
+// 🔧 1.1 Initial Setup:
+- Each new project **must include** a `README.md` file in the root directory.
+- The README.md should include:
+  - A clear and concise **project overview**.
+  - A detailed **folder-by-folder breakdown**, explaining the contents and purpose of each directory and major file.
+
+// 🔄 1.2 Update Triggers:
+- The `README.md` **must be updated** after any major structural changes, including:
+  - Addition or removal of folders or significant files.
+  - Renaming or reorganization of the directory structure.
+  - New modules or important scripts added.
+- Cursor AI should:
+  - Prompt the developer to review and update the README.
+  - Automatically **detect changes** and offer suggestions for updated README sections.
+
+// 🧭 1.3 Best Practices:
+- Use clear, human-friendly language.
+- Maintain a consistent formatting style (markdown headers, bullet points, etc.).
+- Include a `## Changelog` section to track significant structural or functional changes.
+- The `README.md` should be treated as the **first source of truth** for understanding the project layout.
+
+
+// 💬 SECTION 2: CODE DOCUMENTATION
+
+// 📝 2.1 Inline Comments:
+- **Every line of code** (in any language: `.py`, `.js`, `.ts`, `.sh`, etc.) must have a clear and concise **inline comment in English**.
+- Comments must:
+  - Explain what each line does.
+  - Clarify why it's needed, if not obvious.
+  - Avoid unnecessary redundancy.
+  - Be placed for optimal readability without cluttering the code.
+
+// 📄 2.2 Script-Level Docstrings:
+- Each script or module should begin with a **structured docstring** describing:
+  - Its purpose and function.
+  - Input/output behavior.
+  - Dependencies or environment specifics.
+- Any time the script changes significantly, the docstring must be **revised** to reflect those updates.
+
+// 🔍 2.3 Best Practices:
+- Use consistent docstring formats (e.g., Google, NumPy, or reStructuredText).
+- Include examples or usage instructions when applicable.
+- Avoid vague comments (e.g. `# does something`) — describe **intent** clearly.
+
+
+// 🤖 SECTION 3: AI-ASSISTED AUTOMATION
+
+- Cursor AI is expected to assist by:
+  - Detecting changes in project structure.
+  - Identifying lines lacking inline comments.
+  - Spotting missing or outdated docstrings.
+- Cursor should:
+  - Prompt the developer to update documentation.
+  - Offer to **auto-generate or revise** the README.md based on detected structure.
+  - Suggest inline comments and docstrings for new code.
+
+
+// ✅ Summary:
+By enforcing this rule, all projects become self-explanatory, easy to onboard, and maintainable as they evolve — reducing technical debt and improving team collaboration.

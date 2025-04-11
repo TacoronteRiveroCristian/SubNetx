@@ -1,6 +1,27 @@
 version: '3.8'
 
 services:
+  api:
+    build:
+      context: .
+      dockerfile: ./services/api/Dockerfile
+    container_name: subnetx_api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT}:${API_PORT}"
+    environment:
+      - API_HOST=${API_HOST}
+      - API_PORT=${API_PORT}
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    command: ["uvicorn", "services.api.src.main:app", "--host", "0.0.0.0", "--port", "${API_PORT}", "--reload"]
+    networks:
+      - subnetx
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   subnetx:
     build:
       context: .
@@ -25,15 +46,15 @@ services:
       postgres:
         condition: service_healthy
 
-  duckdns:
-    image: linuxserver/duckdns
-    container_name: subnetx_duckdns
-    restart: unless-stopped
-    environment:
-      - SUBDOMAINS=${PUBLIC_IP}
-      - TOKEN=${DUCKDNS_TOKEN}
-    networks:
-      - subnetx
+  # duckdns:
+  #   image: linuxserver/duckdns
+  #   container_name: subnetx_duckdns
+  #   restart: unless-stopped
+  #   environment:
+  #     - SUBDOMAINS=${PUBLIC_IP}
+  #     - TOKEN=${DUCKDNS_TOKEN}
+  #   networks:
+  #     - subnetx
 
   # ui:
   #   build:
