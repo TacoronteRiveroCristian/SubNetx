@@ -9,7 +9,7 @@ from typing import Any, Dict
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
-from scripts.api.routers.utils import APIResponse, run_command
+from scripts.api.routers.utils import APIResponse, ErrorResponse, run_command
 
 # Define router
 router = APIRouter(
@@ -50,11 +50,11 @@ async def get_status() -> APIResponse:
     if not result["success"]:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "success": False,
-                "error": "Failed to get VPN status",
-                "details": result["error"],
-            },
+            detail=ErrorResponse(
+                success=False,
+                message="Failed to get VPN status",
+                details={"error": result["error"]},
+            ).dict(),
         )
 
     # Process the output to ensure it is in English and properly formatted
@@ -82,7 +82,7 @@ async def get_status() -> APIResponse:
     return APIResponse(
         success=True,
         message="VPN server status retrieved successfully",
-        data={"status": status_info},
+        details={"status": status_info},
     )
 
 
@@ -98,11 +98,11 @@ async def start_server() -> APIResponse:
     if not result["success"]:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "success": False,
-                "error": "Failed to start VPN server",
-                "details": result["error"],
-            },
+            detail=ErrorResponse(
+                success=False,
+                message="Failed to start VPN server",
+                details={"error": result["error"]},
+            ).dict(),
         )
 
     return APIResponse(success=True, message="VPN server started successfully")
@@ -131,7 +131,7 @@ async def stop_server() -> APIResponse:
         return APIResponse(
             success=True,
             message="VPN server is already stopped",
-            data={"status": "stopped", "was_running": False},
+            details={"status": "stopped", "was_running": False},
         )
 
     # Si está en ejecución, intentar detenerla
@@ -140,17 +140,17 @@ async def stop_server() -> APIResponse:
     if not result["success"]:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "success": False,
-                "error": "Failed to stop VPN server",
-                "details": result["error"],
-            },
+            detail=ErrorResponse(
+                success=False,
+                message="Failed to stop VPN server",
+                details={"error": result["error"]},
+            ).dict(),
         )
 
     return APIResponse(
         success=True,
         message="VPN server stopped successfully",
-        data={"status": "stopped", "was_running": True},
+        details={"status": "stopped", "was_running": True},
     )
 
 
@@ -184,17 +184,17 @@ async def setup_server(config: SetupConfig) -> APIResponse:
     if not result["success"]:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "success": False,
-                "error": "Failed to set up VPN server",
-                "details": result["error"],
-            },
+            detail=ErrorResponse(
+                success=False,
+                message="Failed to set up VPN server",
+                details={"error": result["error"]},
+            ).dict(),
         )
 
     return APIResponse(
         success=True,
         message="VPN server set up successfully",
-        data={"setup_output": result["output"]},
+        details={"setup_output": result["output"]},
     )
 
 
@@ -226,11 +226,11 @@ async def reset_server() -> APIResponse:
     if not result["success"]:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "success": False,
-                "error": "Failed to reset VPN server",
-                "details": result["error"],
-            },
+            detail=ErrorResponse(
+                success=False,
+                message="Failed to reset VPN server",
+                details={"error": result["error"]},
+            ).dict(),
         )
 
     # Determinamos el mensaje adecuado
@@ -242,7 +242,7 @@ async def reset_server() -> APIResponse:
     return APIResponse(
         success=True,
         message=message,
-        data={
+        details={
             "previous_status": "running" if is_running else "stopped",
             "current_status": "running" if is_running else "stopped",
             "reset_output": result["output"],
@@ -281,17 +281,17 @@ async def cleanup_server() -> APIResponse:
     if not result["success"]:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "success": False,
-                "error": "Failed to clean up VPN server",
-                "details": result["error"],
-            },
+            detail=ErrorResponse(
+                success=False,
+                message="Failed to clean up VPN server",
+                details={"error": result["error"]},
+            ).dict(),
         )
 
     return APIResponse(
         success=True,
         message="VPN server has been completely cleaned up",
-        data={
+        details={
             "was_running": was_running,
             "current_status": "stopped",
             "cleanup_output": result["output"],

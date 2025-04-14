@@ -6,12 +6,15 @@ This API provides endpoints to manage OpenVPN operations.
 """
 
 import os
-from typing import Any, Dict
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException
 
 from scripts.api.routers import clients, server
+from scripts.api.routers.utils import APIResponse, ErrorResponse
 
 # Initialize FastAPI application
 app = FastAPI(
@@ -25,14 +28,52 @@ app.include_router(server.router)
 app.include_router(clients.router)
 
 
-@app.get("/")
-async def root() -> Dict[str, Any]:
+@app.exception_handler(HTTPException)
+async def http_exception_handler(
+    _request: Request, exc: HTTPException
+) -> JSONResponse:
+    """Handle HTTP exceptions with standardized format.
+
+    Ensures all error responses follow the standardized format.
+    """
+    status_code = exc.status_code
+
+    # If detail is already a dict with our format, use it
+    if isinstance(exc.detail, dict) and "success" in exc.detail:
+        return JSONResponse(status_code=status_code, content=exc.detail)
+
+    # Otherwise, create a properly formatted error response
+    return JSONResponse(
+        status_code=status_code,
+        content=ErrorResponse(
+            success=False, message=str(exc.detail), details=None
+        ).model_dump(exclude_none=True),
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    _request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """Handle validation errors with standardized format."""
+    return JSONResponse(
+        status_code=422,
+        content=ErrorResponse(
+            success=False,
+            message="Validation error",
+            details={"errors": exc.errors()},
+        ).model_dump(),
+    )
+
+
+@app.get("/", response_model=APIResponse)
+async def root() -> APIResponse:
     """Root endpoint to check API status."""
-    return {
-        "status": "online",
-        "message": "VPN Operations API is running",
-        "version": app.version,
-    }
+    return APIResponse(
+        success=True,
+        message="VPN Operations API is running",
+        details={"version": app.version},
+    )
 
 
 if __name__ == "__main__":

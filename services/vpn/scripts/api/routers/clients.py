@@ -9,7 +9,7 @@ import json
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
-from scripts.api.routers.utils import APIResponse, run_command
+from scripts.api.routers.utils import APIResponse, ErrorResponse, run_command
 
 # Define router
 router = APIRouter(
@@ -47,7 +47,7 @@ async def list_clients() -> APIResponse:
     {
       "success": true,
       "message": "Retrieved client list successfully",
-      "data": {
+      "details": {
         "clients": {
           "client1": {
             "ip_address": "10.10.10.10",
@@ -70,11 +70,11 @@ async def list_clients() -> APIResponse:
     if not result["success"]:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "success": False,
-                "error": "Failed to list VPN clients",
-                "details": result["error"],
-            },
+            detail=ErrorResponse(
+                success=False,
+                message="Failed to list VPN clients",
+                details={"error": result["error"]},
+            ).dict(),
         )
 
     # Parse the JSON output from the script
@@ -83,16 +83,16 @@ async def list_clients() -> APIResponse:
         return APIResponse(
             success=True,
             message="Retrieved client list successfully",
-            data=clients_data,
+            details=clients_data,
         )
     except json.JSONDecodeError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "success": False,
-                "error": "Failed to parse client list",
-                "details": str(e),
-            },
+            detail=ErrorResponse(
+                success=False,
+                message="Failed to parse client list",
+                details={"error": str(e)},
+            ).dict(),
         )
 
 
@@ -118,11 +118,11 @@ async def create_client(client: ClientConfig) -> APIResponse:
     if not result["success"]:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "success": False,
-                "error": "Failed to create VPN client",
-                "details": result["error"],
-            },
+            detail=ErrorResponse(
+                success=False,
+                message="Failed to create VPN client",
+                details={"error": result["error"]},
+            ).dict(),
         )
 
     # Get client configuration file
@@ -140,7 +140,7 @@ async def create_client(client: ClientConfig) -> APIResponse:
     return APIResponse(
         success=True,
         message="Client created successfully",
-        data={
+        details={
             "client_name": client.name,
             "client_ip": client.ip,
             "client_config": client_config,
@@ -167,11 +167,11 @@ async def delete_client(client_name: str) -> APIResponse:
     if not result["success"]:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "success": False,
-                "error": "Failed to delete VPN client",
-                "details": result["error"],
-            },
+            detail=ErrorResponse(
+                success=False,
+                message="Failed to delete VPN client",
+                details={"error": result["error"]},
+            ).dict(),
         )
 
     return APIResponse(

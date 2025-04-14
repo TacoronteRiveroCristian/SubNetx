@@ -23,6 +23,14 @@ show_help() {
     exit 0
 }
 
+# Initialize variables
+VPN_NETWORK=""
+VPN_NETMASK=""
+OPENVPN_PORT=""
+OPENVPN_PROTO=""
+TUN_DEVICE=""
+PUBLIC_IP=""
+
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -59,6 +67,22 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Validate all required parameters are provided
+if [ -z "$VPN_NETWORK" ] || [ -z "$VPN_NETMASK" ] || [ -z "$OPENVPN_PORT" ] || \
+   [ -z "$OPENVPN_PROTO" ] || [ -z "$TUN_DEVICE" ] || [ -z "$PUBLIC_IP" ]; then
+    echo "Error: All parameters are required!"
+    echo "Missing parameters:"
+    [ -z "$VPN_NETWORK" ] && echo "  --red <ip>"
+    [ -z "$VPN_NETMASK" ] && echo "  --mask <mask>"
+    [ -z "$OPENVPN_PORT" ] && echo "  --port <port>"
+    [ -z "$OPENVPN_PROTO" ] && echo "  --proto <proto>"
+    [ -z "$TUN_DEVICE" ] && echo "  --tun <device>"
+    [ -z "$PUBLIC_IP" ] && echo "  --ip <ip>"
+    echo ""
+    show_help
+    exit 1
+fi
 
 # ---------------------------
 # Validate required environment variables
@@ -276,7 +300,13 @@ if ! sysctl -p; then # Apply sysctl configuration
 fi
 
 echo "Configuring iptables to route VPN traffic..."
-# Modify routing tables
+# Clean existing rules for eth0 and lo interfaces
+echo "Cleaning existing iptables rules..."
+iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE 2>/dev/null || true
+iptables -t nat -D POSTROUTING -o lo -j MASQUERADE 2>/dev/null || true
+
+# Add new rules
+echo "Adding new iptables rules..."
 if ! iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE; then # Configure NAT for eth0
     handle_error "Error configuring iptables for eth0"
 fi

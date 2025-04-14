@@ -15,25 +15,25 @@ class APIResponse(BaseModel):
 
     :ivar success: Indicates if the operation was successful
     :ivar message: Message describing the result of the operation
-    :ivar data: Optional data returned by the operation
+    :ivar details: Optional details returned by the operation
     """
 
     success: bool
     message: str
-    data: Optional[Dict[str, Any]] = None
+    details: Optional[Dict[str, Any]] = None
 
 
 class ErrorResponse(BaseModel):
     """Error response model.
 
     :ivar success: Always False for error responses
-    :ivar error: Error message
+    :ivar message: Error message
     :ivar details: Optional details about the error
     """
 
     success: bool = False
-    error: str
-    details: Optional[str] = None
+    message: str
+    details: Optional[Dict[str, Any]] = None
 
 
 def run_command(command: List[str]) -> Dict[str, Any]:
