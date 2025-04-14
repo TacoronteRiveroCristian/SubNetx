@@ -19,6 +19,9 @@ from scripts.api.main import app
 TEST_PORT = int(os.getenv("VPN_API_PORT", "9000")) + 1
 TEST_HOST = os.getenv("VPN_API_HOST", "0.0.0.0")
 
+# Timeout for requests
+TIMEOUT = 120.0
+
 
 class SimpleTestClient:
     """A simple test client that sends real HTTP requests to a running server."""
@@ -29,14 +32,16 @@ class SimpleTestClient:
 
     def get(self, path: str) -> requests.Response:
         """Send a GET request to the specified path."""
-        response = requests.get(f"{self.base_url}{path}")
+        response = requests.get(f"{self.base_url}{path}", timeout=TIMEOUT)
         return response
 
     def post(
         self, path: str, json: Optional[Dict[str, Any]] = None
     ) -> requests.Response:
         """Send a POST request to the specified path."""
-        response = requests.post(f"{self.base_url}{path}", json=json)
+        response = requests.post(
+            f"{self.base_url}{path}", json=json, timeout=TIMEOUT
+        )
         return response
 
 
