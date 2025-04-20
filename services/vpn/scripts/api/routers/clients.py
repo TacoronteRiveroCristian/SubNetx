@@ -5,9 +5,10 @@ This module provides endpoints to manage OpenVPN clients.
 """
 
 import json
+import re
 
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from scripts.api.routers.utils import APIResponse, ErrorResponse, run_command
 
@@ -28,6 +29,27 @@ class ClientConfig(BaseModel):
 
     name: str
     ip: str
+
+    model_config = {
+        "extra": "forbid"  # Reject additional fields not defined in the model
+    }
+
+    @field_validator("ip")
+    @classmethod
+    def validate_ip(cls, v: str) -> str:
+        """Validate that the IP field contains a valid IPv4 address."""
+        ip_pattern = re.compile(r"^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$")
+        if not ip_pattern.match(v):
+            raise ValueError("Invalid IP address format")
+
+        # Check that each octet is between 0 and 255
+        octets = v.split(".")
+        for octet in octets:
+            num = int(octet)
+            if num < 0 or num > 255:
+                raise ValueError("IP address octets must be between 0 and 255")
+
+        return v
 
 
 @router.get("/", response_model=APIResponse)

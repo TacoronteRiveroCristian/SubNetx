@@ -1,0 +1,290 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Sistema de Construcción de Contexto Avanzado
+
+## Comandos Principales
+`Build Context`
+
+### Build Context
+Al ejecutar el comando `Build Context`, el agente debe crear un arhivo PROJECT_CONTEXT.md
+que recoge todo lo siguiente:
+
+1. **Análisis Profundo de Estructura**
+   - Examinar la estructura de directorios y su organización
+   - Identificar patrones arquitectónicos (MVC, Microservicios, etc.)
+   - Analizar la configuración de build y deployment
+   - Detectar estrategias de testing y CI/CD
+   - Evaluar la gestión de dependencias y versiones
+   - **Detectar y analizar entornos de contenedores Docker**:
+     - Identificar archivos Dockerfile y docker-compose.yml
+     - Analizar la configuración de contenedores y redes de servicios
+     - Evaluar la estrategia de orquestación de contenedores
+     - Documentar volúmenes, redes y servicios
+     - Identificar la estructura de la imagen base y sus capas
+     - Detectar configuraciones de bind y variables de entorno
+     - **Analizar configuración multi-stage build**
+     - **Identificar estrategias de desarrollo con Docker (hot-reload, bind mounts, etc.)**
+     - **Evaluar la integración de Docker Compose con otros servicios (bases de datos, cache, etc.)**
+     - **Analizar scripts de inicialización y configuración de contenedores**
+
+2. **Análisis de Código Avanzado**
+   - Realizar análisis estático de código
+   - Identificar patrones de diseño y anti-patrones
+   - Analizar la complejidad ciclomática
+   - Detectar posibles problemas de seguridad
+   - Evaluar la calidad del código (métricas)
+   - Analizar la cobertura de tests
+
+3. **Análisis de Documentación**
+   - Procesar documentación técnica y de usuario
+   - Analizar comentarios en el código
+   - Identificar brechas en la documentación
+   - Evaluar la calidad de la documentación
+   - Detectar documentación desactualizada
+
+4. **Análisis de Dependencias**
+   - Evaluar dependencias directas e indirectas
+   - Analizar versiones y compatibilidad
+   - Detectar dependencias obsoletas
+   - Identificar posibles vulnerabilidades
+   - Evaluar el impacto de actualizaciones
+
+5. **Generación de Contexto Avanzado**
+   - Crear/actualizar archivo `PROJECT_CONTEXT.md` con:
+     ```markdown
+     # Contexto del Proyecto
+
+     ## Visión General
+     - Nombre y descripción del proyecto
+     - Objetivos estratégicos
+     - Público objetivo y stakeholders
+     - Propuesta de valor única
+     - Estado actual del proyecto
+     - Roadmap estratégico
+
+     ## Arquitectura Técnica
+     - Stack tecnológico detallado
+     - Patrones arquitectónicos
+     - Diagramas de arquitectura
+     - Decisiones técnicas clave
+     - Consideraciones de escalabilidad
+     - Estrategias de seguridad
+
+     ## Entorno de Desarrollo y Ejecución
+     - Configuración del entorno de desarrollo
+     - **Configuración de Docker/Contenedores:**
+       - Estructura y organización de contenedores
+       - Imágenes base utilizadas
+       - Configuración de redes y volúmenes
+       - Estrategia de orquestación (Docker Compose, Kubernetes, etc.)
+       - Entornos de desarrollo vs producción
+       - **IMPORTANTE: Todos los comandos deben ejecutarse dentro del contenedor correspondiente, no en el host**
+       - **Estructura de Docker Compose y diagrama de servicios**
+       - **Estrategias de hot-reload y desarrollo interactivo con contenedores**
+       - **Gestión de secretos y variables de entorno**
+       - **Herramientas de debugging dentro de contenedores**
+       - **Estrategias de optimización de imágenes y capas**
+       - **Proceso de construcción y publicación de imágenes**
+       - **Mecanismos de comunicación entre contenedores**
+     - Dependencias del sistema
+     - Herramientas necesarias
+     - Procedimientos de instalación
+     - Verificación del entorno
+
+     ## Estructura del Proyecto
+     - Organización de directorios
+     - Componentes principales
+     - Flujos de datos
+     - Integraciones externas
+     - APIs y endpoints
+     - Servicios y microservicios
+
+     ## Calidad y Estándares
+     - Métricas de calidad de código
+     - Estándares de codificación
+     - Prácticas de testing
+     - Cobertura de tests
+     - Procesos de revisión
+     - Herramientas de análisis estático
+
+     ## Desarrollo y Despliegue
+     - Flujo de trabajo de desarrollo
+     - Estrategias de branching
+     - Procesos de CI/CD
+     - Entornos de despliegue
+     - Estrategias de monitoreo
+     - Planes de rollback
+
+     ## Seguridad
+     - Análisis de riesgos
+     - Medidas de seguridad implementadas
+     - Vulnerabilidades conocidas
+     - Prácticas de seguridad
+     - Requisitos de cumplimiento
+     - Planes de respuesta a incidentes
+
+     ## Performance
+     - Métricas de rendimiento
+     - Cuellos de botella identificados
+     - Estrategias de optimización
+     - Requisitos de escalabilidad
+     - Planes de capacidad
+     - Monitoreo de performance
+
+     ## Mantenimiento
+     - Plan de mantenimiento
+     - Frecuencia de actualizaciones
+     - Procesos de soporte
+     - Documentación de troubleshooting
+     - Procedimientos de backup
+     - Planes de recuperación
+     ```
+
+### Update Context
+Al ejecutar `Update Context`, el agente debe:
+
+1. **Análisis de Cambios**
+   - Detectar modificaciones en el código
+   - Analizar impacto en la arquitectura
+   - Evaluar cambios en dependencias
+   - Identificar nuevos patrones
+   - Detectar problemas de seguridad
+   - Evaluar impacto en performance
+   - Detectar cambios en la configuración de Docker/contenedores
+
+2. **Actualización de Documentación**
+   - Revisar y actualizar PROJECT_CONTEXT.md
+   - Mantener coherencia con el código
+   - Documentar decisiones técnicas
+   - Actualizar diagramas y ejemplos
+   - Revisar y actualizar métricas
+   - Mantener historial de cambios
+
+## Análisis Avanzado
+
+1. **Análisis de Código**
+   - Complejidad ciclomática
+   - Cohesión y acoplamiento
+   - Duplicación de código
+   - Calidad de comentarios
+   - Cumplimiento de estándares
+   - Vulnerabilidades de seguridad
+
+2. **Análisis de Arquitectura**
+   - Patrones de diseño
+   - Decisiones arquitectónicas
+   - Dependencias entre módulos
+   - Puntos de integración
+   - Estrategias de escalabilidad
+   - Consideraciones de seguridad
+
+3. **Análisis de Performance**
+   - Métricas de rendimiento
+   - Cuellos de botella
+   - Optimizaciones posibles
+   - Requisitos de escalabilidad
+   - Estrategias de caching
+   - Planes de capacidad
+
+4. **Análisis de Seguridad**
+   - Vulnerabilidades conocidas
+   - Prácticas de seguridad
+   - Requisitos de cumplimiento
+   - Medidas de protección
+   - Planes de respuesta
+   - Auditorías de seguridad
+
+5. **Análisis de Entorno Docker**
+   - Configuración de contenedores
+   - Optimización de imágenes
+   - Estrategias de almacenamiento
+   - Configuración de redes
+   - Seguridad de contenedores
+   - Estrategias de orquestación
+   - **Análisis de configuración multi-contenedor con Docker Compose**
+   - **Estrategias de inicialización y orden de arranque de servicios**
+   - **Persistencia de datos y gestión de volúmenes**
+   - **Optimización de tiempos de build**
+   - **Gestión de logs y monitoreo de contenedores**
+   - **Estrategias de actualización y rollback de contenedores**
+   - **Análisis de portabilidad entre entornos (dev, staging, prod)**
+
+## Mejores Prácticas Avanzadas
+
+1. **Documentación**
+   - Mantener documentación viva
+   - Usar formatos estándar
+   - Incluir ejemplos prácticos
+   - Documentar decisiones clave
+   - Mantener historial de cambios
+   - Facilitar contribuciones
+
+2. **Calidad**
+   - Implementar métricas de calidad
+   - Realizar análisis estático
+   - Mantener alta cobertura de tests
+   - Seguir estándares de codificación
+   - Realizar revisiones de código
+   - Implementar CI/CD
+
+3. **Seguridad**
+   - Realizar análisis de seguridad
+   - Implementar medidas de protección
+   - Mantener dependencias actualizadas
+   - Seguir mejores prácticas
+   - Realizar auditorías periódicas
+   - Tener planes de respuesta
+
+4. **Performance**
+   - Monitorear métricas clave
+   - Optimizar recursos
+   - Implementar caching
+   - Planificar escalabilidad
+   - Realizar pruebas de carga
+   - Mantener planes de capacidad
+
+5. **Docker y Contenedores**
+   - Mantener imágenes ligeras y optimizadas
+   - Implementar estrategias de caching de capas
+   - Seguir el principio de un proceso por contenedor
+   - Gestionar secretos y configuraciones de forma segura
+   - Implementar health checks y estrategias de reinicio
+   - Documentar explícitamente el contexto de ejecución (contenedor vs host)
+   - **Usar .dockerignore para reducir contexto de build**
+   - **Implementar multi-stage builds para optimizar imágenes finales**
+   - **Establecer estrategias de versionado para imágenes**
+   - **Definir políticas de networking entre contenedores**
+   - **Implementar entrypoint scripts con verificación de dependencias**
+   - **Configurar hot-reload para desarrollo eficiente**
+   - **Establecer estrategias para debugging dentro de contenedores**
+   - **Mantener consistencia entre entornos con configuración as code**
+   - **Implementar principios de mínimo privilegio (non-root users, read-only filesystems)**
+
+## Verificación Avanzada
+
+1. **Validación de Contenido**
+   - Precisión técnica
+   - Completitud
+   - Coherencia
+   - Actualidad
+   - Relevancia
+   - Utilidad
+
+2. **Control de Calidad**
+   - Revisión por pares
+   - Validación técnica
+   - Feedback de usuarios
+   - Mejora continua
+   - Auditorías periódicas
+   - Métricas de calidad
+
+3. **Mantenimiento**
+   - Actualizaciones regulares
+   - Control de versiones
+   - Historial de cambios
+   - Planes de mejora
+   - Retroalimentación
+   - Optimización continua

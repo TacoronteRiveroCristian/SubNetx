@@ -56,12 +56,23 @@ async def validation_exception_handler(
     _request: Request, exc: RequestValidationError
 ) -> JSONResponse:
     """Handle validation errors with standardized format."""
+    # Ensure all error information is JSON serializable
+    errors = []
+    for error in exc.errors():
+        # Create a serializable version of the error
+        error_dict = {
+            "loc": error.get("loc", []),
+            "msg": error.get("msg", ""),
+            "type": error.get("type", ""),
+        }
+        errors.append(error_dict)
+
     return JSONResponse(
         status_code=422,
         content=ErrorResponse(
             success=False,
             message="Validation error",
-            details={"errors": exc.errors()},
+            details={"errors": errors},
         ).model_dump(),
     )
 

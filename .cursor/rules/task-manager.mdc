@@ -1,0 +1,244 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Sistema de Gestión de Tareas
+IMPORTANTE: LEER EL FICHERO PROJECT_CONTEXT.md en la raiz del proyecto
+en el caso de que exista ya que da una visión más general.
+
+## Comandos Principales
+
+### Build Tasks
+Al ejecutar `Build Tasks <descripción>`, el agente debe:
+
+1. **Análisis de la Descripción**
+   - Leer y comprender completamente la descripción proporcionada
+   - Identificar los objetivos principales y secundarios
+   - Determinar las dependencias entre tareas
+
+2. **Investigación Profunda e Innovación**
+   - Realizar una investigación exhaustiva sobre el tema
+   - Analizar el estado del arte en la materia
+   - Identificar oportunidades de innovación
+   - Proponer enfoques innovadores y disruptivos
+   - Presentar una síntesis del enfoque para aprobación del usuario
+
+3. **Confirmación de Enfoque**
+   - Presentar al usuario un resumen conciso del enfoque planteado
+   - Destacar los elementos innovadores propuestos
+   - Solicitar aprobación explícita del usuario
+   - Si es aprobado, proceder con el enfoque innovador
+   - Si es rechazado, ajustar el enfoque eliminando los elementos de innovación
+
+4. **Descomposición de Tareas**
+   - Dividir la tarea principal en subtareas atómicas y secuenciales
+   - Cada subtarea debe ser:
+     - Independiente y autocontenida
+     - Clara y específica
+     - Medible y verificable
+     - Realizable en un solo paso
+     - Innovadora cuando sea aplicable
+
+5. **Documentación de Tareas**
+   - Crear/actualizar el archivo `TASKS.md` con el siguiente formato:
+     ```markdown
+     # Tarea Principal: [Descripción]
+
+     ## Enfoque de Innovación
+     - Descripción del enfoque innovador
+     - Tecnologías o metodologías disruptivas
+     - Valor añadido esperado
+     - Riesgos y mitigación
+
+     ## Subtareas
+     1. [ ] Subtarea 1
+        - Descripción detallada
+        - Dependencias (si las hay)
+        - Recursos necesarios
+        - Componente innovador (si aplica)
+
+     2. [ ] Subtarea 2
+        ...
+     ```
+
+### Research and Innovation Tasks
+Al ejecutar `Research Tasks <descripción>`, el agente debe:
+
+1. **Análisis del Dominio**
+   - Recopilar y analizar información del estado actual del conocimiento
+   - Identificar brechas, limitaciones y oportunidades
+   - Analizar competidores y soluciones existentes
+   - Estudiar tendencias emergentes y tecnologías disruptivas
+   - Determinar métricas para evaluación de innovación
+
+2. **Exploración Creativa**
+   - Realizar sesiones de ideación (brainstorming simulado)
+   - Aplicar técnicas de pensamiento lateral y disruptivo
+   - Explorar conexiones interdisciplinarias
+   - Generar múltiples conceptos innovadores
+   - Documentar ideas con potencial transformador
+
+3. **Evaluación y Refinamiento**
+   - Establecer criterios de evaluación de innovación
+   - Analizar viabilidad técnica de las propuestas
+   - Evaluar impacto potencial y originalidad
+   - Refinar conceptos prometedores
+   - Desarrollar prototipos conceptuales o pruebas de concepto
+
+4. **Documentación de Investigación**
+   - Crear/actualizar el archivo `RESEARCH.md` con el siguiente formato:
+     ```markdown
+     # Investigación: [Tema]
+
+     ## Estado del Arte
+     - Análisis de la situación actual
+     - Tecnologías y enfoques existentes
+     - Limitaciones identificadas
+
+     ## Propuestas Innovadoras
+     1. [Concepto Innovador 1]
+        - Descripción detallada
+        - Diferenciadores clave
+        - Ventajas competitivas
+        - Desafíos de implementación
+        - Evaluación de viabilidad (1-5)
+
+     2. [Concepto Innovador 2]
+        ...
+
+     ## Recomendaciones
+     - Propuesta seleccionada
+     - Justificación
+     - Plan de implementación
+     - Métricas de éxito
+     ```
+
+### Execute Tasks
+Al ejecutar `Execute Tasks`, el agente debe:
+
+1. **Preparación**
+   - Leer y validar el archivo `TASKS.md`
+   - **Leer y analizar el archivo `PROJECT_CONTEXT.md` para comprender el entorno de ejecución**
+   - **Identificar si el proyecto utiliza Docker/contenedores y asegurar que todos los comandos se ejecuten en el contenedor correcto**
+   - **Identificar la configuración de Docker Compose y mapear cada tarea a su servicio correspondiente**
+   - **Verificar el estado de los contenedores necesarios (running, stopped, o inexistentes)**
+   - **Analizar dependencias entre servicios Docker para determinar el orden correcto de ejecución**
+   - Verificar que todas las dependencias estén disponibles
+   - Preparar el entorno necesario
+   - **Documentar qué comandos deben ejecutarse con `docker-compose exec` o `docker exec` en cada paso**
+
+2. **Ejecución**
+   - Procesar las subtareas en orden secuencial
+   - Para cada subtarea:
+     - Verificar que las dependencias estén completadas
+     - Ejecutar la subtarea
+     - **Si el proyecto usa Docker, asegurar que los comandos se ejecuten dentro del contenedor apropiado y no en el host**
+     - **Ejecutar comandos con el formato correcto: `docker-compose exec <service> <command>` o `docker exec <container> <command>`**
+     - **Para comandos que requieren entorno interactivo, usar flag `-it` cuando sea necesario**
+     - **Manejar rutas de archivo considerando los volúmenes y bind mounts configurados**
+     - **Verificar la salida del comando para identificar errores específicos de Docker**
+     - Verificar el resultado
+     - Actualizar el estado en `TASKS.md`
+     - Documentar cualquier error o advertencia
+
+3. **Seguimiento**
+   - Mantener un registro de progreso
+   - Documentar cualquier desviación del plan original
+   - Proponer ajustes si es necesario
+   - **Registrar métricas de rendimiento de los contenedores si es relevante**
+   - **Monitorear el uso de recursos (CPU, memoria, almacenamiento) durante la ejecución de tareas**
+
+## Formato de Tareas
+
+Cada tarea en `TASKS.md` debe incluir:
+
+- **Identificador**: Número secuencial
+- **Estado**: [ ] para pendiente, [x] para completada
+- **Descripción**: Explicación clara de la tarea
+- **Componente Innovador**: Descripción del elemento innovador (si aplica)
+- **Dependencias**: Lista de tareas previas necesarias
+- **Recursos**: Archivos, herramientas o información necesaria
+- **Verificación**: Criterios para determinar si la tarea está completa
+- **Impacto Disruptivo**: Evaluación del potencial de innovación (Alto/Medio/Bajo)
+- **Entorno de Ejecución**: Especificar si debe ejecutarse en un contenedor Docker específico
+  - **Servicio Docker**: Nombre del servicio en docker-compose.yml
+  - **Imagen/Contenedor**: Especificación de la imagen o contenedor específico
+  - **Variables de Entorno**: Variables específicas necesarias para la ejecución
+  - **Montajes**: Volúmenes o bind mounts necesarios
+  - **Redes**: Requisitos de red específicos
+  - **Limitaciones**: Restricciones de recursos o tiempo
+
+## Manejo de Errores
+
+1. **Detección**
+   - Identificar errores durante la ejecución
+   - Clasificar la severidad del error
+   - Documentar el contexto del error
+
+2. **Resolución**
+   - Proponer soluciones alternativas
+   - Actualizar el plan si es necesario
+   - Documentar la resolución
+
+3. **Continuidad**
+   - Determinar si se puede continuar con las siguientes tareas
+   - Ajustar las dependencias si es necesario
+   - Actualizar la documentación
+
+## Mejores Prácticas
+
+1. **Claridad**
+   - Usar lenguaje claro y específico
+   - Evitar ambigüedades
+   - Proporcionar ejemplos cuando sea necesario
+
+2. **Organización**
+   - Mantener un orden lógico
+   - Agrupar tareas relacionadas
+   - Usar indentación para mostrar jerarquía
+
+3. **Documentación**
+   - Mantener registro de cambios
+   - Documentar decisiones importantes
+   - Incluir referencias a recursos externos
+
+4. **Verificación**
+   - Incluir pasos de verificación para cada tarea
+   - Documentar criterios de éxito
+   - Mantener coherencia en la verificación
+
+5. **Entorno de Ejecución**
+   - **Especificar claramente en cada tarea si debe ejecutarse en un contenedor Docker**
+   - **Incluir el nombre del servicio o contenedor donde debe ejecutarse la tarea**
+   - **Documentar cualquier volumen o montaje necesario para la tarea**
+   - **Asegurar que los comandos sean compatibles con el entorno de contenedor**
+   - **Verificar que las rutas de archivos sean relativas al contexto del contenedor**
+   - **Establecer prefijos estándar para comandos Docker (`docker-compose exec`, `docker exec`)**
+   - **Documentar estados previos requeridos (contenedor corriendo, detenido, no existente)**
+   - **Incluir parámetros adicionales para ejecución como usuario específico (`-u`), entorno interactivo (`-it`), etc.**
+   - **Gestionar correctamente la salida de comandos (especialmente para comandos que generan logs extensos)**
+   - **Documentar estrategias para verificación de resultados dentro de contenedores**
+   - **Implementar mecanismos de health check antes de ejecutar comandos en contenedores**
+   - **Establecer estrategias para la persistencia de datos entre ejecuciones de tareas**
+   - **Documentar procedimientos para debugging de errores relacionados con Docker**
+
+6. **Gestión de Recursos Docker**
+   - **Monitorear uso de recursos de contenedores durante la ejecución**
+   - **Implementar estrategias de limpieza (eliminar contenedores/volúmenes temporales)**
+   - **Gestionar almacenamiento en caché para optimizar builds y ejecuciones**
+   - **Documentar políticas de retención de logs y datos de contenedores**
+   - **Implementar estrategias para optimizar la ejecución de tareas en entornos Docker**
+   - **Establecer procedimientos para resetear entornos cuando sea necesario**
+
+7. **Investigación e Innovación**
+   - **Mantener un balance entre innovación y practicidad**
+   - **Documentar claramente los elementos innovadores de cada tarea**
+   - **Asegurar que la innovación aporte valor tangible**
+   - **Establecer métricas para evaluar el éxito de los enfoques innovadores**
+   - **Incorporar retroalimentación continua para refinar ideas innovadoras**
+   - **Mantener un registro de lecciones aprendidas**
+   - **Crear un repositorio de ideas innovadoras para futuras implementaciones**
+   - **Implementar ciclos cortos de validación para enfoques innovadores**
+   - **Establecer protocolos para gestionar el riesgo asociado a la innovación**
+   - **Desarrollar mecanismos para escalar gradualmente las innovaciones exitosas**
