@@ -756,6 +756,7 @@ export default function ServerManagement() {
             background: transparent;
             overflow-y: auto;
             max-height: 100vh;
+            padding-bottom: 65px; /* Add padding to prevent content from being hidden behind the fixed footer */
           }
           .nav-button {
             background: none;
@@ -857,33 +858,27 @@ export default function ServerManagement() {
             background-color: #9C27B020;
           }
           .status-indicator {
-            display: inline-flex;
-            align-items: center;
-            padding: 8px 16px;
-            border-radius: 20px;
+            padding: 4px 8px;
+            border-radius: 12px;
             font-weight: 500;
-            margin-left: 10px;
+            font-size: 0.75rem;
+            opacity: 0.9;
+            transition: all 0.2s ease;
           }
           .status-indicator.running {
-            background-color: ${currentTheme.primary}30;
+            background-color: ${currentTheme.primary}15;
             color: ${currentTheme.primary};
-            font-size: 0.8rem;
-            padding: 4px 10px;
-            opacity: 0.8;
+            border: 1px solid ${currentTheme.primary}30;
           }
           .status-indicator.stopped {
-            background-color: #F4433620;
-            color: #F44336;
-            font-size: 0.8rem;
-            padding: 4px 10px;
-            opacity: 0.8;
+            background-color: #F4433610;
+            color: #F4433690;
+            border: 1px solid #F4433630;
           }
           .status-indicator.unknown {
-            background-color: #78909C30;
+            background-color: #78909C15;
             color: #78909C;
-            font-size: 0.8rem;
-            padding: 4px 10px;
-            opacity: 0.8;
+            border: 1px solid #78909C30;
           }
           .modal-overlay {
             position: fixed;
@@ -1316,9 +1311,18 @@ export default function ServerManagement() {
                             </span>
                             OpenVPN Server Management
                             {serverStatus !== 'unknown' && (
-                                <div className={`status-indicator ${serverStatus}`}>
-                                    <span className="material-icons" style={{ fontSize: '14px', marginRight: '4px' }}>
-                                        {serverStatus === 'running' ? 'radio_button_checked' : 'radio_button_unchecked'}
+                                <div className={`status-indicator ${serverStatus}`} style={{
+                                    marginTop: '4px',
+                                    marginLeft: '12px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center'
+                                }}>
+                                    <span className="material-icons" style={{
+                                        fontSize: '12px',
+                                        marginRight: '3px',
+                                        verticalAlign: 'middle'
+                                    }}>
+                                        {serverStatus === 'running' ? 'circle' : 'stop_circle'}
                                     </span>
                                     {serverStatus === 'running' ? 'Running' : 'Stopped'}
                                 </div>

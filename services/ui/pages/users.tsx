@@ -483,6 +483,9 @@ export default function Users() {
             display: flex;
             flex-direction: column;
             background: transparent;
+            overflow-y: auto;
+            max-height: 100vh;
+            padding-bottom: 65px;
           }
           .user-row:hover {
             background-color: ${currentTheme.tableRowHover} !important;

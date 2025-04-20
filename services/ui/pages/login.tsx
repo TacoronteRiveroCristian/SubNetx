@@ -12,208 +12,208 @@ import Logo from '../components/Logo';
 
 // Define the Login component
 export default function Login() {
-  // Initialize router for navigation
-  const router = useRouter();
+    // Initialize router for navigation
+    const router = useRouter();
 
-  // State for form inputs
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  // State for security warning modal
-  const [showSecurityWarning, setShowSecurityWarning] = useState(false);
-  // State for password change form
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [passwordError, setPasswordError] = useState('');
+    // State for form inputs
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+    // State for security warning modal
+    const [showSecurityWarning, setShowSecurityWarning] = useState(false);
+    // State for password change form
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [passwordError, setPasswordError] = useState('');
 
-  // Check if user is already authenticated on mount
-  useEffect(() => {
-    // Verificar autenticación solo si estamos en la página de login
-    if (router.pathname === '/login') {
-      // Primero verificar localStorage para evitar peticiones innecesarias
-      if (localStorage.getItem('isAuthenticated') !== 'true') {
-        // Si no hay datos de autenticación en localStorage, verificar con el servidor
-        fetch('/api/auth/verify', {
-          credentials: 'include',
-          // Añadir cabeceras para evitar caché
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-          }
-        })
-          .then(response => {
-            if (response.ok) {
-              return response.json();
-            }
-            throw new Error('Not authenticated');
-          })
-          .then(data => {
-            // Si estamos autenticados según el servidor, actualizar localStorage y redirigir
-            localStorage.setItem('isAuthenticated', 'true');
-            localStorage.setItem('userRole', data.user.role);
-            localStorage.setItem('userId', data.user.id.toString());
-
-            // Redirigir al dashboard
-            router.replace('/dashboard');
-          })
-          .catch(err => {
-            // Usuario no autenticado, limpiar cualquier dato residual
-            localStorage.removeItem('isAuthenticated');
-            localStorage.removeItem('userRole');
-            localStorage.removeItem('userId');
-            localStorage.removeItem('dashboardMonitoring');
-            localStorage.removeItem('dashboardTargets');
-            localStorage.removeItem('dashboardStatuses');
-          });
-      } else {
-        // Si tenemos datos de autenticación en localStorage, redirigir directamente
-        router.replace('/dashboard');
-      }
-    }
-  }, [router]);
-
-  // Handle form submission
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-        // Call the login API
-        const response = await fetch('/api/auth/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                username: email,
-                password: password
-            }),
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-            // Reset monitoring state in the background before redirecting
-            try {
-                await fetch('/api/system/monitoring', {
-                    method: 'POST',
+    // Check if user is already authenticated on mount
+    useEffect(() => {
+        // Verificar autenticación solo si estamos en la página de login
+        if (router.pathname === '/login') {
+            // Primero verificar localStorage para evitar peticiones innecesarias
+            if (localStorage.getItem('isAuthenticated') !== 'true') {
+                // Si no hay datos de autenticación en localStorage, verificar con el servidor
+                fetch('/api/auth/verify', {
+                    credentials: 'include',
+                    // Añadir cabeceras para evitar caché
                     headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ isMonitoring: false }),
-                });
-            } catch (error) {
-                console.error('Error resetting monitoring state:', error);
-                // Continue with login even if this fails
-            }
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                    }
+                })
+                    .then(response => {
+                        if (response.ok) {
+                            return response.json();
+                        }
+                        throw new Error('Not authenticated');
+                    })
+                    .then(data => {
+                        // Si estamos autenticados según el servidor, actualizar localStorage y redirigir
+                        localStorage.setItem('isAuthenticated', 'true');
+                        localStorage.setItem('userRole', data.user.role);
+                        localStorage.setItem('userId', data.user.id.toString());
 
-            // Clear all existing monitoring data
-            localStorage.removeItem('dashboardData');
-            localStorage.removeItem('dashboardMonitoring');
-            localStorage.removeItem('dashboardTargets');
-            localStorage.removeItem('dashboardStatuses');
-
-            // Set login timestamp to mark this as a fresh login
-            localStorage.setItem('loginTimestamp', Date.now().toString());
-
-            // Set authentication in localStorage
-            localStorage.setItem('isAuthenticated', 'true');
-            // Store user data
-            localStorage.setItem('userId', data.user.id.toString());
-            localStorage.setItem('userRole', data.user.role);
-            // Clear any previous errors
-            setError('');
-
-            // If using default credentials, show security warning
-            if (data.isDefaultCredentials) {
-                setShowSecurityWarning(true);
+                        // Redirigir al dashboard
+                        router.replace('/dashboard');
+                    })
+                    .catch(err => {
+                        // Usuario no autenticado, limpiar cualquier dato residual
+                        localStorage.removeItem('isAuthenticated');
+                        localStorage.removeItem('userRole');
+                        localStorage.removeItem('userId');
+                        localStorage.removeItem('dashboardMonitoring');
+                        localStorage.removeItem('dashboardTargets');
+                        localStorage.removeItem('dashboardStatuses');
+                    });
             } else {
-                // Redirect to dashboard if not using default credentials
-                // Use replace instead of push to prevent back navigation to login
+                // Si tenemos datos de autenticación en localStorage, redirigir directamente
                 router.replace('/dashboard');
             }
-        } else {
-            setError(data.message || 'Invalid credentials');
         }
-    } catch (error) {
-        console.error('Login error:', error);
-        setError('An error occurred during login');
-    }
-  };
+    }, [router]);
 
-  // Handle password change
-  const handlePasswordChange = async (e: React.FormEvent) => {
-    e.preventDefault();
+    // Handle form submission
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            // Call the login API
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    username: email,
+                    password: password
+                }),
+            });
 
-    if (newPassword !== confirmPassword) {
-      setPasswordError('Passwords do not match');
-      return;
-    }
+            const data = await response.json();
 
-    if (newPassword.length < 8) {
-      setPasswordError('Password must be at least 8 characters long');
-      return;
-    }
+            if (response.ok) {
+                // Reset monitoring state in the background before redirecting
+                try {
+                    await fetch('/api/system/monitoring', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ isMonitoring: false }),
+                    });
+                } catch (error) {
+                    console.error('Error resetting monitoring state:', error);
+                    // Continue with login even if this fails
+                }
 
-    try {
-      const response = await fetch('/api/auth/change-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: 'admin',
-          currentPassword: 'admin',
-          newPassword,
-        }),
-      });
+                // Clear all existing monitoring data
+                localStorage.removeItem('dashboardData');
+                localStorage.removeItem('dashboardMonitoring');
+                localStorage.removeItem('dashboardTargets');
+                localStorage.removeItem('dashboardStatuses');
 
-      const data = await response.json();
+                // Set login timestamp to mark this as a fresh login
+                localStorage.setItem('loginTimestamp', Date.now().toString());
 
-      if (!response.ok) {
-        setPasswordError(data.message);
-        return;
-      }
+                // Set authentication in localStorage
+                localStorage.setItem('isAuthenticated', 'true');
+                // Store user data
+                localStorage.setItem('userId', data.user.id.toString());
+                localStorage.setItem('userRole', data.user.role);
+                // Clear any previous errors
+                setError('');
 
-      // Show success message and indicate if user was promoted to admin
-      const successMessage = data.isAdmin
-        ? 'Password changed successfully! You are now an admin user.'
-        : 'Password changed successfully!';
+                // If using default credentials, show security warning
+                if (data.isDefaultCredentials) {
+                    setShowSecurityWarning(true);
+                } else {
+                    // Redirect to dashboard if not using default credentials
+                    // Use replace instead of push to prevent back navigation to login
+                    router.replace('/dashboard');
+                }
+            } else {
+                setError(data.message || 'Invalid credentials');
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            setError('An error occurred during login');
+        }
+    };
 
-      setShowSecurityWarning(false);
-      setNewPassword('');
-      setConfirmPassword('');
-      setPasswordError(null);
+    // Handle password change
+    const handlePasswordChange = async (e: React.FormEvent) => {
+        e.preventDefault();
 
-      // Show success message
-      alert(successMessage);
+        if (newPassword !== confirmPassword) {
+            setPasswordError('Passwords do not match');
+            return;
+        }
 
-      // Redirect to dashboard
-      router.replace('/dashboard');
-    } catch (error) {
-      console.error('Error changing password:', error);
-      setPasswordError('Failed to change password. Please try again.');
-    }
-  };
+        if (newPassword.length < 8) {
+            setPasswordError('Password must be at least 8 characters long');
+            return;
+        }
 
-  // Define a theme style similar to the main app
-  const theme = {
-    background: '#1a1a1a',
-    text: '#ffffff',
-    primary: '#66bb6a',
-    secondary: '#42a5f5',
-    border: '#333333',
-    cardBackground: '#2d2d2d',
-  };
+        try {
+            const response = await fetch('/api/auth/change-password', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    username: 'admin',
+                    currentPassword: 'admin',
+                    newPassword,
+                }),
+            });
 
-  return (
-    <>
-      <Head>
-        <title>Login | SubNetx</title>
-        <meta name="description" content="Login to SubNetx dashboard" />
-        <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
-      </Head>
+            const data = await response.json();
 
-      <style jsx global>{`
+            if (!response.ok) {
+                setPasswordError(data.message);
+                return;
+            }
+
+            // Show success message and indicate if user was promoted to admin
+            const successMessage = data.isAdmin
+                ? 'Password changed successfully! You are now an admin user.'
+                : 'Password changed successfully!';
+
+            setShowSecurityWarning(false);
+            setNewPassword('');
+            setConfirmPassword('');
+            setPasswordError(null);
+
+            // Show success message
+            alert(successMessage);
+
+            // Redirect to dashboard
+            router.replace('/dashboard');
+        } catch (error) {
+            console.error('Error changing password:', error);
+            setPasswordError('Failed to change password. Please try again.');
+        }
+    };
+
+    // Define a theme style similar to the main app
+    const theme = {
+        background: '#1a1a1a',
+        text: '#ffffff',
+        primary: '#66bb6a',
+        secondary: '#42a5f5',
+        border: '#333333',
+        cardBackground: '#2d2d2d',
+    };
+
+    return (
+        <>
+            <Head>
+                <title>Login | SubNetx</title>
+                <meta name="description" content="Login to SubNetx dashboard" />
+                <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+            </Head>
+
+            <style jsx global>{`
         body {
           margin: 0;
           padding: 0;
@@ -291,212 +291,220 @@ export default function Login() {
         }
       `}</style>
 
-      <div className="page-wrapper">
-        <BackgroundEffect theme={{ background: theme.background, primary: theme.primary }} />
+            <div style={{
+                backgroundColor: theme.background,
+                color: theme.text,
+                minHeight: '100vh',
+                display: 'flex',
+                flexDirection: 'column',
+                transition: 'background-color 0.3s ease, color 0.3s ease',
+                paddingBottom: '65px' /* Add padding to prevent content from being hidden behind the fixed footer */
+            }}>
+                <BackgroundEffect theme={{ background: theme.background, primary: theme.primary }} />
 
-        <main className="content">
-          <div style={{
-            backgroundColor: theme.cardBackground,
-            padding: '2rem',
-            borderRadius: '8px',
-            width: '100%',
-            maxWidth: '400px',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-            margin: 'auto'
-          }}>
-            <Logo theme={theme} size="medium" />
+                <main className="content">
+                    <div style={{
+                        backgroundColor: theme.cardBackground,
+                        padding: '2rem',
+                        borderRadius: '8px',
+                        width: '100%',
+                        maxWidth: '400px',
+                        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                        margin: 'auto'
+                    }}>
+                        <Logo theme={theme} size="medium" />
 
-            {error && (
-              <div style={{
-                backgroundColor: '#FFEBEE',
-                color: '#D32F2F',
-                padding: '0.75rem',
-                marginBottom: '1rem',
-                borderRadius: '4px',
-                fontWeight: 500
-              }}>
-                {error}
-              </div>
-            )}
+                        {error && (
+                            <div style={{
+                                backgroundColor: '#FFEBEE',
+                                color: '#D32F2F',
+                                padding: '0.75rem',
+                                marginBottom: '1rem',
+                                borderRadius: '4px',
+                                fontWeight: 500
+                            }}>
+                                {error}
+                            </div>
+                        )}
 
-            <form onSubmit={handleSubmit}>
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '0.5rem',
-                  fontWeight: 500
-                }}>
-                  Username
-                </label>
-                <input
-                  type="text"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    borderRadius: '4px',
-                    border: `1px solid ${theme.border}`,
-                    backgroundColor: theme.background,
-                    color: theme.text,
-                    fontSize: '1rem',
-                    height: '48px',
-                    boxSizing: 'border-box'
-                  }}
-                  placeholder="Enter admin username"
-                />
-              </div>
+                        <form onSubmit={handleSubmit}>
+                            <div style={{ marginBottom: '1rem' }}>
+                                <label style={{
+                                    display: 'block',
+                                    marginBottom: '0.5rem',
+                                    fontWeight: 500
+                                }}>
+                                    Username
+                                </label>
+                                <input
+                                    type="text"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem',
+                                        borderRadius: '4px',
+                                        border: `1px solid ${theme.border}`,
+                                        backgroundColor: theme.background,
+                                        color: theme.text,
+                                        fontSize: '1rem',
+                                        height: '48px',
+                                        boxSizing: 'border-box'
+                                    }}
+                                    placeholder="Enter admin username"
+                                />
+                            </div>
 
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '0.5rem',
-                  fontWeight: 500
-                }}>
-                  Password
-                </label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    borderRadius: '4px',
-                    border: `1px solid ${theme.border}`,
-                    backgroundColor: theme.background,
-                    color: theme.text,
-                    fontSize: '1rem',
-                    height: '48px',
-                    boxSizing: 'border-box'
-                  }}
-                  placeholder="Enter password"
-                />
-              </div>
+                            <div style={{ marginBottom: '1.5rem' }}>
+                                <label style={{
+                                    display: 'block',
+                                    marginBottom: '0.5rem',
+                                    fontWeight: 500
+                                }}>
+                                    Password
+                                </label>
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem',
+                                        borderRadius: '4px',
+                                        border: `1px solid ${theme.border}`,
+                                        backgroundColor: theme.background,
+                                        color: theme.text,
+                                        fontSize: '1rem',
+                                        height: '48px',
+                                        boxSizing: 'border-box'
+                                    }}
+                                    placeholder="Enter password"
+                                />
+                            </div>
 
-              <button
-                type="submit"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  backgroundColor: theme.primary,
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  fontSize: '1rem',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s',
-                  height: '48px'
-                }}
-              >
-                Log In
-              </button>
-            </form>
-          </div>
-        </main>
+                            <button
+                                type="submit"
+                                style={{
+                                    width: '100%',
+                                    padding: '0.75rem',
+                                    backgroundColor: theme.primary,
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    fontSize: '1rem',
+                                    fontWeight: 500,
+                                    cursor: 'pointer',
+                                    transition: 'background-color 0.2s',
+                                    height: '48px'
+                                }}
+                            >
+                                Log In
+                            </button>
+                        </form>
+                    </div>
+                </main>
 
-        <Footer theme={theme} />
-      </div>
-
-      {/* Security Warning Modal */}
-      {showSecurityWarning && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <span className="material-icons modal-icon">warning</span>
-              <h2 className="modal-title">Security Warning</h2>
+                <Footer theme={theme} />
             </div>
-            <p style={{ marginBottom: '1.5rem', lineHeight: '1.5' }}>
-              You are currently using the default credentials (admin/admin). For security reasons, please change your password immediately.
-            </p>
-            <form onSubmit={handlePasswordChange}>
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '0.5rem',
-                  fontWeight: 500
-                }}>
-                  New Password
-                </label>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    borderRadius: '4px',
-                    border: `1px solid ${theme.border}`,
-                    backgroundColor: theme.background,
-                    color: theme.text,
-                    fontSize: '1rem',
-                    height: '48px',
-                    boxSizing: 'border-box'
-                  }}
-                  placeholder="Enter new password"
-                />
-              </div>
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '0.5rem',
-                  fontWeight: 500
-                }}>
-                  Confirm New Password
-                </label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    borderRadius: '4px',
-                    border: `1px solid ${theme.border}`,
-                    backgroundColor: theme.background,
-                    color: theme.text,
-                    fontSize: '1rem',
-                    height: '48px',
-                    boxSizing: 'border-box'
-                  }}
-                  placeholder="Confirm new password"
-                />
-              </div>
-              {passwordError && (
-                <div style={{
-                  backgroundColor: '#FFEBEE',
-                  color: '#D32F2F',
-                  padding: '0.75rem',
-                  marginBottom: '1rem',
-                  borderRadius: '4px',
-                  fontWeight: 500
-                }}>
-                  {passwordError}
+
+            {/* Security Warning Modal */}
+            {showSecurityWarning && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <span className="material-icons modal-icon">warning</span>
+                            <h2 className="modal-title">Security Warning</h2>
+                        </div>
+                        <p style={{ marginBottom: '1.5rem', lineHeight: '1.5' }}>
+                            You are currently using the default credentials (admin/admin). For security reasons, please change your password immediately.
+                        </p>
+                        <form onSubmit={handlePasswordChange}>
+                            <div style={{ marginBottom: '1rem' }}>
+                                <label style={{
+                                    display: 'block',
+                                    marginBottom: '0.5rem',
+                                    fontWeight: 500
+                                }}>
+                                    New Password
+                                </label>
+                                <input
+                                    type="password"
+                                    value={newPassword}
+                                    onChange={(e) => setNewPassword(e.target.value)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem',
+                                        borderRadius: '4px',
+                                        border: `1px solid ${theme.border}`,
+                                        backgroundColor: theme.background,
+                                        color: theme.text,
+                                        fontSize: '1rem',
+                                        height: '48px',
+                                        boxSizing: 'border-box'
+                                    }}
+                                    placeholder="Enter new password"
+                                />
+                            </div>
+                            <div style={{ marginBottom: '1.5rem' }}>
+                                <label style={{
+                                    display: 'block',
+                                    marginBottom: '0.5rem',
+                                    fontWeight: 500
+                                }}>
+                                    Confirm New Password
+                                </label>
+                                <input
+                                    type="password"
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem',
+                                        borderRadius: '4px',
+                                        border: `1px solid ${theme.border}`,
+                                        backgroundColor: theme.background,
+                                        color: theme.text,
+                                        fontSize: '1rem',
+                                        height: '48px',
+                                        boxSizing: 'border-box'
+                                    }}
+                                    placeholder="Confirm new password"
+                                />
+                            </div>
+                            {passwordError && (
+                                <div style={{
+                                    backgroundColor: '#FFEBEE',
+                                    color: '#D32F2F',
+                                    padding: '0.75rem',
+                                    marginBottom: '1rem',
+                                    borderRadius: '4px',
+                                    fontWeight: 500
+                                }}>
+                                    {passwordError}
+                                </div>
+                            )}
+                            <button
+                                type="submit"
+                                style={{
+                                    width: '100%',
+                                    padding: '0.75rem',
+                                    backgroundColor: theme.primary,
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    fontSize: '1rem',
+                                    fontWeight: 500,
+                                    cursor: 'pointer',
+                                    transition: 'background-color 0.2s',
+                                    height: '48px'
+                                }}
+                            >
+                                Change Password
+                            </button>
+                        </form>
+                    </div>
                 </div>
-              )}
-              <button
-                type="submit"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  backgroundColor: theme.primary,
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  fontSize: '1rem',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s',
-                  height: '48px'
-                }}
-              >
-                Change Password
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-    </>
-  );
+            )}
+        </>
+    );
 }

@@ -664,6 +664,9 @@ export default function Dashboard() {
             display: flex;
             flex-direction: column;
             background: transparent;
+            overflow-y: auto;
+            max-height: 100vh;
+            padding-bottom: 65px; /* Add padding to prevent content from being hidden behind the fixed footer */
           }
           .target-row:hover {
             background-color: ${currentTheme.tableRowHover} !important;
