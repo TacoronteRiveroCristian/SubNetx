@@ -4,7 +4,7 @@
  */
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import BackgroundEffect from '../components/BackgroundEffect';
 import Footer from '../components/Footer';
 import Logo from '../components/Logo';
@@ -158,6 +158,59 @@ export default function ServerManagement() {
     // Get current theme
     const currentTheme = themes[theme];
 
+    // Function to refresh server status
+    const refreshServerStatus = useCallback(async () => {
+        try {
+            console.log('Refreshing server status...');
+            const response = await fetch('/api/vpn/status');
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('Server status response:', data);
+
+            // Update the status based on the API response which includes details.status.state
+            if (data.details && data.details.status && data.details.status.state) {
+                setServerStatus(data.details.status.state === 'running' ? 'running' : 'stopped');
+            } else if (data.status) {
+                // Fallback to older API format if available
+                setServerStatus(data.status as 'running' | 'stopped' | 'unknown');
+            }
+
+            // Si la API devuelve información sobre los certificados, actualizamos el estado
+            if (data.hasCertificates !== undefined) {
+                setServerHasCertificates(data.hasCertificates);
+            }
+
+            // If status is running, try to get configuration
+            if ((data.details && data.details.status && data.details.status.state === 'running') || data.status === 'running') {
+                if (data.config) {
+                    const config = {
+                        vpn_network: data.config.vpn_network || "",
+                        vpn_netmask: data.config.vpn_netmask || "",
+                        openvpn_port: data.config.openvpn_port || 0,
+                        openvpn_proto: data.config.openvpn_proto || "",
+                        public_ip: data.config.public_ip || ""
+                    };
+
+                    setServerConfig(config);
+                    localStorage.setItem('serverConfig', JSON.stringify(config));
+                }
+            }
+        } catch (error) {
+            console.error('Failed to refresh server status:', error);
+        }
+    }, []);
+
+    // Refresh status when navigating to the page
+    useEffect(() => {
+        if (router.asPath === '/server') {
+            refreshServerStatus();
+        }
+    }, [router.asPath, refreshServerStatus]);
+
     // Check authentication on mount and ensure user is admin
     useEffect(() => {
         const checkAuth = async () => {
@@ -173,66 +226,20 @@ export default function ServerManagement() {
                 return;
             }
 
-            // Cargar el estado real del servidor desde la API
-            try {
-                console.log('Fetching server status...');
-                const response = await fetch('/api/vpn/status');
+            // Refresh server status instead of directly fetching
+            await refreshServerStatus();
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const data = await response.json();
-                console.log('Server status response:', data);
-
-                setServerStatus(data.status as 'running' | 'stopped' | 'unknown');
-
-                // Si la API devuelve información sobre los certificados, actualizamos el estado
-                if (data.hasCertificates !== undefined) {
-                    setServerHasCertificates(data.hasCertificates);
-                } else {
-                    // Si la API no proporciona esta información, asumimos que no hay certificados
-                    // Este caso debería manejarse adecuadamente en el backend
-                    setServerHasCertificates(false);
-                }
-
-                // If status is running, try to get configuration
-                if (data.status === 'running' && data.config) {
-                    const config = {
-                        vpn_network: data.config.vpn_network || "",
-                        vpn_netmask: data.config.vpn_netmask || "",
-                        openvpn_port: data.config.openvpn_port || 0,
-                        openvpn_proto: data.config.openvpn_proto || "",
-                        public_ip: data.config.public_ip || ""
-                    };
-
-                    setServerConfig(config);
-
-                    // Guardar la configuración en localStorage para persistencia
-                    localStorage.setItem('serverConfig', JSON.stringify(config));
-                } else {
-                    // Si el servidor no está corriendo, intentamos cargar la configuración del localStorage
-                    const savedConfig = localStorage.getItem('serverConfig');
-                    if (savedConfig) {
-                        setServerConfig(JSON.parse(savedConfig));
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to fetch server status:', error);
-                setServerStatus('unknown');
-
-                // En caso de error, intentamos cargar la configuración del localStorage
+            // Try to load configuration from localStorage if not available from API
+            if (serverStatus !== 'running') {
                 const savedConfig = localStorage.getItem('serverConfig');
                 if (savedConfig) {
                     setServerConfig(JSON.parse(savedConfig));
                 }
-
-                showNotification('Could not connect to server', 'error');
             }
         };
 
         checkAuth();
-    }, [router]);
+    }, [router, refreshServerStatus, serverStatus]);
 
     // Load theme from localStorage
     useEffect(() => {
@@ -354,34 +361,8 @@ export default function ServerManagement() {
                     setServerStatus('stopped');
                     showNotification('Server stopped successfully', 'success');
 
-                    // Verificar que el servidor realmente se detuvo
-                    try {
-                        const verifyResponse = await fetch('/api/vpn/status');
-                        if (verifyResponse.ok) {
-                            const statusData = await verifyResponse.json();
-                            if (statusData.details && statusData.details.status === 'running') {
-                                // Si el servidor sigue ejecutándose, intentar nuevamente
-                                console.log('Server still running after stop command, retrying...');
-
-                                // Use error handling system with retry
-                                handleError(
-                                    `Stopping server`,
-                                    new Error('Server still running after stop command'),
-                                    true,
-                                    async () => {
-                                        await fetch('/api/vpn/stop', {
-                                            method: 'POST',
-                                            headers: {
-                                                'Content-Type': 'application/json'
-                                            }
-                                        });
-                                    }
-                                );
-                            }
-                        }
-                    } catch (verifyError) {
-                        console.error('Error verifying server stop:', verifyError);
-                    }
+                    // Refresh server status to confirm
+                    setTimeout(refreshServerStatus, 500);
                 }
             } else {
                 // Manejar error con el sistema centralizado
@@ -1779,7 +1760,7 @@ export default function ServerManagement() {
                                 fontSize: '0.8rem',
                                 opacity: 0.7
                             }}>
-                                {clientsLoading ? (
+                                {clientsLoading && (
                                     <>
                                         <div style={{
                                             width: '16px',
@@ -1791,14 +1772,7 @@ export default function ServerManagement() {
                                         }} />
                                         <span>Loading...</span>
                                     </>
-                                ) : lastClientUpdate ? (
-                                    <>
-                                        <span className="material-icons" style={{ fontSize: '16px', color: '#4CAF50' }}>
-                                            check_circle
-                                        </span>
-                                        <span>Updated: {lastClientUpdate.toLocaleTimeString()}</span>
-                                    </>
-                                ) : null}
+                                )}
                             </div>
                         </div>
 

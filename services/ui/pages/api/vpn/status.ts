@@ -35,9 +35,26 @@ export default async function handler(
         const data = await response.json();
         console.log(`Response data:`, data);
 
-        // Añadir información sobre la existencia de certificados
-        // Esto se utiliza por la UI para determinar si el servidor tiene una configuración
-        // Nota: En un entorno real, esto debería ser determinado por el backend
+        // Standardize response format for UI consumption
+        let responseData = {
+            success: data.success || false,
+            message: data.message || 'Status retrieved',
+            details: data.details || {},
+            status: 'unknown' as 'running' | 'stopped' | 'unknown',
+            hasCertificates: false
+        };
+
+        // Extract status from different possible API response formats
+        if (data.details && data.details.status) {
+            // New API format
+            const serverState = data.details.status.state;
+            responseData.status = (serverState === 'running') ? 'running' : 'stopped';
+        } else if (data.status) {
+            // Old API format
+            responseData.status = data.status;
+        }
+
+        // Try to get certificate information
         try {
             // Verificar si existe el endpoint auxiliar para detectar certificados
             const certCheckUrl = `${serverConfig.vpnApiBaseUrl}/has-certificates`;
@@ -50,19 +67,19 @@ export default async function handler(
 
             if (certCheckResponse.ok) {
                 const certData = await certCheckResponse.json();
-                data.hasCertificates = certData.hasCertificates;
+                responseData.hasCertificates = certData.hasCertificates;
             } else {
                 // Si el endpoint no existe, asumimos que hay certificados si el servidor está en ejecución
-                data.hasCertificates = data.status === 'running';
+                responseData.hasCertificates = responseData.status === 'running';
             }
         } catch (certError) {
             console.warn('Error checking certificates status:', certError);
             // En caso de error, asumimos que el estado depende de si el servidor está en ejecución
-            data.hasCertificates = data.status === 'running';
+            responseData.hasCertificates = responseData.status === 'running';
         }
 
-        // Return the proxied response with the additional information
-        res.status(response.status).json(data);
+        // Return the standardized response
+        res.status(response.status).json(responseData);
     } catch (error) {
         console.error('VPN Status Proxy error:', error);
 
