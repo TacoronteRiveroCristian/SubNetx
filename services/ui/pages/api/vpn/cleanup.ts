@@ -1,5 +1,8 @@
 /**
- * API proxy endpoint for starting the VPN server
+ * API proxy endpoint for cleaning up the VPN server configuration
+ *
+ * Este archivo maneja la limpieza de la configuración del servidor VPN,
+ * actuando como un proxy entre la UI y el contenedor del servidor VPN.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -16,8 +19,8 @@ export default async function handler(
 
     try {
         // Build the target URL
-        const targetUrl = buildServerUrl(serverConfig.vpnEndpoints.start);
-        console.log(`Proxying VPN start request to: ${targetUrl}`);
+        const targetUrl = buildServerUrl(serverConfig.vpnEndpoints.cleanup);
+        console.log(`Proxying VPN cleanup request to: ${targetUrl}`);
 
         // Forward the request to the target
         const response = await fetch(targetUrl, {
@@ -38,11 +41,11 @@ export default async function handler(
         // Return the proxied response
         res.status(response.status).json(data);
     } catch (error) {
-        console.error('VPN Start Proxy error:', error);
+        console.error('VPN Cleanup Proxy error:', error);
 
         res.status(500).json({
             success: false,
-            message: 'Failed to start VPN server',
+            message: 'Failed to clean up VPN server configuration',
             error: error instanceof Error ? error.message : String(error)
         });
     }

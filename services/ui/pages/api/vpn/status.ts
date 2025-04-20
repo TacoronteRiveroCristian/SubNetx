@@ -3,9 +3,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-
-// The internal URL to the VPN container (only accessible from server-side)
-const VPN_API_URL = 'http://subnetx_vpn:8000';
+import { buildServerUrl, serverConfig } from '../../../lib/apiConfig';
 
 export default async function handler(
     req: NextApiRequest,
@@ -18,7 +16,7 @@ export default async function handler(
 
     try {
         // Build the target URL
-        const targetUrl = `${VPN_API_URL}/api/vpn/status`;
+        const targetUrl = buildServerUrl(serverConfig.vpnEndpoints.status);
         console.log(`Proxying VPN status request to: ${targetUrl}`);
 
         // Forward the request to the target
@@ -42,7 +40,8 @@ export default async function handler(
         // Nota: En un entorno real, esto debería ser determinado por el backend
         try {
             // Verificar si existe el endpoint auxiliar para detectar certificados
-            const certCheckResponse = await fetch(`${VPN_API_URL}/api/vpn/has-certificates`, {
+            const certCheckUrl = `${serverConfig.vpnApiBaseUrl}/has-certificates`;
+            const certCheckResponse = await fetch(certCheckUrl, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',

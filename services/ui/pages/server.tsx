@@ -25,6 +25,7 @@ const themes = {
         statusIndicator: '#E3F2FD',
         navbar: '#ffffff',
         buttonHover: '#f0f0f0',
+        borderLight: '#ccc',
     },
     dark: {
         background: '#1a1a1a',
@@ -40,6 +41,7 @@ const themes = {
         statusIndicator: '#1a237e',
         navbar: '#1a1a1a',
         buttonHover: '#2d2d2d',
+        borderLight: '#444',
     },
 };
 
@@ -97,6 +99,61 @@ export default function ServerManagement() {
         type: 'success' | 'error';
         visible: boolean;
     }>({ message: '', type: 'success', visible: false });
+
+    // Error handling state
+    const [errorLog, setErrorLog] = useState<{ message: string, timestamp: Date, retryCount: number }[]>([]);
+
+    // Client loading states
+    const [clientsLoading, setClientsLoading] = useState(false);
+    const [lastClientUpdate, setLastClientUpdate] = useState<Date | null>(null);
+
+    // Delete client states
+    const [deletingClient, setDeletingClient] = useState<string | null>(null);
+    const [deleteClientConfirmOpen, setDeleteClientConfirmOpen] = useState(false);
+    const [clientToDelete, setClientToDelete] = useState<string>('');
+
+    // Centralized error handler function
+    const handleError = (operation: string, error: any, retry?: boolean, retryFn?: () => Promise<void>, maxRetries = 3) => {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error(`Error during ${operation}:`, error);
+
+        // Add to error log
+        const newError = {
+            message: `${operation} failed: ${errorMessage}`,
+            timestamp: new Date(),
+            retryCount: 0
+        };
+
+        setErrorLog(prev => {
+            // Limit length of error log to prevent it growing too large
+            const updatedLog = [...prev, newError];
+            if (updatedLog.length > 10) {
+                return updatedLog.slice(updatedLog.length - 10);
+            }
+            return updatedLog;
+        });
+
+        // Show notification
+        showNotification(`${operation} failed: ${errorMessage}`, 'error');
+
+        // Attempt retry if specified
+        if (retry && retryFn) {
+            const existingErrors = errorLog.filter(e => e.message.startsWith(`${operation} failed`));
+            const retryCount = existingErrors.length;
+
+            if (retryCount < maxRetries) {
+                console.log(`Retrying ${operation} (attempt ${retryCount + 1}/${maxRetries})...`);
+                setTimeout(() => {
+                    retryFn().catch(retryError => {
+                        handleError(`${operation} (retry ${retryCount + 1})`, retryError);
+                    });
+                }, 2000 * (retryCount + 1)); // Exponential backoff
+            } else {
+                console.log(`Maximum retry attempts (${maxRetries}) reached for ${operation}`);
+                showNotification(`Maximum retry attempts reached for ${operation}`, 'error');
+            }
+        }
+    };
 
     // Get current theme
     const currentTheme = themes[theme];
@@ -256,33 +313,30 @@ export default function ServerManagement() {
         setLoading(true);
 
         try {
-            // Mantener la simulación solo para la operación 'edit'
-            if (operation === 'edit') {
-                // Simulate API call with timeout for edit operation only
-                setTimeout(() => {
-                    setLoading(false);
-                }, 1500);
-                return;
-            }
-
-            // Configurar endpoint según la operación
             let endpoint = '';
-            let body = null;
-
             switch (operation) {
-                case 'start': endpoint = '/api/vpn/start'; break;
-                case 'stop': endpoint = '/api/vpn/stop'; break;
+                case 'start':
+                    endpoint = '/api/vpn/start';
+                    break;
+                case 'stop':
+                    endpoint = '/api/vpn/stop';
+                    break;
+                case 'edit':
+                    // Simulate API call with timeout for edit operation only
+                    setTimeout(() => {
+                        setLoading(false);
+                    }, 1500);
+                    return;
+                default:
+                    throw new Error(`Unsupported operation: ${operation}`);
             }
 
-            console.log(`Calling VPN endpoint: ${endpoint}`);
-
-            // Realizar la llamada a la API usando el nuevo endpoint de proxy
+            // Realizar la llamada a la API
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
-                },
-                body: body ? JSON.stringify(body) : null
+                }
             });
 
             if (!response.ok) {
@@ -299,15 +353,45 @@ export default function ServerManagement() {
                 } else if (operation === 'stop') {
                     setServerStatus('stopped');
                     showNotification('Server stopped successfully', 'success');
+
+                    // Verificar que el servidor realmente se detuvo
+                    try {
+                        const verifyResponse = await fetch('/api/vpn/status');
+                        if (verifyResponse.ok) {
+                            const statusData = await verifyResponse.json();
+                            if (statusData.details && statusData.details.status === 'running') {
+                                // Si el servidor sigue ejecutándose, intentar nuevamente
+                                console.log('Server still running after stop command, retrying...');
+
+                                // Use error handling system with retry
+                                handleError(
+                                    `Stopping server`,
+                                    new Error('Server still running after stop command'),
+                                    true,
+                                    async () => {
+                                        await fetch('/api/vpn/stop', {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json'
+                                            }
+                                        });
+                                    }
+                                );
+                            }
+                        }
+                    } catch (verifyError) {
+                        console.error('Error verifying server stop:', verifyError);
+                    }
                 }
             } else {
-                // Manejar error
-                console.error('Error:', data.error || data.message);
-                showNotification(data.error || data.message || 'Operation failed', 'error');
+                // Manejar error con el sistema centralizado
+                handleError(`${operation} server`, new Error(data.error || data.message || 'Operation failed'));
             }
         } catch (error) {
-            console.error('Failed to perform operation:', error);
-            showNotification('Failed to connect to server', 'error');
+            // Usar el sistema centralizado de manejo de errores
+            handleError(`${operation} server`, error, operation === 'stop', async () => {
+                await handleServerOperation(operation);
+            });
         } finally {
             setLoading(false);
         }
@@ -319,8 +403,8 @@ export default function ServerManagement() {
         setDeleteError(null);
 
         try {
-            // Call the API endpoint to delete configuration
-            const response = await fetch('/api/vpn/reset', {
+            // Call the API endpoint to cleanup configuration
+            const response = await fetch('/api/vpn/cleanup', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -354,18 +438,18 @@ export default function ServerManagement() {
                 // Eliminar la configuración del localStorage
                 localStorage.removeItem('serverConfig');
 
-                showNotification('Server configuration deleted successfully', 'success');
+                showNotification('Server configuration cleaned up successfully', 'success');
 
                 // Close the modal
                 setDeleteConfirmModalOpen(false);
             } else {
-                setDeleteError(data.message || 'Error deleting server configuration');
-                showNotification('Error deleting server configuration: ' + (data.message || 'Unknown error'), 'error');
+                const errorMsg = data.message || 'Error cleaning up server configuration';
+                setDeleteError(errorMsg);
+                handleError('Cleaning up server configuration', new Error(errorMsg));
             }
         } catch (error) {
-            console.error('Failed to delete configuration:', error);
             setDeleteError('Failed to connect to server');
-            showNotification('Failed to connect to server', 'error');
+            handleError('Cleaning up server configuration', error);
         } finally {
             setDeleteProcessing(false);
         }
@@ -497,21 +581,55 @@ export default function ServerManagement() {
     // Function to load clients
     const loadClients = async () => {
         try {
+            setClientsLoading(true);
             const response = await fetch('/api/vpn/clients');
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
+
             const data = await response.json();
-            setClients(data);
+            console.log('Clients data:', data);
+
+            // Transform API response to client array
+            if (data.details && data.details.clients) {
+                const clientsObject = data.details.clients;
+                const clientsArray = Object.keys(clientsObject).map(name => ({
+                    name: name,
+                    ip: clientsObject[name].ip_address || clientsObject[name].ip || '',
+                    created_at: clientsObject[name].creation_date || clientsObject[name].created_at || new Date().toISOString()
+                }));
+                setClients(clientsArray);
+            } else if (Array.isArray(data)) {
+                // Handle case where data is already an array
+                setClients(data);
+            } else {
+                // If data format is unexpected, set empty array
+                console.warn('Unexpected clients data format:', data);
+                setClients([]);
+            }
+
+            setLastClientUpdate(new Date());
         } catch (error) {
-            console.error('Failed to load clients:', error);
-            showNotification('Failed to load clients list', 'error');
+            // Use centralized error handling
+            handleError('Loading clients', error, true, loadClients);
+            // If there's an error, set clients to an empty array to prevent issues
+            setClients([]);
+        } finally {
+            setClientsLoading(false);
         }
     };
 
-    // Load clients on mount and after client operations
+    // Setup clients loading only on mount
     useEffect(() => {
-        if (serverStatus === 'running') {
+        // Load clients just once on component mount
+        loadClients();
+
+        // No automatic refresh interval
+    }, []);
+
+    // Also load clients after server status changes or operations that affect them
+    useEffect(() => {
+        if (serverStatus !== 'unknown') {
             loadClients();
         }
     }, [serverStatus]);
@@ -557,9 +675,9 @@ export default function ServerManagement() {
         }
 
         // Check if name or IP already exists
-        const existingClient = clients.find(
-            client => client.name === newClientName || client.ip === newClientIP
-        );
+        const existingClient = Array.isArray(clients)
+            ? clients.find(client => client.name === newClientName || client.ip === newClientIP)
+            : undefined;
         if (existingClient) {
             if (existingClient.name === newClientName) {
                 setClientError(`A client with name ${newClientName} already exists`);
@@ -591,6 +709,8 @@ export default function ServerManagement() {
             setNewClientName('');
             setNewClientIP('');
             loadClients(); // Reload clients list
+            showNotification(`Client ${newClientName} created successfully`, 'success');
+            setCreateClientModalOpen(false); // Close the modal
         } catch (error) {
             setClientError(error instanceof Error ? error.message : 'Error creating client');
         }
@@ -1631,26 +1751,52 @@ export default function ServerManagement() {
 
                     {/* Add clients list section after server info card */}
                     <div style={{
-                        backgroundColor: currentTheme.cardBackground,
-                        border: `1px solid ${currentTheme.border}`,
+                        backgroundColor: `${currentTheme.cardBackground}`,
                         borderRadius: '12px',
+                        border: `1px solid ${currentTheme.border}`,
                         padding: '1.5rem',
-                        marginBottom: '2rem',
-                        color: currentTheme.text
+                        gridColumn: 'span 2',
+                        height: 'auto',
+                        transition: 'all 0.3s ease'
                     }}>
-                        <h2 style={{
-                            margin: '0 0 1.5rem 0',
-                            fontSize: '1.3rem',
+                        <div style={{
                             display: 'flex',
+                            justifyContent: 'space-between',
                             alignItems: 'center',
-                            gap: '8px',
-                            color: currentTheme.text
+                            marginBottom: '1.5rem'
                         }}>
-                            <span className="material-icons" style={{ color: currentTheme.secondary }}>
-                                people
-                            </span>
-                            Created Clients
-                        </h2>
+                            <h2 style={{ margin: 0, fontSize: '1.4rem' }}>VPN Clients</h2>
+
+                            {/* Client loading indicators */}
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                fontSize: '0.8rem',
+                                opacity: 0.7
+                            }}>
+                                {clientsLoading ? (
+                                    <>
+                                        <div style={{
+                                            width: '16px',
+                                            height: '16px',
+                                            border: `2px solid ${currentTheme.borderLight}`,
+                                            borderTop: `2px solid ${currentTheme.primary}`,
+                                            borderRadius: '50%',
+                                            animation: 'spin 1s linear infinite'
+                                        }} />
+                                        <span>Loading...</span>
+                                    </>
+                                ) : lastClientUpdate ? (
+                                    <>
+                                        <span className="material-icons" style={{ fontSize: '16px', color: '#4CAF50' }}>
+                                            check_circle
+                                        </span>
+                                        <span>Updated: {lastClientUpdate.toLocaleTimeString()}</span>
+                                    </>
+                                ) : null}
+                            </div>
+                        </div>
 
                         {clients.length > 0 ? (
                             <div style={{
@@ -1693,7 +1839,7 @@ export default function ServerManagement() {
                                 padding: '2rem',
                                 opacity: 0.7
                             }}>
-                                No clients connected
+                                No clients created
                             </div>
                         )}
                     </div>
@@ -2321,6 +2467,9 @@ export default function ServerManagement() {
                     </div>
                 </div>
             )}
+
+            {/* Delete Client Confirmation Modal */}
+            {/* Modal removido según se solicitó */}
         </>
     );
 }

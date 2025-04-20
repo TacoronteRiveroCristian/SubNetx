@@ -1,11 +1,9 @@
 /**
- * API proxy endpoint for VPN setup operation
+ * API proxy endpoint for setting up the VPN server
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-
-// The internal URL to the VPN container (only accessible from server-side)
-const VPN_API_URL = 'http://subnetx_vpn:8000';
+import { buildServerUrl, serverConfig } from '../../../lib/apiConfig';
 
 export default async function handler(
     req: NextApiRequest,
@@ -17,10 +15,12 @@ export default async function handler(
     }
 
     try {
+        // Get configuration from request body
+        const config = req.body;
+
         // Build the target URL
-        const targetUrl = `${VPN_API_URL}/api/vpn/setup`;
+        const targetUrl = buildServerUrl(serverConfig.vpnEndpoints.setup);
         console.log(`Proxying VPN setup request to: ${targetUrl}`);
-        console.log('Request body:', req.body);
 
         // Forward the request to the target
         const response = await fetch(targetUrl, {
@@ -29,7 +29,7 @@ export default async function handler(
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
             },
-            body: JSON.stringify(req.body)
+            body: JSON.stringify(config)
         });
 
         // Log the response status

@@ -1,30 +1,28 @@
 /**
- * API proxy endpoint for VPN reset operation
+ * API proxy endpoint for resetting the VPN server configuration
  *
  * Este archivo maneja la eliminación de toda la configuración del servidor VPN,
  * actuando como un proxy entre la UI y el contenedor del servidor VPN.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-
-// La URL interna al contenedor VPN (solo accesible del lado del servidor)
-const VPN_API_URL = 'http://subnetx_vpn:8000';
+import { buildServerUrl, serverConfig } from '../../../lib/apiConfig';
 
 export default async function handler(
     req: NextApiRequest,
     res: NextApiResponse
 ) {
-    // Solo permitir solicitudes POST
+    // Only allow POST requests
     if (req.method !== 'POST') {
         return res.status(405).json({ success: false, error: 'Method not allowed' });
     }
 
     try {
-        // Construir la URL destino
-        const targetUrl = `${VPN_API_URL}/api/vpn/reset`;
-        console.log(`Enviando solicitud de reset al VPN: ${targetUrl}`);
+        // Build the target URL
+        const targetUrl = buildServerUrl(serverConfig.vpnEndpoints.reset);
+        console.log(`Proxying VPN reset request to: ${targetUrl}`);
 
-        // Enviar la solicitud al destino
+        // Forward the request to the target
         const response = await fetch(targetUrl, {
             method: 'POST',
             headers: {
@@ -33,21 +31,21 @@ export default async function handler(
             }
         });
 
-        // Registrar el estado de la respuesta
-        console.log(`Estado de respuesta: ${response.status}`);
+        // Log the response status
+        console.log(`Response status: ${response.status}`);
 
-        // Obtener los datos de la respuesta
+        // Get the response data
         const data = await response.json();
-        console.log(`Datos de respuesta:`, data);
+        console.log(`Response data:`, data);
 
-        // Devolver la respuesta proxeada
+        // Return the proxied response
         res.status(response.status).json(data);
     } catch (error) {
-        console.error('Error en proxy VPN Reset:', error);
+        console.error('VPN Reset Proxy error:', error);
 
         res.status(500).json({
             success: false,
-            message: 'Failed to delete VPN server configuration',
+            message: 'Failed to reset VPN server configuration',
             error: error instanceof Error ? error.message : String(error)
         });
     }

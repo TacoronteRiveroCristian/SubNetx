@@ -59,29 +59,29 @@ services:
   #   networks:
   #     - subnetx
 
-  # ui:
-  #   build:
-  #     context: .
-  #     dockerfile: ./docker/ui.Dockerfile
-  #   container_name: subnetx_ui
-  #   volumes:
-  #     - ./ui:/app
-  #     - ui_node_modules:/app/node_modules
-  #     - ui_next_cache:/app/.next
-  #   ports:
-  #     - "3200:3200"
-  #   environment:
-  #     - NODE_ENV=development
-  #     - NEXT_PUBLIC_API_URL=http://subnetx_vpn:8000
-  #     - WATCHPACK_POLLING=true
-  #     - CHOKIDAR_USEPOLLING=true
-  #     - NEXT_TELEMETRY_DISABLED=1
-  #     - NODE_OPTIONS=--max_old_space_size=4096
-  #   networks:
-  #     - subnetx
-  #   depends_on:
-  #     - subnetx
-  #   restart: unless-stopped
+  ui:
+    build:
+      context: ./services/ui
+      dockerfile: Dockerfile
+    container_name: subnetx_ui
+    volumes:
+      - ./services/ui:/app
+      - ui_node_modules:/app/node_modules
+      - ui_next_cache:/app/.next
+    ports:
+      - "3200:3200"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://subnetx_vpn:${VPN_API_PORT}
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+      - NEXT_TELEMETRY_DISABLED=1
+      - NODE_OPTIONS=--max_old_space_size=4096
+    networks:
+      - subnetx
+    depends_on:
+      - subnetx
+    restart: unless-stopped
 
   postgres:
     image: postgres:16
@@ -106,3 +106,7 @@ services:
 networks:
   subnetx:
     driver: bridge
+
+volumes:
+  ui_node_modules:
+  ui_next_cache:

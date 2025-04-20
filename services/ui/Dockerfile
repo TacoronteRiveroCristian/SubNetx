@@ -18,7 +18,7 @@ RUN echo "ALL ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 WORKDIR /app
 
 # Copy all application files
-COPY ui/ .
+COPY . .
 
 # Install dependencies
 RUN npm install --omit=optional
