@@ -12,6 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
+from fastapi_mcp import FastApiMCP
 
 from scripts.api.routers import clients, server
 from scripts.api.routers.utils import APIResponse, ErrorResponse
@@ -86,6 +87,8 @@ async def root() -> APIResponse:
         details={"version": app.version},
     )
 
+mcp = FastApiMCP(app)
+mcp.mount()
 
 if __name__ == "__main__":
     uvicorn.run(
