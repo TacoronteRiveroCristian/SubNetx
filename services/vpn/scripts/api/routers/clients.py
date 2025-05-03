@@ -127,6 +127,38 @@ async def create_client(client: ClientConfig) -> APIResponse:
     :return: Result of the operation
     :rtype: APIResponse
     """
+    # First verify that PKI is properly initialized
+    pki_verification = run_command(
+        ["/app/scripts/openvpn/client/openvpn-client-verify-pki.sh"]
+    )
+
+    if not pki_verification["success"]:
+        # Extract meaningful error message from output if possible
+        error_message = "PKI verification failed. "
+        if "Error: " in pki_verification["output"]:
+            for line in pki_verification["output"].split("\n"):
+                if line.startswith("Error:"):
+                    error_message += line
+                    break
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,  # Changed to 400 to indicate client error
+            detail=ErrorResponse(
+                success=False,
+                message="Server not properly configured for client creation",
+                details={
+                    "error": error_message,
+                    "resolution": "Run server setup and start the server before creating clients",
+                    "sequence": [
+                        "1. POST /server/setup - Configure the server",
+                        "2. POST /server/start - Start the server",
+                        "3. POST /clients/ - Create clients"
+                    ]
+                },
+            ).dict(),
+        )
+
+    # If PKI verification passed, proceed with client creation
     result = run_command(
         [
             "/app/scripts/openvpn/client/openvpn-client-new.sh",

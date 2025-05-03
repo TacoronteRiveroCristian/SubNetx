@@ -355,3 +355,70 @@
 - **Planes de recuperación**:
   - No documentados explícitamente, pero la arquitectura permite reinicio de servicios independientes
   - Supervisord proporciona reinicio automático de procesos fallidos
+
+## Troubleshooting y Resolución de Problemas
+
+### Caso de Estudio: Error en la Creación de Clientes VPN
+
+- **Problema Detectado**:
+  - Error al intentar crear clientes VPN a través de la API
+  - Mensajes de error indicando la falta del archivo `serial` en el directorio de Easy-RSA
+  - Infraestructura PKI incompleta que impedía la generación de certificados para clientes
+
+- **Causa Raíz**:
+  - Secuencia de inicialización incorrecta: se intentaba crear clientes sin haber realizado previamente la configuración del servidor
+  - Falta de validaciones en la API para verificar prerrequisitos antes de ejecutar operaciones
+  - Ausencia de una infraestructura PKI completa (CA, certificados, archivo serial)
+
+- **Proceso de Resolución**:
+  1. **Análisis Sistemático**:
+     - Inspección de logs y mensajes de error
+     - Verificación de la estructura de directorios y archivos
+     - Análisis del código en scripts relevantes
+
+  2. **Limpieza del Entorno**:
+     - Eliminación de certificados y archivos de configuración inconsistentes
+     - Detención de procesos relacionados con OpenVPN
+     - Reinicio de contenedores para asegurar un estado limpio
+
+  3. **Aplicación de la Secuencia Correcta**:
+     - Configuración inicial del servidor (setup) para generar la infraestructura PKI completa
+     - Inicio del servidor VPN
+     - Creación de clientes VPN
+
+  4. **Verificación de la Solución**:
+     - Pruebas completas de creación de múltiples clientes
+     - Verificación de conectividad y configuración
+     - Pruebas de detención y reinicio del servicio
+
+  5. **Documentación de la Solución**:
+     - Creación de documentación detallada sobre la secuencia correcta de operaciones
+     - Registro de pasos específicos para resolver problemas similares
+
+- **Mejoras Implementadas**:
+  - **Verificaciones Adicionales**: Validación de prerrequisitos antes de intentar operaciones que dependen de configuración previa
+  - **Mensajes de Error Mejorados**: Errores más descriptivos que indican la secuencia correcta
+  - **Procedimiento Documentado**: Guía paso a paso para la configuración inicial y creación de clientes
+
+- **Lecciones Aprendidas**:
+  - La importancia de seguir la secuencia correcta: setup → start → client creation
+  - Necesidad de validaciones más robustas en componentes interdependientes
+  - Valor de mensajes de error descriptivos que indican acciones correctivas
+
+- **Protocolo de Inicialización Recomendado**:
+  ```bash
+  # 1. Configuración inicial del servidor
+  docker exec subnetx_vpn curl -X POST http://localhost:9020/server/setup -H "Content-Type: application/json" -d '{...}'
+
+  # 2. Inicio del servidor VPN
+  docker exec subnetx_vpn curl -X POST http://localhost:9020/server/start
+
+  # 3. Creación de clientes
+  docker exec subnetx_vpn curl -X POST http://localhost:9020/clients/ -H "Content-Type: application/json" -d '{...}'
+  ```
+
+- **Impacto de la Solución**:
+  - Eliminación de errores en la creación de clientes VPN
+  - Mejora en la robustez del sistema
+  - Mayor claridad para los desarrolladores sobre las dependencias entre componentes
+  - Base para futuras mejoras en la validación y gestión de errores

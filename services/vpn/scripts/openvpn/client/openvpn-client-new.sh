@@ -2,7 +2,14 @@
 # Description: Generates a certificate and configuration for a new OpenVPN client with a fixed IP.
 # Uses environment variables defined in the Dockerfile for consistency.
 
-# Check if configuration file exists
+# First, verify that PKI infrastructure is properly initialized
+if ! /app/scripts/openvpn/client/openvpn-client-verify-pki.sh; then
+    echo "Error: PKI verification failed. Cannot create client."
+    echo "Please run openvpn-setup.sh first and ensure the server is properly configured."
+    exit 1
+fi
+
+# Check if configuration file exists (redundant but kept for backward compatibility)
 if [ ! -f "$OPENVPN_DIR/vpn_config.json" ]; then
     echo "Error: Configuration file not found at $OPENVPN_DIR/vpn_config.json"
     echo "Run openvpn-setup.sh first to generate the configuration."
