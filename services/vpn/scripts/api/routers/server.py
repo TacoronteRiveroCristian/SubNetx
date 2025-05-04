@@ -35,7 +35,7 @@ class SetupConfig(BaseModel):
     port: str = "1194"
     proto: str = "udp"
     tun: str = "tun0"
-    ip: str = "localhost"
+    ip: str
 
 
 @router.get("/status", response_model=APIResponse)

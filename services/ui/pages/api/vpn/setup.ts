@@ -18,9 +18,20 @@ export default async function handler(
         // Get configuration from request body
         const config = req.body;
 
+        // Transform property names to match what the VPN API expects
+        const transformedConfig = {
+            red: config.vpn_network,
+            mask: config.vpn_netmask,
+            port: config.openvpn_port.toString(),
+            proto: config.openvpn_proto,
+            tun: config.tun_device || "tun0",
+            ip: config.public_ip
+        };
+
         // Build the target URL
         const targetUrl = buildServerUrl(serverConfig.vpnEndpoints.setup);
         console.log(`Proxying VPN setup request to: ${targetUrl}`);
+        console.log(`Transformed request body:`, transformedConfig);
 
         // Forward the request to the target
         const response = await fetch(targetUrl, {
@@ -29,7 +40,7 @@ export default async function handler(
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
             },
-            body: JSON.stringify(config)
+            body: JSON.stringify(transformedConfig)
         });
 
         // Log the response status

@@ -25,6 +25,30 @@ OPENVPN_PROTO=$(jq -r '.openvpn_proto' "$OPENVPN_DIR/vpn_config.json")
 TUN_DEVICE=$(jq -r '.tun_device' "$OPENVPN_DIR/vpn_config.json")
 PUBLIC_IP=$(jq -r '.public_ip' "$OPENVPN_DIR/vpn_config.json")
 
+# Verificar explícitamente el valor de PUBLIC_IP
+if [ "$PUBLIC_IP" = "localhost" ] || [ "$PUBLIC_IP" = "127.0.0.1" ]; then
+    echo "ADVERTENCIA: La IP pública en el archivo de configuración es localhost o 127.0.0.1"
+    echo "Intentando obtener la IP pública automáticamente..."
+
+    # Intentar obtener la IP pública automáticamente
+    AUTO_IP=$(curl -s https://api.ipify.org || wget -qO- https://api.ipify.org)
+
+    if [ -n "$AUTO_IP" ] && [ "$AUTO_IP" != "localhost" ] && [ "$AUTO_IP" != "127.0.0.1" ]; then
+        echo "Se obtuvo la IP pública automáticamente: $AUTO_IP"
+        PUBLIC_IP="$AUTO_IP"
+        # Actualizar el archivo JSON con la IP correcta
+        TMP_JSON=$(mktemp)
+        jq --arg ip "$PUBLIC_IP" '.public_ip = $ip' "$OPENVPN_DIR/vpn_config.json" > "$TMP_JSON" && mv "$TMP_JSON" "$OPENVPN_DIR/vpn_config.json"
+        echo "Archivo de configuración actualizado con la IP pública: $PUBLIC_IP"
+    else
+        echo "No se pudo obtener la IP pública automáticamente."
+        echo "Por favor, proporcione una IP pública válida al ejecutar openvpn-setup.sh"
+    fi
+fi
+
+# Debug: mostrar el valor de PUBLIC_IP
+echo "DEBUG: Valor final de PUBLIC_IP: $PUBLIC_IP"
+
 # Verify that all required variables were loaded
 if [ -z "$VPN_NETWORK" ] || [ -z "$VPN_NETMASK" ] || [ -z "$OPENVPN_PORT" ] || \
    [ -z "$OPENVPN_PROTO" ] || [ -z "$TUN_DEVICE" ] || [ -z "$PUBLIC_IP" ]; then
@@ -106,6 +130,13 @@ CLIENT_CONFIG_COPY="$CERTS_DIR/clients/$CLIENT_NAME/$CLIENT_NAME.ovpn" # Copy in
 
 echo "Creating client configuration file: $CLIENT_CONFIG"
 echo "Using PUBLIC_IP: $PUBLIC_IP for the remote server"
+
+# Asegurarse de que PUBLIC_IP no sea localhost antes de crear el archivo
+if [ "$PUBLIC_IP" = "localhost" ] || [ "$PUBLIC_IP" = "127.0.0.1" ]; then
+    echo "ERROR: La IP pública aún es localhost. No se puede crear un archivo de configuración válido."
+    echo "Ejecute openvpn-setup.sh con el parámetro --ip correcto."
+    exit 1
+fi
 
 cat > "$CLIENT_CONFIG" <<EOF
 client

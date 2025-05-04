@@ -36,26 +36,32 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         --red)
             VPN_NETWORK="$2"
+            export VPN_NETWORK
             shift 2
             ;;
         --mask)
             VPN_NETMASK="$2"
+            export VPN_NETMASK
             shift 2
             ;;
         --port)
             OPENVPN_PORT="$2"
+            export OPENVPN_PORT
             shift 2
             ;;
         --proto)
             OPENVPN_PROTO="$2"
+            export OPENVPN_PROTO
             shift 2
             ;;
         --tun)
             TUN_DEVICE="$2"
+            export TUN_DEVICE
             shift 2
             ;;
         --ip)
             PUBLIC_IP="$2"
+            export PUBLIC_IP
             shift 2
             ;;
         --help)
@@ -88,18 +94,15 @@ fi
 # Validate required environment variables
 # ---------------------------
 required_vars=(
-    "VPN_NETWORK"
-    "VPN_NETMASK"
-    "OPENVPN_PORT"
-    "OPENVPN_PROTO"
-    "TUN_DEVICE"
-    "PUBLIC_IP"
     "OPENVPN_DIR"
     "CERTS_DIR"
     "SERVER_CONF_DIR"
     "EASYRSA_DIR"
     "LOGS_DIR"
 )
+
+# Ya no verificamos VPN_NETWORK, VPN_NETMASK, OPENVPN_PORT, OPENVPN_PROTO, TUN_DEVICE, PUBLIC_IP
+# porque ya se establecieron como parámetros y se exportaron como variables de entorno
 
 missing_vars=() # Initialize array for missing variables
 
@@ -116,6 +119,15 @@ if [ ${#missing_vars[@]} -ne 0 ]; then # If there are missing variables
     /app/scripts/utils/openvpn-help.sh # Show help
     exit 1 # Exit with error
 fi
+
+# Mostrar los valores que se van a utilizar
+echo "Configurando OpenVPN con los siguientes valores:"
+echo "VPN Network: $VPN_NETWORK"
+echo "VPN Netmask: $VPN_NETMASK"
+echo "OpenVPN Port: $OPENVPN_PORT"
+echo "OpenVPN Protocol: $OPENVPN_PROTO"
+echo "TUN Device: $TUN_DEVICE"
+echo "Public IP: $PUBLIC_IP"
 
 # Create OpenVPN directory if it doesn't exist
 mkdir -p "$OPENVPN_DIR"
