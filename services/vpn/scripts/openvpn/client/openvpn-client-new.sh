@@ -105,6 +105,7 @@ CLIENT_CONFIG="$CLIENTS_DIR/$CLIENT_NAME.ovpn" # Path to configuration file
 CLIENT_CONFIG_COPY="$CERTS_DIR/clients/$CLIENT_NAME/$CLIENT_NAME.ovpn" # Copy in centralized directory
 
 echo "Creating client configuration file: $CLIENT_CONFIG"
+echo "Using PUBLIC_IP: $PUBLIC_IP for the remote server"
 
 cat > "$CLIENT_CONFIG" <<EOF
 client
@@ -153,4 +154,5 @@ chmod 644 "$CERTS_DIR/clients/$CLIENT_NAME/$CLIENT_NAME.crt" "$CERTS_DIR/ca.crt"
 echo "Client created successfully with fixed IP: $CLIENT_IP"
 echo "OVPN file (all embedded): $CLIENT_CONFIG"
 echo "Backup copy in: $CLIENT_CONFIG_COPY"
+echo "Remote server configured as: $PUBLIC_IP:$OPENVPN_PORT"
 echo "All certificates and client files have been saved in: $CERTS_DIR/clients/$CLIENT_NAME"

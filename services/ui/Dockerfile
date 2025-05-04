@@ -17,18 +17,21 @@ RUN echo "ALL ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 # Create app directory
 WORKDIR /app
 
-# Copy all application files
+# Copy package files first for better caching
+COPY package*.json ./
+COPY prisma ./prisma/
+
+# Copy the entrypoint script
+COPY scripts/docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# Install dependencies only if not using volume mount
+# This will be overridden by the entrypoint script when using volume mounts
+RUN npm install --omit=optional && \
+    npx prisma generate
+
+# Copy the rest of the application
 COPY . .
-
-# Install dependencies
-RUN npm install --omit=optional
-
-# Create fix-permissions script
-RUN echo '#!/bin/bash\n\
-    chown -R node:node /app/node_modules\n\
-    chmod -R 755 /app/node_modules\n\
-    exec "$@"' > /usr/local/bin/fix-permissions.sh && \
-    chmod +x /usr/local/bin/fix-permissions.sh
 
 # Create startup script
 RUN echo '#!/bin/bash\n\
@@ -38,8 +41,8 @@ RUN echo '#!/bin/bash\n\
     exec npm run dev' > /usr/local/bin/start.sh && \
     chmod +x /usr/local/bin/start.sh
 
-# Set entrypoint to fix permissions before running the command
-ENTRYPOINT ["/usr/local/bin/fix-permissions.sh"]
+# Set entrypoint to the new script
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 # Default command
 CMD ["/usr/local/bin/start.sh"]
